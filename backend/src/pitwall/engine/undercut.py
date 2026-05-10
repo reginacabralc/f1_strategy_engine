@@ -1,4 +1,4 @@
-"""Undercut-viability scoring — master plan §6.4–6.8.
+"""Undercut-viability scoring - master plan §6.4-6.8.
 
 The sole public entry point is :func:`evaluate_undercut`.  It takes the
 current :class:`~pitwall.engine.state.RaceState`, an attacker/defender
@@ -7,7 +7,7 @@ active :class:`~pitwall.engine.projection.PacePredictor`.  It returns an
 :class:`UndercutDecision` that encapsulates the score, confidence, and
 whether an alert should be broadcast.
 
-Math (§6.4–6.7)
+Math (§6.4-6.7)
 ----------------
 
 1. Project the defender's lap times k=1..K_MAX laps ahead (on worn tyres).
@@ -26,7 +26,6 @@ from typing import cast
 
 from pitwall.engine.pit_loss import DEFAULT_PIT_LOSS_MS
 from pitwall.engine.projection import (
-    COLD_TYRE_PENALTIES_MS,
     Compound,
     PaceContext,
     PacePredictor,
@@ -136,7 +135,7 @@ def evaluate_undercut(
         gap_actual_ms=attacker.gap_to_ahead_ms,
     )
 
-    def _insufficient(**kwargs: object) -> UndercutDecision:
+    def _insufficient() -> UndercutDecision:
         return UndercutDecision(
             **_base,  # type: ignore[arg-type]
             alert_type="INSUFFICIENT_DATA",
@@ -144,7 +143,6 @@ def evaluate_undercut(
             confidence=0.0,
             estimated_gain_ms=0,
             should_alert=False,
-            **kwargs,
         )
 
     # Guard: must have at least 3 laps of stint data to project reliably (§S6).
@@ -157,9 +155,7 @@ def evaluate_undercut(
         return _insufficient()
 
     def_compound = defender.compound or _DEFAULT_NEXT_COMPOUND
-    next_compound = _NEXT_COMPOUND.get(
-        (attacker.compound or "").upper(), _DEFAULT_NEXT_COMPOUND
-    )
+    next_compound = _NEXT_COMPOUND.get((attacker.compound or "").upper(), _DEFAULT_NEXT_COMPOUND)
     circuit_id = state.circuit_id or ""
 
     try:
@@ -206,15 +202,14 @@ def evaluate_undercut(
         return _insufficient()
 
     # Cumulative gap recovery over the projection window (§6.6).
-    gap_recuperable_ms = sum(d - a for d, a in zip(defender_laps, attacker_laps))
+    gap_recuperable_ms = sum(d - a for d, a in zip(defender_laps, attacker_laps, strict=True))
     estimated_gain_ms = gap_recuperable_ms - pit_loss_ms
 
     # Normalised score (§6.7).  The MARGIN ensures marginal undercuts don't
     # trigger an alert.
     raw_score = (
-        (gap_recuperable_ms - pit_loss_ms - gap_actual_ms - UNDERCUT_MARGIN_MS)
-        / pit_loss_ms
-    )
+        gap_recuperable_ms - pit_loss_ms - gap_actual_ms - UNDERCUT_MARGIN_MS
+    ) / pit_loss_ms
     score = max(0.0, min(1.0, raw_score))
 
     should_alert = score > SCORE_THRESHOLD and confidence > CONFIDENCE_THRESHOLD

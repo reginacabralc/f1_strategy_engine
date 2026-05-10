@@ -76,8 +76,8 @@ def test_session_summary_shape(client: TestClient) -> None:
 
 def test_empty_repository_returns_empty_list() -> None:
     app = create_app()
-    app.dependency_overrides[get_session_repository] = (
-        lambda: InMemorySessionRepository(sessions=())
+    app.dependency_overrides[get_session_repository] = lambda: InMemorySessionRepository(
+        sessions=()
     )
     with TestClient(app) as client:
         r = client.get("/api/v1/sessions")
@@ -102,8 +102,8 @@ def test_custom_repository_round_trips_through_route() -> None:
         ),
     )
     app = create_app()
-    app.dependency_overrides[get_session_repository] = (
-        lambda: InMemorySessionRepository(sessions=custom)
+    app.dependency_overrides[get_session_repository] = lambda: InMemorySessionRepository(
+        sessions=custom
     )
     with TestClient(app) as client:
         r = client.get("/api/v1/sessions")

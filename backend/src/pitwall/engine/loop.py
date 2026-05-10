@@ -26,14 +26,14 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from pitwall.core.topics import Topics
 from pitwall.engine.pit_loss import PitLossTable, lookup_pit_loss
 from pitwall.engine.projection import PacePredictor
 from pitwall.engine.state import DriverState, RaceState, compute_relevant_pairs
-from pitwall.engine.undercut import evaluate_undercut
+from pitwall.engine.undercut import UndercutDecision, evaluate_undercut
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +46,7 @@ logger = logging.getLogger(__name__)
 class Broadcaster(Protocol):
     """Deliver JSON-serialisable messages to all connected WebSocket clients."""
 
-    async def broadcast_json(self, data: dict[str, Any]) -> None:
-        ...
+    async def broadcast_json(self, data: dict[str, Any]) -> None: ...
 
 
 # ---------------------------------------------------------------------------
@@ -134,14 +133,10 @@ class EngineLoop:
             self._state.drivers[atk.driver_code].undercut_score = decision.score
 
             if decision.should_alert:
-                await self._broadcaster.broadcast_json(
-                    _alert_message(decision, self._state)
-                )
+                await self._broadcaster.broadcast_json(_alert_message(decision, self._state))
 
         # Broadcast current snapshot (with updated undercut scores).
-        await self._broadcaster.broadcast_json(
-            _snapshot_message(self._state, self._predictor_name)
-        )
+        await self._broadcaster.broadcast_json(_snapshot_message(self._state, self._predictor_name))
 
 
 # ---------------------------------------------------------------------------
@@ -150,7 +145,7 @@ class EngineLoop:
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _driver_to_dict(d: DriverState) -> dict[str, Any]:
@@ -188,16 +183,12 @@ def _snapshot_message(state: RaceState, predictor_name: str) -> dict[str, Any]:
                 key=lambda d: (d["position"] is None, d["position"]),
             ),
             "active_predictor": predictor_name,
-            "last_event_ts": (
-                state.last_event_ts.isoformat() if state.last_event_ts else None
-            ),
+            "last_event_ts": (state.last_event_ts.isoformat() if state.last_event_ts else None),
         },
     }
 
 
-def _alert_message(decision: "UndercutDecision", state: RaceState) -> dict[str, Any]:  # noqa: F821
-    from pitwall.engine.undercut import UndercutDecision  # local import avoids cycle
-    assert isinstance(decision, UndercutDecision)
+def _alert_message(decision: UndercutDecision, state: RaceState) -> dict[str, Any]:
     return {
         "v": 1,
         "type": "alert",

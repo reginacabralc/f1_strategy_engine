@@ -8,6 +8,7 @@ DriverState / RaceState fields.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 from pitwall.engine.state import (
     GAP_RELEVANCE_MS,
@@ -15,7 +16,7 @@ from pitwall.engine.state import (
     RaceState,
     compute_relevant_pairs,
 )
-
+from pitwall.feeds.base import Event
 
 # ---------------------------------------------------------------------------
 # Event builders
@@ -29,7 +30,7 @@ def _session_start(
     circuit_id: str = "monaco",
     total_laps: int = 78,
     drivers: list[str] | None = None,
-) -> dict:
+) -> Event:
     return {
         "type": "session_start",
         "session_id": session_id,
@@ -56,8 +57,8 @@ def _lap_complete(
     is_valid: bool = True,
     track_status: str | None = None,
     session_id: str = "monaco_2024_R",
-) -> dict:
-    payload: dict = {
+) -> Event:
+    payload: dict[str, Any] = {
         "driver_code": driver_code,
         "lap_number": lap_number,
         "lap_time_ms": lap_time_ms,
@@ -78,7 +79,7 @@ def _lap_complete(
     return {"type": "lap_complete", "session_id": session_id, "ts": _TS, "payload": payload}
 
 
-def _pit_in(driver_code: str = "VER", lap_number: int = 20) -> dict:
+def _pit_in(driver_code: str = "VER", lap_number: int = 20) -> Event:
     return {
         "type": "pit_in",
         "session_id": "monaco_2024_R",
@@ -93,7 +94,7 @@ def _pit_out(
     new_compound: str = "HARD",
     new_tyre_age: int = 0,
     new_stint_number: int = 2,
-) -> dict:
+) -> Event:
     return {
         "type": "pit_out",
         "session_id": "monaco_2024_R",
@@ -109,7 +110,7 @@ def _pit_out(
     }
 
 
-def _track_status_change(status: str = "SC", previous: str = "GREEN") -> dict:
+def _track_status_change(status: str = "SC", previous: str = "GREEN") -> Event:
     return {
         "type": "track_status_change",
         "session_id": "monaco_2024_R",
@@ -123,7 +124,7 @@ def _weather_update(
     air_temp: float = 28.0,
     humidity_pct: float = 35.0,
     rainfall: bool = False,
-) -> dict:
+) -> Event:
     return {
         "type": "weather_update",
         "session_id": "monaco_2024_R",
@@ -137,7 +138,7 @@ def _weather_update(
     }
 
 
-def _data_stale(driver_code: str = "VER", stale_since_lap: int = 10) -> dict:
+def _data_stale(driver_code: str = "VER", stale_since_lap: int = 10) -> Event:
     return {
         "type": "data_stale",
         "session_id": "monaco_2024_R",
@@ -150,7 +151,7 @@ def _data_stale(driver_code: str = "VER", stale_since_lap: int = 10) -> dict:
     }
 
 
-def _session_end(classification: list[dict] | None = None) -> dict:
+def _session_end(classification: list[dict[str, Any]] | None = None) -> Event:
     return {
         "type": "session_end",
         "session_id": "monaco_2024_R",
@@ -197,7 +198,9 @@ def test_apply_session_start_idempotent_for_existing_drivers() -> None:
 def test_apply_lap_complete_updates_position_and_gaps() -> None:
     state = RaceState()
     state.apply(_session_start())
-    state.apply(_lap_complete("VER", lap_number=5, position=1, gap_to_leader_ms=0, gap_to_ahead_ms=None))
+    state.apply(
+        _lap_complete("VER", lap_number=5, position=1, gap_to_leader_ms=0, gap_to_ahead_ms=None)
+    )
 
     ver = state.drivers["VER"]
     assert ver.position == 1
@@ -267,7 +270,7 @@ def test_apply_lap_complete_pit_in_marks_driver_in_pit_and_records_lap() -> None
 def test_apply_lap_complete_pit_out_clears_pit_and_resets_stint_count() -> None:
     state = RaceState()
     state.apply(_session_start())
-    state.apply(_lap_complete("VER", is_pit_in=True))         # in pit
+    state.apply(_lap_complete("VER", is_pit_in=True))  # in pit
     state.apply(_lap_complete("VER", is_pit_out=True, compound="HARD", tyre_age=0))
 
     ver = state.drivers["VER"]
@@ -327,7 +330,7 @@ def test_apply_pit_out_event_updates_compound_and_clears_pit() -> None:
     assert lec.compound == "HARD"
     assert lec.tyre_age == 0
     assert lec.stint_number == 2
-    assert lec.laps_in_stint == 0   # will become 1 on next lap_complete
+    assert lec.laps_in_stint == 0  # will become 1 on next lap_complete
 
 
 # ---------------------------------------------------------------------------
@@ -416,14 +419,16 @@ def test_apply_unknown_event_type_is_silently_ignored() -> None:
     state.apply(_session_start())
     initial_lap = state.current_lap
 
-    state.apply({
-        "type": "mystery_event",   # type: ignore[typeddict-item]
-        "session_id": "monaco_2024_R",
-        "ts": _TS,
-        "payload": {},
-    })
+    state.apply(
+        {
+            "type": "mystery_event",  # type: ignore[typeddict-item]
+            "session_id": "monaco_2024_R",
+            "ts": _TS,
+            "payload": {},
+        }
+    )
 
-    assert state.current_lap == initial_lap   # nothing changed
+    assert state.current_lap == initial_lap  # nothing changed
 
 
 # ---------------------------------------------------------------------------
@@ -511,7 +516,7 @@ def test_compute_relevant_pairs_with_single_driver() -> None:
 def test_compute_relevant_pairs_returns_pair_within_gap() -> None:
     state = _state_with_positions(
         ("VER", 1, None),
-        ("LEC", 2, 10_000),   # 10 s behind VER — relevant
+        ("LEC", 2, 10_000),  # 10 s behind VER — relevant
     )
     pairs = compute_relevant_pairs(state)
     assert len(pairs) == 1
@@ -523,8 +528,8 @@ def test_compute_relevant_pairs_returns_pair_within_gap() -> None:
 def test_compute_relevant_pairs_excludes_gap_over_30s() -> None:
     state = _state_with_positions(
         ("VER", 1, None),
-        ("LEC", 2, GAP_RELEVANCE_MS),      # exactly 30 s — NOT included
-        ("NOR", 3, 5_000),                 # 5 s — included
+        ("LEC", 2, GAP_RELEVANCE_MS),  # exactly 30 s — NOT included
+        ("NOR", 3, 5_000),  # 5 s — included
     )
     pairs = compute_relevant_pairs(state)
     codes = [(a.driver_code, d.driver_code) for a, d in pairs]
@@ -572,9 +577,9 @@ def test_compute_relevant_pairs_excludes_drivers_with_no_position() -> None:
 def test_compute_relevant_pairs_multiple_pairs_ordered_by_position() -> None:
     state = _state_with_positions(
         ("VER", 1, None),
-        ("LEC", 2, 8_000),    # P2 → P1: 8 s
-        ("NOR", 3, 12_000),   # P3 → P2: 12 s
-        ("SAI", 4, 35_000),   # P4 → P3: 35 s — too far
+        ("LEC", 2, 8_000),  # P2 → P1: 8 s
+        ("NOR", 3, 12_000),  # P3 → P2: 12 s
+        ("SAI", 4, 35_000),  # P4 → P3: 35 s — too far
     )
     pairs = compute_relevant_pairs(state)
     assert len(pairs) == 2

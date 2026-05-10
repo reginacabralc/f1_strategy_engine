@@ -83,9 +83,7 @@ class PaceContext:
         if self.laps_remaining is not None and self.laps_remaining < 0:
             raise ValueError(f"laps_remaining must be >= 0, got {self.laps_remaining}")
         if self.humidity_pct is not None and not 0.0 <= self.humidity_pct <= 100.0:
-            raise ValueError(
-                f"humidity_pct must be in [0, 100], got {self.humidity_pct}"
-            )
+            raise ValueError(f"humidity_pct must be in [0, 100], got {self.humidity_pct}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,13 +102,9 @@ class PacePrediction:
 
     def __post_init__(self) -> None:
         if self.predicted_lap_time_ms <= 0:
-            raise ValueError(
-                f"predicted_lap_time_ms must be > 0, got {self.predicted_lap_time_ms}"
-            )
+            raise ValueError(f"predicted_lap_time_ms must be > 0, got {self.predicted_lap_time_ms}")
         if not 0.0 <= self.confidence <= 1.0:
-            raise ValueError(
-                f"confidence must be in [0.0, 1.0], got {self.confidence}"
-            )
+            raise ValueError(f"confidence must be in [0.0, 1.0], got {self.confidence}")
 
 
 class UnsupportedContextError(LookupError):

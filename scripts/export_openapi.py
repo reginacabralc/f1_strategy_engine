@@ -81,10 +81,7 @@ def main(argv: list[str] | None = None) -> int:
 
     n_paths = len(spec.get("paths", {}))
     n_schemas = len(spec.get("components", {}).get("schemas", {}))
-    print(
-        f"Wrote {args.output} ({fmt.upper()}, "
-        f"{n_paths} paths, {n_schemas} schemas)"
-    )
+    print(f"Wrote {args.output} ({fmt.upper()}, {n_paths} paths, {n_schemas} schemas)")
     return 0
 
 

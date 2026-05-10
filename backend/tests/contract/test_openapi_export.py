@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-import yaml  # type: ignore[import-untyped]
+import yaml
 from openapi_spec_validator import validate
 
 from pitwall.api.main import create_app
@@ -44,11 +44,11 @@ STATIC_SPEC = REPO_ROOT / "docs" / "interfaces" / "openapi_v1.yaml"
 # routes land; CI will then enforce that those routes stay in sync with
 # the static contract.
 IMPLEMENTED: dict[str, set[str]] = {
-    "/health":                 {"get"},
-    "/ready":                  {"get"},
-    "/api/v1/sessions":        {"get"},
-    "/api/v1/replay/start":    {"post"},
-    "/api/v1/replay/stop":     {"post"},
+    "/health": {"get"},
+    "/ready": {"get"},
+    "/api/v1/sessions": {"get"},
+    "/api/v1/replay/start": {"post"},
+    "/api/v1/replay/stop": {"post"},
 }
 
 
@@ -94,8 +94,7 @@ def test_every_live_operation_exists_in_static_spec(
         )
         for method in methods:
             assert method in static_paths[path], (
-                f"Live API exposes {method.upper()} {path} but the "
-                f"static spec does not."
+                f"Live API exposes {method.upper()} {path} but the static spec does not."
             )
 
 
@@ -120,9 +119,7 @@ def test_operation_id_matches_static_spec(
         f"{method.upper()} {path} has no operationId in the live spec — "
         f"add `operation_id=...` to the FastAPI route."
     )
-    assert static_op_id is not None, (
-        f"{method.upper()} {path} has no operationId in {STATIC_SPEC}."
-    )
+    assert static_op_id is not None, f"{method.upper()} {path} has no operationId in {STATIC_SPEC}."
     assert live_op_id == static_op_id, (
         f"operationId drift on {method.upper()} {path}: "
         f"live={live_op_id!r} vs static={static_op_id!r}."

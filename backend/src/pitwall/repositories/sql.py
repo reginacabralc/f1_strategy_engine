@@ -80,8 +80,7 @@ WEATHER_EVENTS_SQL = """
 
 
 class EngineLike(Protocol):
-    def connect(self) -> Any:
-        ...
+    def connect(self) -> Any: ...
 
 
 class SqlSessionRepository:

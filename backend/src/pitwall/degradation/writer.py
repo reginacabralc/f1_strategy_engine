@@ -58,8 +58,7 @@ UPSERT_COEFFICIENT_SQL = """
 
 
 class WriteConnection(Protocol):
-    def execute(self, statement: object, parameters: list[dict[str, Any]] | None = None) -> Any:
-        ...
+    def execute(self, statement: object, parameters: list[dict[str, Any]] | None = None) -> Any: ...
 
 
 def build_coefficient_payload(result: DegradationFitResult) -> dict[str, Any]:

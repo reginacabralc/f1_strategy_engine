@@ -44,8 +44,10 @@ from pitwall.engine.replay_manager import ReplayManager
 def _build_predictor() -> PacePredictor:
     """Try to load ScipyPredictor from DB; fall back to empty on failure."""
     from pitwall.degradation.predictor import ScipyPredictor
+
     try:
         from pitwall.db.engine import create_db_engine
+
         return ScipyPredictor.from_engine(create_db_engine())
     except Exception:
         return ScipyPredictor([])
@@ -69,7 +71,7 @@ def create_app() -> FastAPI:
         topics,
         connection_manager,
         predictor,
-        {},                        # pit_loss_table — Stream A populates Day 6
+        {},  # pit_loss_table — Stream A populates Day 6
         settings.pace_predictor,
     )
 
@@ -78,8 +80,9 @@ def create_app() -> FastAPI:
         # Try to reload a fresh predictor from DB (if available at startup).
         # This is a no-op when DATABASE_URL is unset (typical in tests).
         try:
-            from pitwall.degradation.predictor import ScipyPredictor
             from pitwall.db.engine import create_db_engine
+            from pitwall.degradation.predictor import ScipyPredictor
+
             engine_loop.set_predictor(
                 ScipyPredictor.from_engine(create_db_engine()),
                 settings.pace_predictor,

@@ -58,15 +58,22 @@ def main() -> int:
                     "session_ids": list(DEMO_SESSION_IDS),
                     "monaco_session": "monaco_2024_R",
                 },
-            ).one()._mapping
+            )
+            .one()
+            ._mapping
         )
-        coefficients = [dict(row._mapping) for row in connection.execute(COEFFICIENT_SQL)]
+        coefficients = [
+            dict(row._mapping) for row in connection.execute(COEFFICIENT_SQL)
+        ]
         predictor = ScipyPredictor.from_connection(connection)
 
     print("Degradation validation summary")
     print_table([summary], list(summary))
     print("\nCoefficient rows")
-    print_table(coefficients, ["circuit_id", "compound", "n_laps", "r2", "rmse_ms", "source_sessions"])
+    print_table(
+        coefficients,
+        ["circuit_id", "compound", "n_laps", "r2", "rmse_ms", "source_sessions"],
+    )
     if predictor.is_available("monaco", "MEDIUM"):
         prediction = predictor.predict(
             PaceContext(
@@ -104,7 +111,11 @@ def print_table(rows: Iterable[dict[str, Any]], columns: list[str]) -> None:
     print(" | ".join(column.ljust(widths[column]) for column in columns))
     print("-+-".join("-" * widths[column] for column in columns))
     for row in rows:
-        print(" | ".join(str(row.get(column, "")).ljust(widths[column]) for column in columns))
+        print(
+            " | ".join(
+                str(row.get(column, "")).ljust(widths[column]) for column in columns
+            )
+        )
 
 
 if __name__ == "__main__":

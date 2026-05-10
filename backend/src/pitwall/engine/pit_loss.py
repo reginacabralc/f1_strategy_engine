@@ -26,7 +26,7 @@ DEFAULT_PIT_LOSS_MS: int = 21_000
 """Fallback pit-loss used when no estimate exists for a (circuit, team) pair.
 
 21 000 ms is a conservative upper-bound for most modern F1 circuits.
-Monaco typically sees 22–24 s; high-speed circuits (Monza, Spa) can be
+Monaco typically sees 22-24 s; high-speed circuits (Monza, Spa) can be
 as low as 18 s.  The bound errs on the side of *underestimating* the
 viability of an undercut, which is the safer direction.
 """

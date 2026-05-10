@@ -24,7 +24,7 @@ See ``docs/interfaces/websocket_messages.md`` for the full message spec.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter
 from starlette.websockets import WebSocket, WebSocketDisconnect
@@ -53,16 +53,18 @@ async def ws_live(websocket: WebSocket) -> None:
                     timeout=_HEARTBEAT_INTERVAL,
                 )
                 # Client frame received — ignore content (V1).
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # No message from client in 15 s — send a ping so slow clients
                 # are detected by their next failed receive.
                 try:
-                    await websocket.send_json({
-                        "v": 1,
-                        "type": "ping",
-                        "ts": datetime.now(timezone.utc).isoformat(),
-                        "payload": {},
-                    })
+                    await websocket.send_json(
+                        {
+                            "v": 1,
+                            "type": "ping",
+                            "ts": datetime.now(UTC).isoformat(),
+                            "payload": {},
+                        }
+                    )
                 except Exception:
                     break  # connection is gone
     except (WebSocketDisconnect, RuntimeError):

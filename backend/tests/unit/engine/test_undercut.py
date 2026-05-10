@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from pitwall.degradation.predictor import ScipyCoefficient, ScipyPredictor
 from pitwall.engine.state import DriverState, RaceState
 from pitwall.engine.undercut import (
@@ -11,7 +9,6 @@ from pitwall.engine.undercut import (
     SCORE_THRESHOLD,
     evaluate_undercut,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -25,12 +22,14 @@ def _pred(
     hard_r2: float = 0.75,
 ) -> ScipyPredictor:
     """Monaco MEDIUM + HARD coefficients with fast degradation (for clear signals)."""
-    return ScipyPredictor([
-        # MEDIUM: degrades aggressively (high b + c)
-        ScipyCoefficient("monaco", "MEDIUM", a=80_000.0, b=250.0, c=5.0, r_squared=medium_r2),
-        # HARD: durable, faster absolute pace
-        ScipyCoefficient("monaco", "HARD",   a=79_000.0, b=120.0, c=2.0, r_squared=hard_r2),
-    ])
+    return ScipyPredictor(
+        [
+            # MEDIUM: degrades aggressively (high b + c)
+            ScipyCoefficient("monaco", "MEDIUM", a=80_000.0, b=250.0, c=5.0, r_squared=medium_r2),
+            # HARD: durable, faster absolute pace
+            ScipyCoefficient("monaco", "HARD", a=79_000.0, b=120.0, c=2.0, r_squared=hard_r2),
+        ]
+    )
 
 
 def _state(circuit_id: str = "monaco") -> RaceState:
@@ -94,7 +93,10 @@ def test_evaluate_undercut_insufficient_when_laps_in_stint_lt_3() -> None:
     pred = _pred()
     state = _state()
     atk = DriverState(
-        driver_code="NOR", position=2, compound="MEDIUM", tyre_age=2,
+        driver_code="NOR",
+        position=2,
+        compound="MEDIUM",
+        tyre_age=2,
         laps_in_stint=2,  # < 3 — should not project
         gap_to_ahead_ms=5_000,
     )

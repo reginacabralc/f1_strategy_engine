@@ -11,7 +11,7 @@ def test_lookup_returns_exact_team_entry() -> None:
 
 
 def test_lookup_falls_back_to_circuit_median_when_team_missing() -> None:
-    table = {"monaco": {None: 21_000}}
+    table: dict[str, dict[str | None, int]] = {"monaco": {None: 21_000}}
     assert lookup_pit_loss("monaco", "ferrari", table) == 21_000
 
 
@@ -24,7 +24,7 @@ def test_lookup_uses_default_arg_when_circuit_missing() -> None:
 
 
 def test_lookup_handles_none_team_code() -> None:
-    table = {"monaco": {None: 22_000}}
+    table: dict[str, dict[str | None, int]] = {"monaco": {None: 22_000}}
     assert lookup_pit_loss("monaco", None, table) == 22_000
 
 

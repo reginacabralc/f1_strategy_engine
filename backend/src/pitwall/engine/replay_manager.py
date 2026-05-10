@@ -77,8 +77,7 @@ class ReplayManager:
         """Start a replay.  Raises :exc:`ValueError` if already running."""
         if self.is_running:
             raise ValueError(
-                f"A replay is already running for session {self._session_id!r}. "
-                "Call stop() first."
+                f"A replay is already running for session {self._session_id!r}. Call stop() first."
             )
         self._run_id = uuid4()
         self._session_id = session_id

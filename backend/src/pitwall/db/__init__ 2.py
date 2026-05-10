@@ -1,2 +1,0 @@
-"""Database support for PitWall."""
-

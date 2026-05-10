@@ -36,7 +36,9 @@ def main() -> int:
         results = fit_degradation(rows)
         written = write_fit_results(connection, results)
 
-    print(f"Read {len(rows)} clean-air diagnostic rows; wrote {written} coefficient rows.")
+    print(
+        f"Read {len(rows)} clean-air diagnostic rows; wrote {written} coefficient rows."
+    )
     print_eligibility_summary(rows)
     print_fit_table(results)
     return 0
@@ -84,7 +86,9 @@ def print_fit_table(results: Iterable[DegradationFitResult]) -> None:
         }
         for result in results
     ]
-    print_table(rows, ["session/circuit", "compound", "n_laps", "R2", "RMSE_ms", "status"])
+    print_table(
+        rows, ["session/circuit", "compound", "n_laps", "R2", "RMSE_ms", "status"]
+    )
 
 
 def print_table(rows: list[dict[str, Any]], columns: list[str]) -> None:
@@ -95,7 +99,11 @@ def print_table(rows: list[dict[str, Any]], columns: list[str]) -> None:
     print(" | ".join(column.ljust(widths[column]) for column in columns))
     print("-+-".join("-" * widths[column] for column in columns))
     for row in rows:
-        print(" | ".join(str(row.get(column, "")).ljust(widths[column]) for column in columns))
+        print(
+            " | ".join(
+                str(row.get(column, "")).ljust(widths[column]) for column in columns
+            )
+        )
 
 
 def _format_metric(value: float | None, *, digits: int) -> str:

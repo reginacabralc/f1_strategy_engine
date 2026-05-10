@@ -58,7 +58,7 @@ class ConnectionManager:
         for ws in list(self._connections):
             try:
                 await asyncio.wait_for(ws.send_json(data), timeout=1.0)
-            except (WebSocketDisconnect, asyncio.TimeoutError, RuntimeError, Exception):
+            except (TimeoutError, WebSocketDisconnect, RuntimeError, Exception):
                 dead.add(ws)
         for ws in dead:
             self._connections.discard(ws)

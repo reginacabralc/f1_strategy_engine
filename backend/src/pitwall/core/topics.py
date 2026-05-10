@@ -25,12 +25,6 @@ from pitwall.feeds.base import Event
 class Topics:
     """Shared in-process message channels for V1 (no Kafka, no Redis)."""
 
-    events: asyncio.Queue[Event] = field(
-        default_factory=lambda: asyncio.Queue(maxsize=1_000)
-    )
-    alerts: asyncio.Queue[Any] = field(
-        default_factory=lambda: asyncio.Queue(maxsize=500)
-    )
-    snapshots: asyncio.Queue[Any] = field(
-        default_factory=lambda: asyncio.Queue(maxsize=100)
-    )
+    events: asyncio.Queue[Event] = field(default_factory=lambda: asyncio.Queue(maxsize=1_000))
+    alerts: asyncio.Queue[Any] = field(default_factory=lambda: asyncio.Queue(maxsize=500))
+    snapshots: asyncio.Queue[Any] = field(default_factory=lambda: asyncio.Queue(maxsize=100))

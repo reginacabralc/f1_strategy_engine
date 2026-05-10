@@ -132,4 +132,3 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Leave canonical session IDs in place on downgrade."""
-

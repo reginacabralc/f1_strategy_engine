@@ -25,8 +25,7 @@ COEFFICIENT_SQL = """
 
 
 class CoefficientConnection(Protocol):
-    def execute(self, statement: object) -> Iterable[Any]:
-        ...
+    def execute(self, statement: object) -> Iterable[Any]: ...
 
 
 @dataclass(frozen=True, slots=True)

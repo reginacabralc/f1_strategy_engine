@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi.testclient import TestClient
 
 from pitwall.api.connections import ConnectionManager
 from pitwall.api.main import create_app
-
 
 # ---------------------------------------------------------------------------
 # ConnectionManager unit tests (mock WebSocket)
@@ -40,8 +36,8 @@ async def test_connection_manager_tracks_connected_clients() -> None:
     ws1 = _MockWebSocket()
     ws2 = _MockWebSocket()
 
-    await cm.connect(ws1)
-    await cm.connect(ws2)
+    await cm.connect(ws1)  # type: ignore[arg-type]
+    await cm.connect(ws2)  # type: ignore[arg-type]
 
     assert cm.count == 2
     assert ws1.accepted
@@ -51,8 +47,8 @@ async def test_connection_manager_tracks_connected_clients() -> None:
 async def test_connection_manager_disconnect_reduces_count() -> None:
     cm = ConnectionManager()
     ws = _MockWebSocket()
-    await cm.connect(ws)
-    cm.disconnect(ws)
+    await cm.connect(ws)  # type: ignore[arg-type]
+    cm.disconnect(ws)  # type: ignore[arg-type]
     assert cm.count == 0
 
 
@@ -60,8 +56,8 @@ async def test_connection_manager_broadcast_sends_to_all() -> None:
     cm = ConnectionManager()
     ws1 = _MockWebSocket()
     ws2 = _MockWebSocket()
-    await cm.connect(ws1)
-    await cm.connect(ws2)
+    await cm.connect(ws1)  # type: ignore[arg-type]
+    await cm.connect(ws2)  # type: ignore[arg-type]
 
     payload = {"v": 1, "type": "ping", "ts": "now", "payload": {}}
     await cm.broadcast_json(payload)
@@ -74,8 +70,8 @@ async def test_connection_manager_removes_dead_connection_on_send_failure() -> N
     cm = ConnectionManager()
     live = _MockWebSocket()
     dead = _MockWebSocket(fail_on_send=True)
-    await cm.connect(live)
-    await cm.connect(dead)
+    await cm.connect(live)  # type: ignore[arg-type]
+    await cm.connect(dead)  # type: ignore[arg-type]
 
     await cm.broadcast_json({"type": "test"})
 
@@ -97,10 +93,9 @@ async def test_connection_manager_broadcast_to_empty_set_is_noop() -> None:
 def test_ws_live_endpoint_accepts_connection() -> None:
     """The /ws/v1/live endpoint must accept and survive a clean disconnect."""
     app = create_app()
-    with TestClient(app) as client:
-        with client.websocket_connect("/ws/v1/live") as ws:
-            # Connection accepted — we don't send anything, just disconnect
-            pass  # __exit__ sends close frame
+    with TestClient(app) as client, client.websocket_connect("/ws/v1/live") as _ws:
+        # Connection accepted — we don't send anything, just disconnect
+        pass  # __exit__ sends close frame
 
 
 def test_ws_live_endpoint_is_in_openapi_paths() -> None:

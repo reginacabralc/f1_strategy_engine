@@ -24,8 +24,8 @@ from pitwall.feeds.base import Event
 # Constants
 # ---------------------------------------------------------------------------
 
-GAP_RELEVANCE_MS: int = 30_000   # 30 s in milliseconds — master plan §6.1
-GAP_SMOOTH_WINDOW: int = 3       # rolling-average window — master plan §6.2
+GAP_RELEVANCE_MS: int = 30_000  # 30 s in milliseconds — master plan §6.1
+GAP_SMOOTH_WINDOW: int = 3  # rolling-average window — master plan §6.2
 
 
 # ---------------------------------------------------------------------------
@@ -43,8 +43,8 @@ class DriverState:
     # Position and gap (updated from lap_complete events)
     position: int | None = None
     gap_to_leader_ms: int | None = None
-    gap_to_ahead_ms: int | None = None   # smoothed rolling average
-    last_lap_ms: int | None = None       # most recent *valid* lap time
+    gap_to_ahead_ms: int | None = None  # smoothed rolling average
+    last_lap_ms: int | None = None  # most recent *valid* lap time
 
     # Tyre state
     compound: str | None = None
@@ -54,7 +54,7 @@ class DriverState:
 
     # Pit / race status
     is_in_pit: bool = False
-    is_lapped: bool = False   # V1: always False; lapping detection is Day 8
+    is_lapped: bool = False  # V1: always False; lapping detection is Day 8
     last_pit_lap: int | None = None
 
     # Data quality
@@ -154,9 +154,8 @@ class RaceState:
     def _apply_session_end(self, payload: dict[str, Any]) -> None:
         for entry in payload.get("final_classification") or []:
             code = str(entry.get("driver_code") or "")
-            if code and code in self.drivers:
-                if (pos := entry.get("position")) is not None:
-                    self.drivers[code].position = int(pos)
+            if code and code in self.drivers and (pos := entry.get("position")) is not None:
+                self.drivers[code].position = int(pos)
 
     def _apply_lap_complete(self, payload: dict[str, Any]) -> None:
         code = str(payload.get("driver_code") or "")
@@ -191,7 +190,7 @@ class RaceState:
 
         if is_pit_out:
             d.is_in_pit = False
-            d.laps_in_stint = 1         # first lap on new rubber
+            d.laps_in_stint = 1  # first lap on new rubber
         else:
             d.laps_in_stint += 1
 
@@ -231,8 +230,8 @@ class RaceState:
             d.tyre_age = int(age)
         if (stint := payload.get("new_stint_number")) is not None:
             d.stint_number = int(stint)
-        d.laps_in_stint = 0          # incremented to 1 on next lap_complete
-        d._gap_samples.clear()       # gap history is invalid during a pit stop
+        d.laps_in_stint = 0  # incremented to 1 on next lap_complete
+        d._gap_samples.clear()  # gap history is invalid during a pit stop
 
     def _apply_track_status_change(self, payload: dict[str, Any]) -> None:
         if (status := payload.get("status")) is not None:
@@ -281,23 +280,18 @@ def compute_relevant_pairs(
     Pairs are ordered by position: (P2 vs P1), (P3 vs P2), …
     """
     in_race = [
-        d for d in state.drivers.values()
-        if d.position is not None
-        and not d.is_in_pit
-        and not d.is_lapped
-        and not d.data_stale
+        d
+        for d in state.drivers.values()
+        if d.position is not None and not d.is_in_pit and not d.is_lapped and not d.data_stale
     ]
     in_race.sort(key=lambda d: d.position)  # type: ignore[arg-type, return-value]
 
     pairs: list[tuple[DriverState, DriverState]] = []
     for i in range(len(in_race) - 1):
-        defender = in_race[i]       # ahead (lower position number)
-        attacker = in_race[i + 1]   # behind (higher position number)
+        defender = in_race[i]  # ahead (lower position number)
+        attacker = in_race[i + 1]  # behind (higher position number)
 
-        if (
-            attacker.gap_to_ahead_ms is not None
-            and attacker.gap_to_ahead_ms < GAP_RELEVANCE_MS
-        ):
+        if attacker.gap_to_ahead_ms is not None and attacker.gap_to_ahead_ms < GAP_RELEVANCE_MS:
             pairs.append((attacker, defender))
 
     return pairs
