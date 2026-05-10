@@ -29,14 +29,13 @@ into the "OpenAPI in CI" deliverable noted in the Day 2 plan.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
-import yaml
+import yaml  # type: ignore[import-untyped]
 from openapi_spec_validator import validate
 
 from pitwall.api.main import create_app
-
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 STATIC_SPEC = REPO_ROOT / "docs" / "interfaces" / "openapi_v1.yaml"
@@ -61,7 +60,7 @@ IMPLEMENTED: dict[str, set[str]] = {
 @pytest.fixture(scope="module")
 def static_spec() -> dict[str, Any]:
     with STATIC_SPEC.open() as f:
-        return yaml.safe_load(f)
+        return cast(dict[str, Any], yaml.safe_load(f))
 
 
 @pytest.fixture(scope="module")

@@ -12,6 +12,8 @@ application code.
 
 from __future__ import annotations
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from pitwall.api.dependencies import get_event_loader, get_replay_manager
@@ -21,6 +23,9 @@ from pitwall.engine.replay_manager import ReplayManager
 from pitwall.repositories.events import SessionEventLoader
 
 router = APIRouter(prefix="/api/v1/replay", tags=["replay"])
+
+ReplayManagerDep = Annotated[ReplayManager, Depends(get_replay_manager)]
+SessionEventLoaderDep = Annotated[SessionEventLoader, Depends(get_event_loader)]
 
 
 @router.post(
@@ -37,8 +42,8 @@ router = APIRouter(prefix="/api/v1/replay", tags=["replay"])
 )
 async def start_replay(
     body: ReplayStartRequest,
-    replay_manager: ReplayManager = Depends(get_replay_manager),
-    event_loader: SessionEventLoader = Depends(get_event_loader),
+    replay_manager: ReplayManagerDep,
+    event_loader: SessionEventLoaderDep,
 ) -> ReplayRun:
     if replay_manager.is_running:
         raise HTTPException(
@@ -75,7 +80,7 @@ async def start_replay(
     summary="Stop the active replay",
 )
 async def stop_replay(
-    replay_manager: ReplayManager = Depends(get_replay_manager),
+    replay_manager: ReplayManagerDep,
 ) -> ReplayStopResponse:
     run_id = await replay_manager.stop()
     return ReplayStopResponse(stopped=run_id is not None, run_id=run_id)

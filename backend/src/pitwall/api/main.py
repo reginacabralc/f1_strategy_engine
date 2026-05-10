@@ -26,8 +26,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from pitwall import __version__
-from pitwall.api.routes import sessions as sessions_routes
 from pitwall.api.routes import replay as replay_routes
+from pitwall.api.routes import sessions as sessions_routes
 from pitwall.api.schemas import Health
 from pitwall.core.config import get_settings
 from pitwall.core.logging import configure_logging

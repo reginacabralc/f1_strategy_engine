@@ -23,7 +23,9 @@ from pitwall.repositories.sessions import (
 
 @pytest.fixture
 def client() -> TestClient:
-    return TestClient(create_app())
+    app = create_app()
+    app.dependency_overrides[get_session_repository] = lambda: InMemorySessionRepository()
+    return TestClient(app)
 
 
 # --------------------------------------------------------------------------

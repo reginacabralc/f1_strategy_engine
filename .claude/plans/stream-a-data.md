@@ -88,12 +88,22 @@ docs/adr/0009-xgboost-vs-scipy-resultados.md
 - [x] Cargar 3 carreras demo a DB local.
   - Bahrain 2024 R: `bahrain_2024_R`.
   - Monaco 2024 R: `monaco_2024_R`.
-  - Hungary 2024 R: `hungarian_2024_R`.
+  - Hungary 2024 R: `hungary_2024_R`.
+  - Migraciones `0003_canonical_hungary_slug.py` y
+    `0004_canonical_hungary_coefficient_sources.py` reparan DBs locales
+    cargadas antes del override `hungarian` -> `hungary`.
 - [x] Reconstruir stints desde lap data en la normalización Day 2/3.
   - Implementado dentro de `backend/src/pitwall/ingest/normalize.py`, no como `ingest/stints.py`.
 - [x] Validar conteos de demo con `scripts/validate_demo_ingest.py` / `make validate-demo`.
   - Última validación local: Bahrain 1129 laps/63 stints, Monaco 1237 laps/43 stints, Hungary 1355 laps/60 stints.
   - Day 3 cargó 3 carreras demo, no la temporada completa (~30k laps).
+- [x] Integración SQL con Stream B.
+  - `backend/src/pitwall/repositories/sql.py` implementa
+    `SqlSessionRepository` y `SqlSessionEventLoader`.
+  - `backend/src/pitwall/api/dependencies.py` usa repos SQL cuando
+    `DATABASE_URL` está configurado y conserva fallback in-memory sin DB.
+  - Smoke local con DB: `GET /api/v1/sessions` lista las 3 demos y
+    `POST /api/v1/replay/start` acepta `monaco_2024_R` con eventos desde DB.
 - [x] Make targets reproducibles: `db-up`, `db-down`, `migrate`, `ingest-monaco`, `ingest-demo`, `validate-demo`, `test`, `lint`.
 
 ### Día 4 — Degradación scipy (E3)

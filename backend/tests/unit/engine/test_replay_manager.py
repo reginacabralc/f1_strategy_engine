@@ -15,7 +15,6 @@ from pitwall.core.topics import Topics
 from pitwall.engine.replay_manager import ReplayManager
 from pitwall.feeds.base import Event
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

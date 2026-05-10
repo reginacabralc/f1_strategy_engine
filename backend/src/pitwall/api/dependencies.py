@@ -22,18 +22,33 @@ from functools import lru_cache
 from fastapi import Request
 
 from pitwall.core.topics import Topics
+from pitwall.db.engine import create_db_engine, database_url_from_env
 from pitwall.engine.replay_manager import ReplayManager
 from pitwall.repositories.events import InMemorySessionEventLoader, SessionEventLoader
 from pitwall.repositories.sessions import InMemorySessionRepository, SessionRepository
+from pitwall.repositories.sql import EngineLike, SqlSessionEventLoader, SqlSessionRepository
+
+
+@lru_cache(maxsize=1)
+def _db_engine_or_none() -> EngineLike | None:
+    """Return a configured DB engine, or ``None`` when local DB is not enabled."""
+    try:
+        database_url = database_url_from_env()
+    except RuntimeError:
+        return None
+    return create_db_engine(database_url)
 
 
 @lru_cache(maxsize=1)
 def get_session_repository() -> SessionRepository:
     """Return the active :class:`SessionRepository`.
 
-    V1 default: in-memory fixture with the three demo races.
-    Stream A replaces this body with a SQL-backed implementation on Day 3.
+    Uses the Stream A SQL repository when ``DATABASE_URL`` is configured,
+    otherwise falls back to the in-memory three-race demo catalogue.
     """
+    engine = _db_engine_or_none()
+    if engine is not None:
+        return SqlSessionRepository(engine)
     return InMemorySessionRepository()
 
 
@@ -41,11 +56,13 @@ def get_session_repository() -> SessionRepository:
 def get_event_loader() -> SessionEventLoader:
     """Return the active :class:`SessionEventLoader`.
 
-    V1 default: empty in-memory loader (always returns [] → 404 on replay
-    start unless tests inject events via ``dependency_overrides``).
-    Stream A wires a SQL loader here on Day 3 once the demo sessions are
-    loaded into the DB.
+    Uses the Stream A SQL replay-event loader when ``DATABASE_URL`` is
+    configured. Without a DB URL, replay starts still require test or
+    development fixtures injected via ``dependency_overrides``.
     """
+    engine = _db_engine_or_none()
+    if engine is not None:
+        return SqlSessionEventLoader(engine)
     return InMemorySessionEventLoader()
 
 

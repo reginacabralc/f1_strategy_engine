@@ -113,9 +113,28 @@ Docker DB ingest:
 ScipyPredictor smoke: monaco MEDIUM age 10 -> 81366 ms (confidence 0.362)
 ```
 
+## Stream B integration checkpoint
+
+After the Stream B Day 3 merge, Stream A now provides SQL-backed repository
+adapters for the API/replay seam:
+
+- `SqlSessionRepository` lists sessions from `sessions` joined to `events`.
+- `SqlSessionEventLoader` builds `session_start`, `lap_complete`, and
+  `weather_update` replay events from the ingested DB tables.
+- `pitwall.api.dependencies` uses those SQL adapters when `DATABASE_URL` is
+  configured, with the in-memory fixtures still available when no DB URL exists.
+
+Latest local DB API smoke:
+
+```text
+sessions 200 ['bahrain_2024_R', 'monaco_2024_R', 'hungary_2024_R']
+start 202 {'session_id': 'monaco_2024_R', 'pace_predictor': 'scipy', ...}
+stop 200 {'stopped': True, ...}
+```
+
 ## Day 5 notes
 
-- Use `ScipyPredictor` from persisted coefficients inside the undercut engine once Stream B is ready to wire it.
+- Use `ScipyPredictor` from persisted coefficients inside the undercut engine.
 - Add richer notebook plots and call out where R² is below 0.6.
 - Prepare driver skill offsets once the baseline curve is stable.
 - Keep the XGBoost dataset work separate until the Day 7/8 tasks.

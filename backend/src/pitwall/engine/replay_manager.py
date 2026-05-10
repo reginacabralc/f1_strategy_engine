@@ -18,7 +18,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from pitwall.core.topics import Topics
@@ -83,7 +83,7 @@ class ReplayManager:
         self._run_id = uuid4()
         self._session_id = session_id
         self._speed_factor = speed_factor
-        self._started_at = datetime.now(timezone.utc)
+        self._started_at = datetime.now(UTC)
         self._feed = ReplayFeed(events, speed_factor=speed_factor)
         self._task = asyncio.create_task(self._run(), name=f"replay-{session_id}")
         return self._run_id
