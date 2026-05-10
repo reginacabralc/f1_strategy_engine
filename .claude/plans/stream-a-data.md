@@ -40,13 +40,26 @@ docs/adr/0009-xgboost-vs-scipy-resultados.md
 
 ## Tareas
 
-### Día 1 — Kickoff
-- [ ] Proponer `docs/interfaces/db_schema_v1.sql` final.
-- [ ] Acordar interfaz `PacePredictor` con Stream B.
-- [ ] Confirmar rondas de demo (Mónaco=6, Hungría=11, Bahrein=1 — verificar números reales en FastF1).
+### Day 1 — Kickoff ✅
+
+- [x] Propose final `docs/interfaces/db_schema_v1.sql` (English, hypertable PK fixed, CHECK constraints).
+- [x] Define the `PacePredictor` Protocol in `backend/src/pitwall/engine/projection.py` with `PaceContext` and `PacePrediction` (pending sign-off from Stream B).
+- [x] Lock the contract with unit tests in `backend/tests/unit/engine/test_projection.py`.
+- [x] **Verify FastF1 round numbers for the 2024 demo races.** Verified
+  against the 2024 calendar:
+  - **Bahrain GP = round 1** (2 March 2024)
+  - **Monaco GP = round 8** (26 May 2024)
+  - **Hungarian GP = round 13** (21 July 2024)
+
+  Earlier drafts of the master plan and walkthrough had `ROUND=11` for
+  Hungary (round 11 in 2024 is Austria) and `Mónaco=6`. README and
+  walkthrough have been corrected; the master plan's "Primeras 15 tareas"
+  section still lists the wrong placeholder (acceptable — the master plan
+  is a snapshot, the per-stream plans take precedence).
 
 ### Día 2 — Ingesta (E2)
-- [ ] `scripts/ingest_season.py --year 2024 --rounds 1,6,11` funcional.
+
+- [ ] `scripts/ingest_season.py --year 2024 --rounds 1,8,13` funcional.
 - [ ] Activar `fastf1.Cache.enable_cache(./data/cache)`.
 - [ ] Pin `fastf1==X.Y.Z` en pyproject.
 - [ ] Notebook `notebooks/01_explore_fastf1.ipynb` mostrando estructura.

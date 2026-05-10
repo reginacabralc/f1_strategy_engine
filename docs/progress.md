@@ -27,10 +27,18 @@
 - [x] `.claude/plans/00-master-plan.md` commiteado al repo.
 
 ### Día 1 — Kickoff
-- [ ] Stream A: schema DB v1 propuesto en `docs/interfaces/db_schema_v1.sql`.
+- [x] **Stream A**: schema DB v1 proposed in `docs/interfaces/db_schema_v1.sql`
+      (English, hypertable PK fixed to include `ts`, CHECK constraints added).
+- [x] **Stream A**: `PacePredictor` Protocol + `PaceContext` + `PacePrediction`
+      defined in `backend/src/pitwall/engine/projection.py`
+      (pending sign-off from Stream B).
+- [x] **Stream A**: contract tests in `backend/tests/unit/engine/test_projection.py`.
+- [x] **Stream A**: 2024 demo round numbers verified — Bahrain=1, Monaco=8, Hungary=13.
+      README and walkthrough corrected (the previous `ROUND=11` for Hungary was
+      Austria 2024).
 - [ ] Stream B: OpenAPI v1 esqueleto + WebSocket messages.
 - [ ] Stream B: Replay event format propuesto.
-- [ ] Stream A+B: firma de `PacePredictor` acordada.
+- [ ] Stream A+B: `PacePredictor` signature signed off (waiting on B).
 - [ ] Stream D: branch `bootstrap` con `.gitignore`, pyproject.toml, package.json, docker-compose esqueleto.
 - [ ] Stream D: ADRs 0001-0004 escritos.
 

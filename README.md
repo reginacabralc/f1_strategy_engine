@@ -37,12 +37,14 @@ make demo
 
 Esto levanta la base de datos, corre migraciones, carga 1 carrera de demo (Mónaco 2024), arranca backend en `http://localhost:8000` y frontend en `http://localhost:5173`. Ver más en [`docs/walkthrough.md`](docs/walkthrough.md).
 
-## Reproducir otra carrera
+## Replay another race
 
 ```bash
-make ingest YEAR=2024 ROUND=11   # Hungría
+make ingest YEAR=2024 ROUND=13   # Hungarian GP (round 13 of 2024)
 make replay SESSION=hungary_2024_R SPEED=30
 ```
+
+Demo race round numbers for 2024: **Bahrain = 1**, **Monaco = 8**, **Hungary = 13**.
 
 ## Stack
 

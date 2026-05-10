@@ -83,14 +83,15 @@ Compara las alertas que produce cada predictor. La quanta [`06-curva-fit-vs-xgbo
 ## 6. Cargar otra carrera
 
 ```bash
-# Cargar Hungría 2024 (round 11)
-make ingest YEAR=2024 ROUND=11
+# Load the 2024 Hungarian GP (round 13 of 2024)
+make ingest YEAR=2024 ROUND=13
 
-# Reproducirla
+# Replay it
 make replay SESSION=hungary_2024_R SPEED=30
 ```
 
-Para cargar todas las carreras de demo (Mónaco, Hungría, Bahrein):
+The three demo races for 2024 are: **Bahrain (round 1)**, **Monaco (round 8)**,
+**Hungary (round 13)**. To load all three at once:
 
 ```bash
 make ingest-demo
