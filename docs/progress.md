@@ -36,9 +36,19 @@
 - [x] **Stream A**: 2024 demo round numbers verified — Bahrain=1, Monaco=8, Hungary=13.
       README and walkthrough corrected (the previous `ROUND=11` for Hungary was
       Austria 2024).
-- [ ] Stream B: OpenAPI v1 esqueleto + WebSocket messages.
-- [ ] Stream B: Replay event format propuesto.
-- [ ] Stream A+B: `PacePredictor` signature signed off (waiting on B).
+- [x] **Stream B**: OpenAPI v1 finalised in `docs/interfaces/openapi_v1.yaml`
+      (9 paths, 17 schemas, error responses, examples, validated with
+      `openapi-spec-validator`).
+- [x] **Stream B**: WebSocket message spec finalised in
+      `docs/interfaces/websocket_messages.md` (8 server→client types,
+      reconnect / heartbeat / backpressure semantics).
+- [x] **Stream B**: Replay event format finalised in
+      `docs/interfaces/replay_event_format.md` (8 event types,
+      ordering guarantees, pacing algorithm).
+- [x] **Stream A+B**: `PacePredictor` signed off. Cross-stream contract
+      test in `backend/tests/contract/test_pace_predictor_contract.py`
+      proves the engine's projection-loop call pattern works against
+      Stream A's surface.
 - [ ] Stream D: branch `bootstrap` con `.gitignore`, pyproject.toml, package.json, docker-compose esqueleto.
 - [ ] Stream D: ADRs 0001-0004 escritos.
 
@@ -47,7 +57,28 @@
 - [ ] Stream D: GitHub Actions lint + test corriendo en PR.
 - [ ] Stream A: `scripts/ingest_season.py` funcional para 1 ronda.
 - [ ] Stream A: Notebook 01_explore_fastf1.
-- [ ] Stream B: `RaceFeed` interface + `ReplayFeed` con fixture sintético.
+- [x] **Stream B**: `RaceFeed` Protocol + event payload `TypedDict`s
+      in `backend/src/pitwall/feeds/base.py`; `ReplayFeed` skeleton in
+      `backend/src/pitwall/feeds/replay.py` with `t0`-anchored pacing
+      and cancellable `stop()`; `OpenF1Feed` stub raises on
+      instantiation per ADR 0002.
+- [x] **Stream B**: FastAPI app at `backend/src/pitwall/api/main.py`
+      with `/health`, `/ready`, and `/api/v1/sessions`. Sessions route
+      reads from a `SessionRepository` Protocol injected via
+      `app.dependency_overrides` — Stream A drops in a SQL
+      implementation on Day 3 by editing one function. V1 default is
+      `InMemorySessionRepository` with the three demo races.
+- [x] **Stream B**: OpenAPI export script at
+      `scripts/export_openapi.py` (JSON or YAML output). Contract test
+      at `backend/tests/contract/test_openapi_export.py` enforces that
+      every implemented route's `operationId` and tags match the
+      static `docs/interfaces/openapi_v1.yaml`.
+- [x] **Stream B**: 60 tests passing (10 replay + 8 API + 11 OpenAPI
+      contract + 4 PacePredictor contract + 27 projection unit).
+      `backend/pyproject.toml` extended with FastAPI/uvicorn/pydantic/
+      pydantic-settings/structlog runtime deps and httpx/pyyaml/
+      openapi-spec-validator dev deps; the additions are clearly
+      labelled so Stream D's Day 1 becomes verify-and-extend.
 - [ ] Stream C: Vite app + TanStack Query consultando `/sessions`.
 
 ### Día 3
