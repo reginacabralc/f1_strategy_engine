@@ -63,8 +63,6 @@
 ### Día 2
 - [ ] Stream D: docker-compose up funcional (3 servicios up sin errores). DB-only currently; backend+frontend Dockerfiles pending.
 - [x] **Stream D**: GitHub Actions `lint.yml` + `test.yml` added (Day 1 carry-over, landed with audit PR).
-- [ ] Stream A: `scripts/ingest_season.py` funcional para 1 ronda.
-- [ ] Stream A: Notebook 01_explore_fastf1.
 - [x] **Stream B**: `RaceFeed` Protocol + event payload `TypedDict`s
       in `backend/src/pitwall/feeds/base.py`; `ReplayFeed` skeleton in
       `backend/src/pitwall/feeds/replay.py` with `t0`-anchored pacing
@@ -95,13 +93,17 @@
       timedelta-to-ms conversion, and null cleanup at write boundaries.
 - [x] Stream A: Notebook 01_explore_fastf1.
       Implemented as `notebooks/01_explore_fastf1.md` to avoid noisy notebook JSON before exploratory plots exist.
-- [ ] Stream B: `RaceFeed` interface + `ReplayFeed` con fixture sintético.
 - [ ] Stream C: Vite app + TanStack Query consultando `/sessions`.
 
 ### Día 3
 - [x] Stream A: 2024 cargado a DB (3 carreras demo).
       Loaded Bahrain 2024 R (`bahrain_2024_R`), Monaco 2024 R (`monaco_2024_R`),
-      and Hungary 2024 R (`hungarian_2024_R`) through idempotent DB upserts.
+      and Hungary 2024 R (`hungary_2024_R`) through idempotent DB upserts.
+      **Note**: a post-merge slug fix corrected `"hungarian_2024_R"` →
+      `"hungary_2024_R"` in code. Alembic migrations
+      `0003_canonical_hungary_slug.py` and
+      `0004_canonical_hungary_coefficient_sources.py` repair existing local
+      DBs without wiping the Docker volume.
       `make validate-demo` checks laps, stints, pit stops, weather, and clean lap availability.
       Latest local validation: Bahrain 1129 laps/63 stints/86 pit stops/157 weather rows;
       Monaco 1237/43/46/200; Hungary 1355/60/82/155.
@@ -111,7 +113,12 @@
       `clean_air_lap_times` materialized view. Repro path: `make db-up && make migrate`.
       DB utilities live in `backend/src/pitwall/db/engine.py`; Make targets cover
       DB lifecycle, migration, ingestion, validation, tests, and lint.
-- [ ] Stream B: ReplayFeed leyendo de DB real (no fixture).
+- [x] Stream A+B: ReplayFeed leyendo de DB real (no fixture).
+      Added `SqlSessionRepository` and `SqlSessionEventLoader`, wired through
+      `backend/src/pitwall/api/dependencies.py` when `DATABASE_URL` is
+      configured. Local API smoke with Docker DB: `/api/v1/sessions` returned
+      `bahrain_2024_R`, `monaco_2024_R`, `hungary_2024_R`; replay start/stop
+      for `monaco_2024_R` returned 202/200 using DB events.
 - [ ] Stream C: SessionPicker + RaceTable mock funcional.
 - [ ] Stream D: Dockerfile multi-stage para backend.
 
@@ -126,6 +133,14 @@
       should improve filtering/normalization or document the limitation.
       Added Alembic `0002_clean_air_lap_times.py`, degradation unit tests, and
       `notebooks/02_fit_degradation.md`.
+- [x] Stream A: `ScipyPredictor` implementado contra `PacePredictor`.
+      `backend/src/pitwall/degradation/predictor.py` loads `quadratic_v1`
+      coefficients, predicts from `PaceContext`, returns `PacePrediction`, and
+      reports R² as confidence. Unit tests confirm protocol compatibility,
+      missing-coefficient errors, and coefficient loading. Docker-backed smoke
+      passed after fresh `make db-up && make migrate && make ingest-demo &&
+      make fit-degradation`: Monaco MEDIUM tyre age 10 predicts 81,366 ms with
+      confidence 0.362.
 - [ ] Stream B: Motor undercut esqueleto + RaceState.
 - [ ] Stream C: Cliente API + hook WS esqueleto.
 - [ ] Stream D: Logs estructurados, /health endpoint.
@@ -134,6 +149,8 @@
 - [ ] Stream A: Coeficientes en DB + notebook 02 con R² ≥ 0.6.
       Day 4 created `notebooks/02_fit_degradation.md`; Day 5 should confirm
       persisted demo coefficients and document actual R² thresholds/plots.
+      `ScipyPredictor` exists now, but the real-data MAE target and engine
+      integration remain pending.
 - [ ] Stream B: Motor calculando undercut V1 con `ScipyPredictor`.
 - [ ] Stream C: DegradationChart con datos mock.
 - [ ] Stream D: CI verde con tests reales.

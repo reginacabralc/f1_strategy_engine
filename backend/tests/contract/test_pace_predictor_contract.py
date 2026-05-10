@@ -35,18 +35,18 @@ class _LinearPredictor:
     """One base lap-time + one degradation rate per compound."""
 
     BASE_MS: ClassVar[dict[str, int]] = {
-        "SOFT":   73_500,
+        "SOFT": 73_500,
         "MEDIUM": 75_000,
-        "HARD":   76_000,
-        "INTER":  95_000,
-        "WET":   105_000,
+        "HARD": 76_000,
+        "INTER": 95_000,
+        "WET": 105_000,
     }
     RATE_MS_PER_LAP: ClassVar[dict[str, int]] = {
-        "SOFT":   200,
+        "SOFT": 200,
         "MEDIUM": 100,
-        "HARD":    50,
-        "INTER":  300,
-        "WET":    400,
+        "HARD": 50,
+        "INTER": 300,
+        "WET": 400,
     }
 
     def predict(self, ctx: PaceContext) -> PacePrediction:

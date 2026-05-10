@@ -6,19 +6,18 @@ requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "PitWall Team" }]
 
-# Dependencies are layered by stream (keep additions additive):
-#   Stream A, Day 1: nothing (PacePredictor uses only the stdlib).
-#   Stream B, Day 2: HTTP surface + feed abstractions.
-#   Stream A, Day 3: FastF1 ingestion, DB, data processing.
-#   Stream D, Day 1: merged both blocks into one valid TOML array; added xgboost.
+# Dependencies are layered by stream and added additively.
+# Stream B Day 2: HTTP surface, feed abstractions, config & logging.
+# Stream A Day 2-3: FastF1 ingestion, DB access, data processing.
+# Stream D Day 1: merged duplicate TOML blocks (bug fix); added xgboost.
 dependencies = [
-    # Stream B, Day 2 — backend HTTP surface, feed abstractions, config & logging
+    # Stream B, Day 2 — backend HTTP surface
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
     "pydantic>=2.6.0",
     "pydantic-settings>=2.4.0",
     "structlog>=24.1.0",
-    # Stream A, Day 3 — FastF1 ingestion, DB, data processing
+    # Stream A, Day 2-3 — FastF1 ingestion, DB access, data processing
     "alembic>=1.13",
     "fastf1==3.8.3",
     "numpy>=1.26",

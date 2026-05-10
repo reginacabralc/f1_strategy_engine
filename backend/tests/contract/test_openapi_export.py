@@ -29,7 +29,7 @@ into the "OpenAPI in CI" deliverable noted in the Day 2 plan.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 import yaml
@@ -44,9 +44,11 @@ STATIC_SPEC = REPO_ROOT / "docs" / "interfaces" / "openapi_v1.yaml"
 # routes land; CI will then enforce that those routes stay in sync with
 # the static contract.
 IMPLEMENTED: dict[str, set[str]] = {
-    "/health":                {"get"},
-    "/ready":                 {"get"},
-    "/api/v1/sessions":       {"get"},
+    "/health":                 {"get"},
+    "/ready":                  {"get"},
+    "/api/v1/sessions":        {"get"},
+    "/api/v1/replay/start":    {"post"},
+    "/api/v1/replay/stop":     {"post"},
 }
 
 
@@ -58,7 +60,7 @@ IMPLEMENTED: dict[str, set[str]] = {
 @pytest.fixture(scope="module")
 def static_spec() -> dict[str, Any]:
     with STATIC_SPEC.open() as f:
-        return dict(yaml.safe_load(f))
+        return cast(dict[str, Any], yaml.safe_load(f))
 
 
 @pytest.fixture(scope="module")

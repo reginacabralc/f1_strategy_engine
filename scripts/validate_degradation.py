@@ -10,6 +10,8 @@ from sqlalchemy import text
 
 from pitwall.db.engine import create_db_engine
 from pitwall.degradation.dataset import DEMO_SESSION_IDS
+from pitwall.degradation.predictor import ScipyPredictor
+from pitwall.engine.projection import PaceContext
 
 SUMMARY_SQL = text(
     """
@@ -59,11 +61,26 @@ def main() -> int:
             ).one()._mapping
         )
         coefficients = [dict(row._mapping) for row in connection.execute(COEFFICIENT_SQL)]
+        predictor = ScipyPredictor.from_connection(connection)
 
     print("Degradation validation summary")
     print_table([summary], list(summary))
     print("\nCoefficient rows")
     print_table(coefficients, ["circuit_id", "compound", "n_laps", "r2", "rmse_ms", "source_sessions"])
+    if predictor.is_available("monaco", "MEDIUM"):
+        prediction = predictor.predict(
+            PaceContext(
+                driver_code="LEC",
+                circuit_id="monaco",
+                compound="MEDIUM",
+                tyre_age=10,
+            )
+        )
+        print(
+            "\nScipyPredictor smoke: "
+            f"monaco MEDIUM age 10 -> {prediction.predicted_lap_time_ms} ms "
+            f"(confidence {prediction.confidence:.3f})"
+        )
 
     if int(summary["demo_laps"] or 0) <= 0:
         raise SystemExit("No demo lap data found")
@@ -81,7 +98,7 @@ def main() -> int:
 def print_table(rows: Iterable[dict[str, Any]], columns: list[str]) -> None:
     rows = list(rows)
     widths = {
-        column: max(len(column), *(len(str(row.get(column, ""))) for row in rows))
+        column: max([len(column), *(len(str(row.get(column, ""))) for row in rows)])
         for column in columns
     }
     print(" | ".join(column.ljust(widths[column]) for column in columns))
