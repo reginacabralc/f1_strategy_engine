@@ -29,7 +29,7 @@ Más detalle: [`docs/architecture.md`](docs/architecture.md).
 Pre-requisitos: Docker Desktop, GNU Make, ~10 GB libres.
 
 ```bash
-git clone https://github.com/<owner>/f1_strategy_engine.git
+git clone https://github.com/reginacabralc/f1_strategy_engine.git
 cd f1_strategy_engine
 cp .env.example .env
 make demo
@@ -66,7 +66,7 @@ Switch en runtime con `PACE_PREDICTOR=scipy|xgb`. Resultados del experimento en 
 
 ## Estado actual
 
-Proyecto en construcción activa (sprint 2 semanas, equipo de 4). Ver [`docs/progress.md`](docs/progress.md) para el avance día a día.
+Proyecto en construcción activa (sprint 2 semanas, equipo de 4). Ver [`docs/progress.md`](docs/progress.md) para el avance día a día. 
 
 ## Documentación
 
