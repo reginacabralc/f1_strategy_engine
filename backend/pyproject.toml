@@ -6,12 +6,20 @@ requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "PitWall Team" }]
 
-# Stream A, Day 1: minimal dependencies — the PacePredictor interface uses
-# only the standard library. Stream D will expand this file on its own
-# Day 1 with the full backend stack (FastAPI, uvicorn, structlog, SQLModel,
-# Alembic, psycopg, Polars, scipy, xgboost, FastF1, etc.). Keep additions
-# additive; do not reorganise this skeleton without coordinating with D.
-dependencies = []
+# Stream A, Day 3: FastF1 ingestion writes normalized local parquet outputs
+# and idempotent rows into local TimescaleDB/Postgres.
+# Keep additions additive; do not reorganise this skeleton without coordinating
+# with Stream D.
+dependencies = [
+    "alembic>=1.13",
+    "fastf1==3.8.3",
+    "numpy>=1.26",
+    "polars>=1.0",
+    "psycopg[binary]>=3.1",
+    "python-dotenv>=1.0",
+    "scipy>=1.11",
+    "sqlalchemy>=2.0",
+]
 
 [project.optional-dependencies]
 dev = [

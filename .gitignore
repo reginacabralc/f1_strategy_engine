@@ -55,6 +55,7 @@ docker-compose.override.yaml
 # FastF1 cache (puede crecer a varios GB)
 data/cache/
 data/raw/
+data/processed/
 
 # Modelos serializados grandes (regenerables)
 models/*.json
@@ -66,3 +67,5 @@ models/*.bin
 
 # Claude / agent local state
 .claude/settings.local.json
+
+.DS_Store
