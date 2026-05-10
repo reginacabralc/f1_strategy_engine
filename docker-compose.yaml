@@ -1,0 +1,20 @@
+services:
+  db:
+    image: timescale/timescaledb:2.17.2-pg15
+    container_name: pitwall-db
+    environment:
+      POSTGRES_USER: pitwall
+      POSTGRES_PASSWORD: pitwall
+      POSTGRES_DB: pitwall
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pitwall -d pitwall"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  pgdata:
