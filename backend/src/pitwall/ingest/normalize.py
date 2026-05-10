@@ -9,6 +9,13 @@ from math import isfinite, isnan
 from typing import Any, cast
 
 VALID_COMPOUNDS = {"SOFT", "MEDIUM", "HARD", "INTER", "WET"}
+
+# FastF1 event names whose slugified form doesn't match the canonical circuit_id.
+# "Hungarian Grand Prix" → slugify → "hungarian" but the circuit/session id must be "hungary".
+CIRCUIT_SLUG_OVERRIDES: dict[str, str] = {
+    "hungarian": "hungary",
+}
+
 TRACK_STATUS_MAP = {
     "1": "GREEN",
     "2": "YELLOW",
@@ -154,6 +161,17 @@ def slugify(value: str) -> str:
     return slug or "unknown"
 
 
+def circuit_slug(value: str) -> str:
+    """Derive a canonical circuit_id slug from an event name or location.
+
+    Applies :data:`CIRCUIT_SLUG_OVERRIDES` after slugifying so that event
+    names like "Hungarian Grand Prix" produce "hungary" rather than
+    "hungarian", matching the circuit_id agreed in ``openapi_v1.yaml``.
+    """
+    slug = slugify(value)
+    return CIRCUIT_SLUG_OVERRIDES.get(slug, slug)
+
+
 def build_session_id(event: Mapping[str, Any] | Any, year: int, session_code: str) -> str:
     """Build a deterministic session id such as ``monaco_2024_R``."""
 
@@ -161,7 +179,7 @@ def build_session_id(event: Mapping[str, Any] | Any, year: int, session_code: st
     event_name = first_present(event_record, "EventName", "OfficialEventName", "Name", "Location")
     if event_name is None and hasattr(event, "get"):
         event_name = event.get("EventName") or event.get("Location")
-    return f"{slugify(str(event_name or 'unknown'))}_{year}_{session_code}"
+    return f"{circuit_slug(str(event_name or 'unknown'))}_{year}_{session_code}"
 
 
 def normalize_laps(

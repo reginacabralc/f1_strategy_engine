@@ -36,15 +36,49 @@
 - [x] **Stream A**: 2024 demo round numbers verified — Bahrain=1, Monaco=8, Hungary=13.
       README and walkthrough corrected (the previous `ROUND=11` for Hungary was
       Austria 2024).
-- [ ] Stream B: OpenAPI v1 esqueleto + WebSocket messages.
-- [ ] Stream B: Replay event format propuesto.
-- [ ] Stream A+B: `PacePredictor` signature signed off (waiting on B).
+- [x] **Stream B**: OpenAPI v1 finalised in `docs/interfaces/openapi_v1.yaml`
+      (9 paths, 17 schemas, error responses, examples, validated with
+      `openapi-spec-validator`).
+- [x] **Stream B**: WebSocket message spec finalised in
+      `docs/interfaces/websocket_messages.md` (8 server→client types,
+      reconnect / heartbeat / backpressure semantics).
+- [x] **Stream B**: Replay event format finalised in
+      `docs/interfaces/replay_event_format.md` (8 event types,
+      ordering guarantees, pacing algorithm).
+- [x] **Stream A+B**: `PacePredictor` signed off. Cross-stream contract
+      test in `backend/tests/contract/test_pace_predictor_contract.py`
+      proves the engine's projection-loop call pattern works against
+      Stream A's surface.
 - [ ] Stream D: branch `bootstrap` con `.gitignore`, pyproject.toml, package.json, docker-compose esqueleto.
 - [ ] Stream D: ADRs 0001-0004 escritos.
 
 ### Día 2
 - [ ] Stream D: docker-compose up funcional (3 servicios up sin errores).
 - [ ] Stream D: GitHub Actions lint + test corriendo en PR.
+- [ ] Stream A: `scripts/ingest_season.py` funcional para 1 ronda.
+- [ ] Stream A: Notebook 01_explore_fastf1.
+- [x] **Stream B**: `RaceFeed` Protocol + event payload `TypedDict`s
+      in `backend/src/pitwall/feeds/base.py`; `ReplayFeed` skeleton in
+      `backend/src/pitwall/feeds/replay.py` with `t0`-anchored pacing
+      and cancellable `stop()`; `OpenF1Feed` stub raises on
+      instantiation per ADR 0002.
+- [x] **Stream B**: FastAPI app at `backend/src/pitwall/api/main.py`
+      with `/health`, `/ready`, and `/api/v1/sessions`. Sessions route
+      reads from a `SessionRepository` Protocol injected via
+      `app.dependency_overrides` — Stream A drops in a SQL
+      implementation on Day 3 by editing one function. V1 default is
+      `InMemorySessionRepository` with the three demo races.
+- [x] **Stream B**: OpenAPI export script at
+      `scripts/export_openapi.py` (JSON or YAML output). Contract test
+      at `backend/tests/contract/test_openapi_export.py` enforces that
+      every implemented route's `operationId` and tags match the
+      static `docs/interfaces/openapi_v1.yaml`.
+- [x] **Stream B**: 60 tests passing (10 replay + 8 API + 11 OpenAPI
+      contract + 4 PacePredictor contract + 27 projection unit).
+      `backend/pyproject.toml` extended with FastAPI/uvicorn/pydantic/
+      pydantic-settings/structlog runtime deps and httpx/pyyaml/
+      openapi-spec-validator dev deps; the additions are clearly
+      labelled so Stream D's Day 1 becomes verify-and-extend.
 - [x] Stream A: `scripts/ingest_season.py` funcional para 1 ronda.
       Day 2 scope narrowed to one FastF1 race/session: default Monaco 2024 round 8 session R,
       dry-run writer under `data/processed/`, DB mode deferred until Stream D DB/Alembic utilities land.
@@ -53,13 +87,15 @@
       timedelta-to-ms conversion, and null cleanup at write boundaries.
 - [x] Stream A: Notebook 01_explore_fastf1.
       Implemented as `notebooks/01_explore_fastf1.md` to avoid noisy notebook JSON before exploratory plots exist.
-- [ ] Stream B: `RaceFeed` interface + `ReplayFeed` con fixture sintético.
 - [ ] Stream C: Vite app + TanStack Query consultando `/sessions`.
 
 ### Día 3
 - [x] Stream A: 2024 cargado a DB (3 carreras demo).
       Loaded Bahrain 2024 R (`bahrain_2024_R`), Monaco 2024 R (`monaco_2024_R`),
-      and Hungary 2024 R (`hungarian_2024_R`) through idempotent DB upserts.
+      and Hungary 2024 R (`hungary_2024_R`) through idempotent DB upserts.
+      **Note**: a post-merge slug fix corrected `"hungarian_2024_R"` →
+      `"hungary_2024_R"` in code; re-run `make db-down && make db-up &&
+      make migrate && make ingest-demo` to reload DB with the correct IDs.
       `make validate-demo` checks laps, stints, pit stops, weather, and clean lap availability.
       Latest local validation: Bahrain 1129 laps/63 stints/86 pit stops/157 weather rows;
       Monaco 1237/43/46/200; Hungary 1355/60/82/155.

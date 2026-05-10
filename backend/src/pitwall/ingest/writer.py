@@ -8,7 +8,7 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any, Protocol
 
-from pitwall.ingest.normalize import clean_nulls, slugify, to_bool
+from pitwall.ingest.normalize import circuit_slug, clean_nulls, slugify, to_bool
 
 INSERT_ORDER = [
     "seasons",
@@ -306,7 +306,7 @@ def write_payloads_to_database(
 
 def _metadata_circuit_id(metadata: dict[str, Any]) -> str:
     value = metadata.get("event_name") or metadata.get("location") or metadata["session_id"]
-    return slugify(str(value))
+    return circuit_slug(str(value))
 
 
 def _metadata_event_id(metadata: dict[str, Any], circuit_id: str) -> str:
