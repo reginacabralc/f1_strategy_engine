@@ -87,13 +87,15 @@
       timedelta-to-ms conversion, and null cleanup at write boundaries.
 - [x] Stream A: Notebook 01_explore_fastf1.
       Implemented as `notebooks/01_explore_fastf1.md` to avoid noisy notebook JSON before exploratory plots exist.
-- [ ] Stream B: `RaceFeed` interface + `ReplayFeed` con fixture sintético.
 - [ ] Stream C: Vite app + TanStack Query consultando `/sessions`.
 
 ### Día 3
 - [x] Stream A: 2024 cargado a DB (3 carreras demo).
       Loaded Bahrain 2024 R (`bahrain_2024_R`), Monaco 2024 R (`monaco_2024_R`),
-      and Hungary 2024 R (`hungarian_2024_R`) through idempotent DB upserts.
+      and Hungary 2024 R (`hungary_2024_R`) through idempotent DB upserts.
+      **Note**: a post-merge slug fix corrected `"hungarian_2024_R"` →
+      `"hungary_2024_R"` in code; re-run `make db-down && make db-up &&
+      make migrate && make ingest-demo` to reload DB with the correct IDs.
       `make validate-demo` checks laps, stints, pit stops, weather, and clean lap availability.
       Latest local validation: Bahrain 1129 laps/63 stints/86 pit stops/157 weather rows;
       Monaco 1237/43/46/200; Hungary 1355/60/82/155.

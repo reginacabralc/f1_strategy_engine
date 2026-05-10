@@ -9,7 +9,7 @@ from typing import Any, Protocol
 from pitwall.degradation.models import VALID_FIT_COMPOUNDS
 from pitwall.ingest.normalize import clean_nulls, to_bool, to_int
 
-DEMO_SESSION_IDS = ("bahrain_2024_R", "monaco_2024_R", "hungarian_2024_R")
+DEMO_SESSION_IDS = ("bahrain_2024_R", "monaco_2024_R", "hungary_2024_R")
 
 
 class QueryConnection(Protocol):

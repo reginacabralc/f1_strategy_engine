@@ -123,11 +123,46 @@ the static `docs/interfaces/openapi_v1.yaml`.
 
 
 
-### Día 3 — Replay completo (E5)
-- [ ] `ReplayFeed` lee de DB real (no fixture).
-- [ ] `topics.py` con `events_topic`, `alerts_topic`, `snapshot_topic`.
-- [ ] Endpoint `POST /api/v1/replay/start`, `POST /api/v1/replay/stop`.
-- [ ] Tests: replay de 10 vueltas mock genera 10 lap_complete events.
+### Day 3 — Replay completo (E5) ✅
+
+- [x] **`core/topics.py`** — `Topics` dataclass with three `asyncio.Queue`
+  channels (`events`, `alerts`, `snapshots`). ADR 0007: no broker.
+  Queues are created synchronously (Python 3.10+) and stored on
+  `app.state` by `create_app()`.
+- [x] **`repositories/events.py`** — `SessionEventLoader` Protocol +
+  `InMemorySessionEventLoader` fixture loader. Same seam pattern as
+  `SessionRepository`: Stream A drops a SQL implementation in by
+  editing `api.dependencies.get_event_loader`.
+- [x] **`engine/replay_manager.py`** — `ReplayManager` drives one
+  active `ReplayFeed` into `topics.events` via a background
+  `asyncio.Task`. Exposes `start(session_id, speed_factor, events) → UUID`,
+  `stop() → UUID | None`, and `is_running` / `current_session_id`
+  properties. `stop()` signals the feed, waits 2 s, then cancels.
+- [x] **`api/routes/replay.py`** — `POST /api/v1/replay/start`
+  (`startReplay`, 202) and `POST /api/v1/replay/stop` (`stopReplay`,
+  200) with operationIds matching the static spec. 409 on duplicate
+  start, 404 when session has no events.
+- [x] **`api/main.py`** updated — lifespan for graceful shutdown,
+  `Topics` + `ReplayManager` created synchronously in `create_app()`
+  and stored on `app.state`. Replay router included.
+- [x] **`api/dependencies.py`** updated — `get_event_loader()`,
+  `get_replay_manager(request)`, `get_topics(request)` providers added.
+- [x] **104 tests passing** (8 replay API + 8 `ReplayManager` unit +
+  17 OpenAPI contract + 4 `PacePredictor` contract + 27 projection unit
+  + 10 `ReplayFeed` + 5 sessions + 3 health + 4 DB engine + 4 dataset
+  + 2 degradation writer + 4 fit + 6 normalize + 4 ingest writer + 2
+  degradation writer).
+- [x] **Contract test** `test_openapi_export.py` `IMPLEMENTED` dict
+  extended with `/api/v1/replay/start` and `/api/v1/replay/stop`.
+
+#### DB note
+`ReplayFeed` still reads from the in-memory loader (Stream A wires
+the SQL loader on Day 3 of their stream). The `SessionEventLoader`
+Protocol is defined; Stream A implements `SqlSessionEventLoader` and
+edits `get_event_loader()` once demo data is in the DB. After fixing
+the `"hungarian_2024_R"` → `"hungary_2024_R"` slug inconsistency
+(post-merge fix), re-run:
+`make db-down && make db-up && make migrate && make ingest-demo && make fit-degradation`
 
 ### Día 4 — Estado del motor (E6 prep)
 - [ ] `RaceState` y `DriverState` dataclasses.

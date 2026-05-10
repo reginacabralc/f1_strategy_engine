@@ -71,4 +71,4 @@ def test_build_clean_lap_records_preserves_excluded_rows_for_diagnostics() -> No
 
 
 def test_demo_session_ids_are_stable_for_day3_data() -> None:
-    assert DEMO_SESSION_IDS == ("bahrain_2024_R", "monaco_2024_R", "hungarian_2024_R")
+    assert DEMO_SESSION_IDS == ("bahrain_2024_R", "monaco_2024_R", "hungary_2024_R")
