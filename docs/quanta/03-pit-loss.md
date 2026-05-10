@@ -1,0 +1,87 @@
+# Quanta 03 — Pit loss
+
+## Concepto
+
+El **pit loss** es el tiempo perdido al entrar a boxes, comparado con quedarse en pista. No es solo el "tiempo del pit stop" (que en F1 son 2-3 segundos):
+
+```
+pit_loss = (lap_time_in + duración_stop + lap_time_out) - 3·lap_time_potencial
+```
+
+Donde:
+
+- `lap_time_in` = vuelta de entrada (más lenta porque hay frenado para box)
+- `duración_stop` = tiempo estacionario del coche
+- `lap_time_out` = vuelta de salida (más lenta porque hay aceleración)
+- `lap_time_potencial` = vuelta normal con neumáticos del momento
+
+Típicamente está entre **18 y 24 segundos** dependiendo del circuito y del equipo.
+
+## Por qué importa para el producto
+
+El pit loss es la **barrera** que el undercut tiene que superar. Si subestimamos pit loss, generamos falsos positivos. Si sobreestimamos, no detectamos undercuts viables.
+
+## Cómo se modela en PitWall
+
+### V1 (entregable)
+
+Calculamos la **mediana histórica por (circuito, equipo)** sobre 2022-2024:
+
+```sql
+SELECT 
+  circuit_id, 
+  team_code, 
+  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY pit_loss_ms) AS pit_loss_ms,
+  COUNT(*) AS n_samples
+FROM pit_stops
+WHERE n_samples >= 5  -- solo estimaciones con suficientes muestras
+GROUP BY circuit_id, team_code;
+```
+
+Persistido en tabla `pit_loss_estimates`.
+
+### Fallbacks (en orden)
+
+1. Mediana específica `(circuit_id, team_code)`.
+2. Si `n_samples < 5`, mediana del circuito (todos los equipos).
+3. Si tampoco hay datos, valor de referencia teórico del circuito (`circuits.pit_lane_loss_seconds`).
+
+## Por qué varía
+
+| Factor | Efecto en pit loss |
+|--------|---------------------|
+| Longitud y forma del pit lane | Mónaco corto, Bahrein largo |
+| Speed limit | 60 km/h vs 80 km/h |
+| Equipo | Algunos teams hacen stops de 2.0 s, otros de 2.8 s consistentemente |
+| Posición de la salida del pit lane | Si sales en la curva 1 o en la recta principal cambia |
+| Tráfico al salir | Variable carrera a carrera; V1 lo ignora |
+
+## Ejemplo numérico
+
+Mónaco 2024, McLaren:
+
+```sql
+-- Datos hipotéticos
+team='McLaren', circuit='monaco', samples=8, median pit_loss=22_400 ms
+```
+
+→ `pit_loss_estimates[(monaco, McLaren)] = 22_400 ms`
+
+Si en V1 estimamos pit loss de Mercedes en Mónaco con solo 2 samples (n_samples < 5), caemos al fallback de circuito (mediana de todos los equipos en Mónaco).
+
+## Riesgos / variantes
+
+- **Slow stop**: si un equipo tiene un fallo (rueda mal apretada), ese pit_loss es 5+ segundos de outlier. Por eso usamos mediana, no media.
+- **Pit window forzada**: stops bajo SC tienen pit_loss menor (porque todos van más despacio en pista). Filtrar pit stops bajo SC del cálculo.
+- **Cambio de reglamento**: 2022 vs 2024 son eras distintas; teóricamente debería ajustar. V1 mezcla 2022-2024 simple.
+
+## Implementación
+
+- Cálculo histórico: [`scripts/compute_pit_loss.py`](../../scripts/compute_pit_loss.py)
+- Tabla: `pit_loss_estimates` (ver [`docs/interfaces/db_schema_v1.sql`](../interfaces/db_schema_v1.sql))
+- Lookup en runtime: [`backend/src/pitwall/engine/pit_loss.py`](../../backend/src/pitwall/engine/pit_loss.py)
+
+## Quanta relacionadas
+
+- [01 — Undercut](01-undercut.md)
+- [04 — Ventana de undercut](04-ventana-undercut.md)

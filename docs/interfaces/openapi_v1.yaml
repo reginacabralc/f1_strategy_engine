@@ -1,0 +1,280 @@
+# ============================================================================
+# PitWall OpenAPI v1 (esqueleto para kickoff)
+# ============================================================================
+# Esto es el esqueleto inicial acordado en kickoff. La fuente de verdad será
+# `openapi.json` auto-generado por FastAPI (ver ADR 0008). Este archivo se
+# mantiene en YAML para legibilidad humana y se regenera en CI.
+# ============================================================================
+
+openapi: 3.0.3
+info:
+  title: PitWall API
+  version: 0.1.0
+  description: |
+    Real-time F1 undercut detection engine.
+    See `docs/architecture.md` for context.
+
+servers:
+  - url: http://localhost:8000
+    description: Local dev
+  - url: http://backend:8000
+    description: Inside docker-compose network
+
+tags:
+  - name: sessions
+  - name: replay
+  - name: degradation
+  - name: backtest
+  - name: config
+  - name: health
+
+paths:
+
+  /health:
+    get:
+      tags: [health]
+      summary: Liveness probe
+      responses:
+        "200":
+          description: Process alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+
+  /ready:
+    get:
+      tags: [health]
+      summary: Readiness probe (DB connected, model loaded)
+      responses:
+        "200": { description: Ready }
+        "503": { description: Not ready }
+
+  /api/v1/sessions:
+    get:
+      tags: [sessions]
+      summary: Lista sesiones disponibles
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SessionSummary" }
+
+  /api/v1/sessions/{session_id}/snapshot:
+    get:
+      tags: [sessions]
+      summary: Snapshot del estado actual (si hay replay corriendo)
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RaceSnapshot" }
+        "404":
+          description: No active replay for this session
+
+  /api/v1/replay/start:
+    post:
+      tags: [replay]
+      summary: Inicia un replay
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [session_id]
+              properties:
+                session_id: { type: string, example: "monaco_2024_R" }
+                speed_factor: { type: number, default: 30, minimum: 1, maximum: 1000 }
+      responses:
+        "202":
+          description: Replay started
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReplayRun" }
+
+  /api/v1/replay/stop:
+    post:
+      tags: [replay]
+      summary: Detiene el replay activo
+      responses:
+        "200": { description: Stopped }
+
+  /api/v1/degradation:
+    get:
+      tags: [degradation]
+      summary: Curva de degradación ajustada
+      parameters:
+        - name: circuit
+          in: query
+          required: true
+          schema: { type: string }
+        - name: compound
+          in: query
+          required: true
+          schema: { type: string, enum: [SOFT, MEDIUM, HARD, INTER, WET] }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DegradationCurve" }
+
+  /api/v1/backtest/{session_id}:
+    get:
+      tags: [backtest]
+      summary: Resultados de backtest para esta sesión
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: predictor
+          in: query
+          required: false
+          schema: { type: string, enum: [scipy, xgb], default: xgb }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BacktestResult" }
+
+  /api/v1/config/predictor:
+    post:
+      tags: [config]
+      summary: Cambia el predictor activo en runtime
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [predictor]
+              properties:
+                predictor: { type: string, enum: [scipy, xgb] }
+      responses:
+        "200": { description: OK }
+
+components:
+  schemas:
+
+    Health:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+        version: { type: string, example: "0.1.0" }
+
+    SessionSummary:
+      type: object
+      properties:
+        session_id: { type: string, example: "monaco_2024_R" }
+        circuit_id: { type: string, example: monaco }
+        season: { type: integer, example: 2024 }
+        date: { type: string, format: date }
+        total_laps: { type: integer, example: 78 }
+
+    DriverState:
+      type: object
+      properties:
+        driver_code: { type: string, example: VER }
+        team_code: { type: string }
+        position: { type: integer }
+        gap_to_leader_ms: { type: integer }
+        gap_to_ahead_ms: { type: integer, nullable: true }
+        last_lap_ms: { type: integer, nullable: true }
+        compound: { type: string }
+        tyre_age: { type: integer }
+        is_in_pit: { type: boolean }
+        is_lapped: { type: boolean }
+        last_pit_lap: { type: integer, nullable: true }
+        stint_number: { type: integer }
+        undercut_score:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 1
+          description: Score de undercut hacia el piloto delante.
+
+    RaceSnapshot:
+      type: object
+      properties:
+        session_id: { type: string }
+        current_lap: { type: integer }
+        track_status: { type: string, enum: [GREEN, SC, VSC, RED, YELLOW] }
+        track_temp_c: { type: number, nullable: true }
+        drivers:
+          type: array
+          items: { $ref: "#/components/schemas/DriverState" }
+        active_predictor: { type: string, enum: [scipy, xgb] }
+        last_event_ts: { type: string, format: date-time }
+
+    DegradationCurve:
+      type: object
+      properties:
+        circuit_id: { type: string }
+        compound: { type: string }
+        coefficients:
+          type: object
+          properties:
+            a: { type: number }
+            b: { type: number }
+            c: { type: number }
+        r_squared: { type: number }
+        n_samples: { type: integer }
+        sample_points:
+          type: array
+          items:
+            type: object
+            properties:
+              tyre_age: { type: integer }
+              lap_time_ms: { type: integer }
+
+    ReplayRun:
+      type: object
+      properties:
+        run_id: { type: string, format: uuid }
+        session_id: { type: string }
+        speed_factor: { type: number }
+        started_at: { type: string, format: date-time }
+        pace_predictor: { type: string, enum: [scipy, xgb] }
+
+    BacktestResult:
+      type: object
+      properties:
+        session_id: { type: string }
+        predictor: { type: string, enum: [scipy, xgb] }
+        precision: { type: number }
+        recall: { type: number }
+        f1: { type: number }
+        mean_lead_time_laps: { type: number }
+        mae_k1_ms: { type: integer }
+        mae_k3_ms: { type: integer }
+        mae_k5_ms: { type: integer }
+        true_positives:
+          type: array
+          items: { $ref: "#/components/schemas/UndercutMatch" }
+        false_positives:
+          type: array
+          items: { $ref: "#/components/schemas/UndercutMatch" }
+        false_negatives:
+          type: array
+          items: { $ref: "#/components/schemas/UndercutMatch" }
+
+    UndercutMatch:
+      type: object
+      properties:
+        attacker: { type: string }
+        defender: { type: string }
+        lap_alerted: { type: integer, nullable: true }
+        lap_actual: { type: integer, nullable: true }
+        was_successful: { type: boolean, nullable: true }
