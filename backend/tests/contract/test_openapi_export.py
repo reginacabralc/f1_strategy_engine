@@ -45,9 +45,11 @@ STATIC_SPEC = REPO_ROOT / "docs" / "interfaces" / "openapi_v1.yaml"
 # routes land; CI will then enforce that those routes stay in sync with
 # the static contract.
 IMPLEMENTED: dict[str, set[str]] = {
-    "/health":                {"get"},
-    "/ready":                 {"get"},
-    "/api/v1/sessions":       {"get"},
+    "/health":                 {"get"},
+    "/ready":                  {"get"},
+    "/api/v1/sessions":        {"get"},
+    "/api/v1/replay/start":    {"post"},
+    "/api/v1/replay/stop":     {"post"},
 }
 
 
