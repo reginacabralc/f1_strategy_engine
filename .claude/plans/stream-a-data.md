@@ -121,17 +121,26 @@ docs/adr/0009-xgboost-vs-scipy-resultados.md
   - `backend/tests/unit/degradation/test_fit.py`.
   - `backend/tests/unit/degradation/test_degradation_writer.py`.
 - [x] Notebook/markdown `notebooks/02_fit_degradation.md`.
-- [ ] Definir interfaz `PacePredictor` (con B):
-  ```python
-  class PacePredictor(Protocol):
-      def predict(self, driver_code, compound, tyre_age, k=1) -> int: ...
-      def confidence(self, driver_code, compound) -> float: ...
-  ```
-- [ ] Implementar `ScipyPredictor`.
+- [x] Confirmar interfaz `PacePredictor` actual.
+  - La interfaz real ya existe en `backend/src/pitwall/engine/projection.py`.
+  - Firma vigente: `predict(ctx: PaceContext) -> PacePrediction` e
+    `is_available(circuit_id, compound) -> bool`.
+  - No se cambió la firma para no romper el contrato con Stream B; el sign-off
+    formal con B sigue trackeado en Día 1.
+- [x] Implementar `ScipyPredictor`.
+  - `backend/src/pitwall/degradation/predictor.py`.
+  - Carga coeficientes `quadratic_v1` desde `degradation_coefficients`.
+  - Satisface `PacePredictor` en runtime.
+  - Usa R² como `PacePrediction.confidence`.
+  - `scripts/validate_degradation.py` ahora incluye un smoke de predicción
+    Monaco MEDIUM age 10. Última validación Docker: 81,366 ms con confidence
+    0.362.
 
 ### Día 5 — Skill offsets + integración (E3)
 - [ ] Calcular `driver_skill_offsets` por (driver × circuito × compuesto).
-- [ ] Test unitario: ScipyPredictor reproduce vueltas conocidas con MAE < 0.5s.
+- [ ] Test unitario con datos reales/fixtures: ScipyPredictor reproduce vueltas conocidas con MAE < 0.5s.
+  - Ya existen tests sintéticos de contrato/cuadrática; falta fixture real o
+    snapshot pequeño para medir MAE.
 - [ ] Hito S1: motor B corre con `ScipyPredictor` real.
 
 ### Día 6 — Pit loss (E9 setup)

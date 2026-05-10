@@ -65,6 +65,24 @@ monaco          | MEDIUM   | 123    | 0.71 | 420     | fitted
 `fitted_warn` means the fit persisted but R² is below 0.60. Insufficient groups
 are printed but not persisted.
 
+## ScipyPredictor
+
+`backend/src/pitwall/degradation/predictor.py` implements the current
+`PacePredictor` contract from `backend/src/pitwall/engine/projection.py`:
+
+```python
+prediction = predictor.predict(PaceContext(
+    driver_code="LEC",
+    circuit_id="monaco",
+    compound="MEDIUM",
+    tyre_age=10,
+))
+```
+
+The predictor loads `quadratic_v1` rows from `degradation_coefficients`, applies
+`a + b * tyre_age + c * tyre_age^2`, rounds to whole milliseconds, and uses R²
+as prediction confidence.
+
 ## Current Day 4 local validation
 
 On the local demo DB after `make fit-degradation` and `make validate-degradation`:
@@ -80,9 +98,24 @@ quadratic is still mixing driver/team/fuel effects. That is acceptable for Day 4
 foundation, but Day 5 should either improve the clean-air normalization or
 document why the R² ≥ 0.6 target is not realistic for a given group.
 
+After the predictor addition, rerun this DB smoke:
+
+```bash
+make db-up
+make validate-degradation
+```
+
+The validation script now also instantiates `ScipyPredictor` and predicts Monaco
+MEDIUM at tyre age 10 when coefficients exist. Latest local smoke after a fresh
+Docker DB ingest:
+
+```text
+ScipyPredictor smoke: monaco MEDIUM age 10 -> 81366 ms (confidence 0.362)
+```
+
 ## Day 5 notes
 
-- Use the persisted coefficients as the source for `ScipyPredictor`.
+- Use `ScipyPredictor` from persisted coefficients inside the undercut engine once Stream B is ready to wire it.
 - Add richer notebook plots and call out where R² is below 0.6.
 - Prepare driver skill offsets once the baseline curve is stable.
 - Keep the XGBoost dataset work separate until the Day 7/8 tasks.

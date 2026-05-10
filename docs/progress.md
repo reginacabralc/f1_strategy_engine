@@ -4,7 +4,7 @@
 
 ## Hitos
 
-| Hito | Estado | Fecha objetivo | Notas |
+| Hito | Estado | Fecha objetivo![alt text](image.png) | Notas |
 |------|--------|----------------|-------|
 | Andamiaje docs creado | ✅ | Día 0 | Este commit |
 | Setup repo + Docker + CI verde | ⏳ | Día 2 | Stream D |
@@ -84,6 +84,14 @@
       should improve filtering/normalization or document the limitation.
       Added Alembic `0002_clean_air_lap_times.py`, degradation unit tests, and
       `notebooks/02_fit_degradation.md`.
+- [x] Stream A: `ScipyPredictor` implementado contra `PacePredictor`.
+      `backend/src/pitwall/degradation/predictor.py` loads `quadratic_v1`
+      coefficients, predicts from `PaceContext`, returns `PacePrediction`, and
+      reports R² as confidence. Unit tests confirm protocol compatibility,
+      missing-coefficient errors, and coefficient loading. Docker-backed smoke
+      passed after fresh `make db-up && make migrate && make ingest-demo &&
+      make fit-degradation`: Monaco MEDIUM tyre age 10 predicts 81,366 ms with
+      confidence 0.362.
 - [ ] Stream B: Motor undercut esqueleto + RaceState.
 - [ ] Stream C: Cliente API + hook WS esqueleto.
 - [ ] Stream D: Logs estructurados, /health endpoint.
@@ -92,6 +100,8 @@
 - [ ] Stream A: Coeficientes en DB + notebook 02 con R² ≥ 0.6.
       Day 4 created `notebooks/02_fit_degradation.md`; Day 5 should confirm
       persisted demo coefficients and document actual R² thresholds/plots.
+      `ScipyPredictor` exists now, but the real-data MAE target and engine
+      integration remain pending.
 - [ ] Stream B: Motor calculando undercut V1 con `ScipyPredictor`.
 - [ ] Stream C: DegradationChart con datos mock.
 - [ ] Stream D: CI verde con tests reales.

@@ -103,7 +103,7 @@ def main() -> int:
 def print_table(rows: Iterable[dict[str, Any]], columns: list[str]) -> None:
     rows = list(rows)
     widths = {
-        column: max(len(column), *(len(str(row.get(column, ""))) for row in rows))
+        column: max([len(column), *(len(str(row.get(column, ""))) for row in rows)])
         for column in columns
     }
     print(" | ".join(column.ljust(widths[column]) for column in columns))
