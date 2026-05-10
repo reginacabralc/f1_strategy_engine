@@ -6,6 +6,20 @@ requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "PitWall Team" }]
 
+# Dependencies are layered by stream:
+#   Stream A, Day 1: nothing (PacePredictor uses only the stdlib).
+#   Stream B, Day 2: HTTP surface + feed abstractions (the block below).
+#   Stream D, Day 1: will append the rest of the backend stack
+#                    (SQLModel, Alembic, psycopg, Polars, scipy, xgboost,
+#                    FastF1) without reorganising this list.
+# Keep additions additive.
+dependencies = [
+    # Stream B, Day 2 — backend HTTP surface, feed abstractions, config & logging
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.4.0",
+    "structlog>=24.1.0",
 # Stream A, Day 3: FastF1 ingestion writes normalized local parquet outputs
 # and idempotent rows into local TimescaleDB/Postgres.
 # Keep additions additive; do not reorganise this skeleton without coordinating
@@ -28,6 +42,10 @@ dev = [
     "hypothesis>=6.99",
     "ruff>=0.5",
     "mypy>=1.8",
+    # Test client for FastAPI + tooling for the OpenAPI contract test
+    "httpx>=0.27.0",
+    "pyyaml>=6.0",
+    "openapi-spec-validator>=0.7",
 ]
 
 [build-system]
