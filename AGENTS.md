@@ -69,6 +69,7 @@ Lista:
 - La interfaz `PacePredictor` en `backend/src/pitwall/engine/projection.py` (cuando exista).
 
 ## Cómo correr tests localmente
+- If running a python file or downloading a pip library, always activate the local .venv if not created, make one.
 
 ```bash
 make lint       # ruff + eslint + prettier

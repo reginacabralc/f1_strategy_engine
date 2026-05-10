@@ -87,6 +87,7 @@ make demo        # up + seed + abrir browser (target principal)
 - Backend: pytest + hypothesis. Tests de integración usan `testcontainers` para Postgres.
 - Frontend: vitest + React Testing Library + 1 happy-path Playwright.
 - **Replay-as-test**: el CI corre el `ReplayFeed` sobre Mónaco 2024 a 1000× y verifica métricas mínimas (precision/recall) en backtest.
+- If running a python file or downloading a pip library, always activate the local .venv if not created, make one.
 
 ## What NOT to do
 
