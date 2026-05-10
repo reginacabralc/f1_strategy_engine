@@ -12,7 +12,6 @@ from pitwall.api.main import create_app
 from pitwall.feeds.base import Event
 from pitwall.repositories.events import InMemorySessionEventLoader
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -94,7 +93,9 @@ def test_start_409_when_already_running() -> None:
     # Override the DI provider so the route receives our mock
     app.dependency_overrides[get_replay_manager] = lambda: mock_manager
 
-    loader = InMemorySessionEventLoader({"hungary_2024_R": _make_events(session_id="hungary_2024_R")})
+    loader = InMemorySessionEventLoader(
+        {"hungary_2024_R": _make_events(session_id="hungary_2024_R")}
+    )
     app.dependency_overrides[get_event_loader] = lambda: loader
 
     client = TestClient(app)

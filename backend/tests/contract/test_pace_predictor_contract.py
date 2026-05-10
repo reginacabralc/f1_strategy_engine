@@ -15,13 +15,14 @@ arrives in Stream B Day 5.
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from pitwall.engine import (
     Compound,
     PaceContext,
     PacePrediction,
     PacePredictor,
 )
-
 
 # --------------------------------------------------------------------------
 # Deterministic stub — only used by this contract test.
@@ -33,19 +34,19 @@ from pitwall.engine import (
 class _LinearPredictor:
     """One base lap-time + one degradation rate per compound."""
 
-    BASE_MS: dict[str, int] = {
-        "SOFT":   73_500,
+    BASE_MS: ClassVar[dict[str, int]] = {
+        "SOFT": 73_500,
         "MEDIUM": 75_000,
-        "HARD":   76_000,
-        "INTER":  95_000,
-        "WET":   105_000,
+        "HARD": 76_000,
+        "INTER": 95_000,
+        "WET": 105_000,
     }
-    RATE_MS_PER_LAP: dict[str, int] = {
-        "SOFT":   200,
+    RATE_MS_PER_LAP: ClassVar[dict[str, int]] = {
+        "SOFT": 200,
         "MEDIUM": 100,
-        "HARD":    50,
-        "INTER":  300,
-        "WET":    400,
+        "HARD": 50,
+        "INTER": 300,
+        "WET": 400,
     }
 
     def predict(self, ctx: PaceContext) -> PacePrediction:

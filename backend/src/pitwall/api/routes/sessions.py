@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
 
 from pitwall.api.dependencies import get_session_repository
@@ -9,6 +11,8 @@ from pitwall.api.schemas import SessionSummary
 from pitwall.repositories.sessions import SessionRepository, SessionRow
 
 router = APIRouter(prefix="/api/v1", tags=["sessions"])
+
+SessionRepositoryDep = Annotated[SessionRepository, Depends(get_session_repository)]
 
 
 def _row_to_summary(row: SessionRow) -> SessionSummary:
@@ -29,7 +33,7 @@ def _row_to_summary(row: SessionRow) -> SessionSummary:
     response_model=list[SessionSummary],
 )
 async def list_sessions(
-    repo: SessionRepository = Depends(get_session_repository),
+    repo: SessionRepositoryDep,
 ) -> list[SessionSummary]:
     rows = await repo.list_sessions()
     return [_row_to_summary(r) for r in rows]

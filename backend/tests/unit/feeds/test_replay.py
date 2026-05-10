@@ -1,7 +1,7 @@
 """Tests for ``ReplayFeed``.
 
 Day-2 deliverable for Stream B. The bullet in the plan is "ReplayFeed
-emits events in order at factor 1000×"; we cover that plus the
+emits events in order at factor 1000x"; we cover that plus the
 correctness corners that matter for the engine on Day 5: ``stop()``
 during a sleep, empty input, invalid speed factor, and the protocol
 adherence smoke.
@@ -10,7 +10,6 @@ adherence smoke.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from time import monotonic
 
@@ -18,7 +17,6 @@ import pytest
 
 from pitwall.feeds.base import Event, RaceFeed
 from pitwall.feeds.replay import ReplayFeed
-
 
 # --------------------------------------------------------------------------
 # Helpers
@@ -43,7 +41,7 @@ def _lap_event(driver: str, lap: int, t: datetime) -> Event:
 
 
 def _build_session(n_laps: int, n_drivers: int = 2) -> list[Event]:
-    """N laps × M drivers, one second between successive laps."""
+    """N laps x M drivers, one second between successive laps."""
     t0 = datetime(2024, 5, 26, 13, 0, 0, tzinfo=UTC)
     events: list[Event] = []
     for lap in range(1, n_laps + 1):

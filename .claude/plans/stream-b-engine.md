@@ -156,13 +156,17 @@ the static `docs/interfaces/openapi_v1.yaml`.
   extended with `/api/v1/replay/start` and `/api/v1/replay/stop`.
 
 #### DB note
-`ReplayFeed` still reads from the in-memory loader (Stream A wires
-the SQL loader on Day 3 of their stream). The `SessionEventLoader`
-Protocol is defined; Stream A implements `SqlSessionEventLoader` and
-edits `get_event_loader()` once demo data is in the DB. After fixing
-the `"hungarian_2024_R"` → `"hungary_2024_R"` slug inconsistency
-(post-merge fix), re-run:
-`make db-down && make db-up && make migrate && make ingest-demo && make fit-degradation`
+Post-merge Stream A integration is wired. `SessionEventLoader` still
+owns the protocol seam, and `ReplayFeed` remains storage-agnostic, but
+`api.dependencies.get_event_loader()` now returns Stream A's
+`SqlSessionEventLoader` when `DATABASE_URL` is configured. The same
+dependency module returns `SqlSessionRepository` for `/api/v1/sessions`.
+Without `DATABASE_URL`, both seams keep the in-memory fallback.
+
+The `"hungarian_2024_R"` → `"hungary_2024_R"` slug inconsistency is
+canonicalized by Stream A migrations `0003_canonical_hungary_slug.py`
+and `0004_canonical_hungary_coefficient_sources.py`, so existing local
+DB volumes can run `make migrate` instead of being wiped.
 
 ### Día 4 — Estado del motor (E6 prep)
 - [ ] `RaceState` y `DriverState` dataclasses.

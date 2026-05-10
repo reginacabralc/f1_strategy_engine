@@ -11,7 +11,7 @@ that understands ``stdout`` (Loki, CloudWatch, etc.).
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 import structlog
 
@@ -54,4 +54,4 @@ def get_logger(name: str | None = None, **initial_values: Any) -> structlog.stdl
         log = get_logger(__name__, component="engine")
         log.info("event_processed", driver="VER", lap=18)
     """
-    return structlog.get_logger(name, **initial_values)
+    return cast(structlog.stdlib.BoundLogger, structlog.get_logger(name, **initial_values))

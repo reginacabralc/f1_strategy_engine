@@ -12,9 +12,12 @@ from pitwall.repositories.sessions import (
     SessionRepository,
     SessionRow,
 )
+from pitwall.repositories.sql import SqlSessionEventLoader, SqlSessionRepository
 
 __all__ = [
     "InMemorySessionRepository",
     "SessionRepository",
     "SessionRow",
+    "SqlSessionEventLoader",
+    "SqlSessionRepository",
 ]
