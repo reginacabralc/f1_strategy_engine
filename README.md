@@ -64,7 +64,7 @@ Switch en runtime con `PACE_PREDICTOR=scipy|xgb`. Resultados del experimento en 
 
 ## Estado actual
 
-Proyecto en construcción activa (sprint 2 semanas, equipo de 4). Ver [`docs/progress.md`](docs/progress.md) para el avance día a día.
+Proyecto en construcción activa (sprint 2 semanas, equipo de 4). Ver [`docs/progress.md`](docs/progress.md) para el avance día a día. 
 
 ## Documentación
 
