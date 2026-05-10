@@ -13,8 +13,7 @@ DEMO_SESSION_IDS = ("bahrain_2024_R", "monaco_2024_R", "hungary_2024_R")
 
 
 class QueryConnection(Protocol):
-    def execute(self, statement: object, parameters: Mapping[str, object] | None = None) -> Any:
-        ...
+    def execute(self, statement: object, parameters: Mapping[str, object] | None = None) -> Any: ...
 
 
 def eligibility_for_lap(row: Mapping[str, Any]) -> tuple[bool, str | None]:

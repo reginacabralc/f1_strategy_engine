@@ -167,8 +167,8 @@ UPSERT_SQL = {
 
 
 class DatabaseConnection(Protocol):
-    def execute(self, statement: object, parameters: list[dict[str, Any]] | None = None) -> Any:
-        ...
+    def execute(self, statement: object, parameters: list[dict[str, Any]] | None = None) -> Any: ...
+
 
 @dataclass(frozen=True, slots=True)
 class WriteSummary:

@@ -57,8 +57,7 @@ class ReplayStopResponse(BaseModel):
     stopped: bool = Field(
         ...,
         description=(
-            "True if a replay was running and has been stopped; "
-            "false if nothing was running."
+            "True if a replay was running and has been stopped; false if nothing was running."
         ),
     )
     run_id: UUID | None = None

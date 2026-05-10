@@ -85,7 +85,10 @@ def main() -> int:
         clean_rows = [dict(row._mapping) for row in connection.execute(CLEAN_LAPS_SQL)]
 
     print("Demo session counts")
-    print_table(count_rows, ["round_number", "session_id", "laps", "stints", "pit_stops", "weather"])
+    print_table(
+        count_rows,
+        ["round_number", "session_id", "laps", "stints", "pit_stops", "weather"],
+    )
     print("\nClean lap availability")
     print_table(clean_rows, ["session_id", "compound", "clean_laps"])
 
@@ -109,7 +112,11 @@ def print_table(rows: Iterable[dict[str, Any]], columns: list[str]) -> None:
     print(" | ".join(column.ljust(widths[column]) for column in columns))
     print("-+-".join("-" * widths[column] for column in columns))
     for row in rows:
-        print(" | ".join(str(row.get(column, "")).ljust(widths[column]) for column in columns))
+        print(
+            " | ".join(
+                str(row.get(column, "")).ljust(widths[column]) for column in columns
+            )
+        )
 
 
 if __name__ == "__main__":

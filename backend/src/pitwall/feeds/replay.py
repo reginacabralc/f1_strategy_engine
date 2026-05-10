@@ -42,9 +42,7 @@ class ReplayFeed:
         speed_factor: float = 30.0,
     ) -> None:
         if speed_factor <= 0:
-            raise ValueError(
-                f"speed_factor must be > 0, got {speed_factor}"
-            )
+            raise ValueError(f"speed_factor must be > 0, got {speed_factor}")
 
         # Materialise the iterable up-front so the sort below is safe
         # to do once and so ``event_count`` is meaningful for tests.

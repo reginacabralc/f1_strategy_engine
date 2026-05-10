@@ -37,8 +37,7 @@ def r_squared(y_true: Iterable[float], y_pred: Iterable[float]) -> float:
         raise ValueError("at least one value is required")
     mean_actual = fmean(actual)
     ss_res = sum(
-        (observed - estimate) ** 2
-        for observed, estimate in zip(actual, predicted, strict=True)
+        (observed - estimate) ** 2 for observed, estimate in zip(actual, predicted, strict=True)
     )
     ss_tot = sum((observed - mean_actual) ** 2 for observed in actual)
     if ss_tot == 0:
@@ -54,8 +53,7 @@ def rmse(y_true: Iterable[float], y_pred: Iterable[float]) -> float:
     if not actual:
         raise ValueError("at least one value is required")
     ss_res = sum(
-        (observed - estimate) ** 2
-        for observed, estimate in zip(actual, predicted, strict=True)
+        (observed - estimate) ** 2 for observed, estimate in zip(actual, predicted, strict=True)
     )
     return sqrt(ss_res / len(actual))
 

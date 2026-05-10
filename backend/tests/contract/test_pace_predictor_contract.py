@@ -112,8 +112,7 @@ def test_engine_call_pattern_projecting_five_laps_ahead() -> None:
         assert 0.0 <= attacker_lap.confidence <= 1.0
 
         cumulative_gain_ms += (
-            defender_lap.predicted_lap_time_ms
-            - attacker_lap.predicted_lap_time_ms
+            defender_lap.predicted_lap_time_ms - attacker_lap.predicted_lap_time_ms
         )
 
     # Defender on MEDIUM aged 21..25 → 75 000 + 100·age ∈ [77 100, 77 500].
