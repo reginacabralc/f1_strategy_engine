@@ -9,7 +9,7 @@ authors = [{ name = "PitWall Team" }]
 # Dependencies are layered by stream and added additively.
 # Stream B Day 2: HTTP surface, feed abstractions, config & logging.
 # Stream A Day 2-3: FastF1 ingestion, DB access, data processing.
-# Stream D Day 1: will verify/extend (Dockerfiles, CI) without reorganising.
+# Stream D Day 1: merged duplicate TOML blocks (bug fix); added xgboost.
 dependencies = [
     # Stream B, Day 2 — backend HTTP surface
     "fastapi>=0.115.0",
@@ -26,6 +26,8 @@ dependencies = [
     "python-dotenv>=1.0",
     "scipy>=1.11",
     "sqlalchemy>=2.0",
+    # Stream D, Day 1 — ML predictor runtime
+    "xgboost>=2.0",
 ]
 
 [project.optional-dependencies]
@@ -38,6 +40,7 @@ dev = [
     # Test client for FastAPI + tooling for the OpenAPI contract test
     "httpx>=0.27.0",
     "pyyaml>=6.0",
+    "types-PyYAML>=6.0",
     "openapi-spec-validator>=0.7",
 ]
 
@@ -55,6 +58,10 @@ src = ["src"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = [
+    "B008",    # FastAPI Depends() in default arg — standard FastAPI pattern
+    "RUF002",  # Ambiguous unicode in docstring — cosmetic, not a bug
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["pitwall"]
