@@ -10,7 +10,6 @@ adherence smoke.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from time import monotonic
 
@@ -18,7 +17,6 @@ import pytest
 
 from pitwall.feeds.base import Event, RaceFeed
 from pitwall.feeds.replay import ReplayFeed
-
 
 # --------------------------------------------------------------------------
 # Helpers

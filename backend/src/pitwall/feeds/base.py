@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from datetime import datetime
-from typing import Literal, Protocol, TypedDict, runtime_checkable
+from typing import Any, Literal, Protocol, TypedDict, runtime_checkable
 
 # --------------------------------------------------------------------------
 # Event envelope and the discriminator type.
@@ -43,7 +43,7 @@ class Event(TypedDict):
     type: EventType
     session_id: str
     ts: datetime
-    payload: dict
+    payload: dict[str, Any]
 
 
 # --------------------------------------------------------------------------
@@ -58,7 +58,7 @@ class SessionStartPayload(TypedDict):
 
 
 class SessionEndPayload(TypedDict, total=False):
-    final_classification: list[dict]
+    final_classification: list[dict[str, Any]]
 
 
 class LapCompletePayload(TypedDict, total=False):

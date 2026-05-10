@@ -49,12 +49,20 @@
       test in `backend/tests/contract/test_pace_predictor_contract.py`
       proves the engine's projection-loop call pattern works against
       Stream A's surface.
-- [ ] Stream D: branch `bootstrap` con `.gitignore`, pyproject.toml, package.json, docker-compose esqueleto.
-- [ ] Stream D: ADRs 0001-0004 escritos.
+- [x] **Stream D**: platform audit complete (`chore/d-platform-audit-bootstrap`).
+      Critical fix: `backend/pyproject.toml` had duplicate `dependencies = [` TOML error (Streams A+B
+      appended without closing the array) — merged into one valid block and added `xgboost>=2.0`.
+      Fixed 11 ruff errors + 5 mypy errors (import sorts, type annotations, missing `types-PyYAML`).
+      Added `.github/workflows/lint.yml` + `test.yml`. Expanded `Makefile` with `up`, `down`,
+      `down-v`, `logs`, `ps`, `seed`, `replay`, `demo`. Expanded `.env.example` with all 9 vars
+      from `infra/README.md`. Added `models/.gitkeep`. All commands verified:
+      `make install` ✅ · `make db-up` ✅ · `make migrate` ✅ · `make test` (67 passed) ✅ · `make lint` ✅.
+      ADRs 0001-0009 already existed — no duplicate work needed.
+      Next: Stream D Day 2 — `docker/backend.Dockerfile` multi-stage + `docker compose up` all 4 services.
 
 ### Día 2
-- [ ] Stream D: docker-compose up funcional (3 servicios up sin errores).
-- [ ] Stream D: GitHub Actions lint + test corriendo en PR.
+- [ ] Stream D: docker-compose up funcional (3 servicios up sin errores). DB-only currently; backend+frontend Dockerfiles pending.
+- [x] **Stream D**: GitHub Actions `lint.yml` + `test.yml` added (Day 1 carry-over, landed with audit PR).
 - [ ] Stream A: `scripts/ingest_season.py` funcional para 1 ronda.
 - [ ] Stream A: Notebook 01_explore_fastf1.
 - [x] **Stream B**: `RaceFeed` Protocol + event payload `TypedDict`s

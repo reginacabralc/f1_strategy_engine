@@ -6,13 +6,11 @@ requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "PitWall Team" }]
 
-# Dependencies are layered by stream:
+# Dependencies are layered by stream (keep additions additive):
 #   Stream A, Day 1: nothing (PacePredictor uses only the stdlib).
-#   Stream B, Day 2: HTTP surface + feed abstractions (the block below).
-#   Stream D, Day 1: will append the rest of the backend stack
-#                    (SQLModel, Alembic, psycopg, Polars, scipy, xgboost,
-#                    FastF1) without reorganising this list.
-# Keep additions additive.
+#   Stream B, Day 2: HTTP surface + feed abstractions.
+#   Stream A, Day 3: FastF1 ingestion, DB, data processing.
+#   Stream D, Day 1: merged both blocks into one valid TOML array; added xgboost.
 dependencies = [
     # Stream B, Day 2 — backend HTTP surface, feed abstractions, config & logging
     "fastapi>=0.115.0",
@@ -20,11 +18,7 @@ dependencies = [
     "pydantic>=2.6.0",
     "pydantic-settings>=2.4.0",
     "structlog>=24.1.0",
-# Stream A, Day 3: FastF1 ingestion writes normalized local parquet outputs
-# and idempotent rows into local TimescaleDB/Postgres.
-# Keep additions additive; do not reorganise this skeleton without coordinating
-# with Stream D.
-dependencies = [
+    # Stream A, Day 3 — FastF1 ingestion, DB, data processing
     "alembic>=1.13",
     "fastf1==3.8.3",
     "numpy>=1.26",
@@ -33,6 +27,8 @@ dependencies = [
     "python-dotenv>=1.0",
     "scipy>=1.11",
     "sqlalchemy>=2.0",
+    # Stream D, Day 1 — ML predictor runtime
+    "xgboost>=2.0",
 ]
 
 [project.optional-dependencies]
@@ -45,6 +41,7 @@ dev = [
     # Test client for FastAPI + tooling for the OpenAPI contract test
     "httpx>=0.27.0",
     "pyyaml>=6.0",
+    "types-PyYAML>=6.0",
     "openapi-spec-validator>=0.7",
 ]
 
@@ -62,6 +59,10 @@ src = ["src"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = [
+    "B008",    # FastAPI Depends() in default arg — standard FastAPI pattern
+    "RUF002",  # Ambiguous unicode in docstring — cosmetic, not a bug
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["pitwall"]

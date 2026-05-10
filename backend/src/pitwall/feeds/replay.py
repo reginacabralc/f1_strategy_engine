@@ -88,7 +88,7 @@ class ReplayFeed:
                         self._stop_event.wait(),
                         timeout=delay,
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass
                 else:
                     return  # stop() was called during the sleep
