@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-import yaml  # type: ignore[import-untyped]
+import yaml
 from openapi_spec_validator import validate
 
 from pitwall.api.main import create_app
