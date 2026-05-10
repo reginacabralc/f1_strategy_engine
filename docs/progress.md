@@ -12,7 +12,7 @@
 | 1 temporada (2024) ingerida en DB | ⏳ | Día 3 | Stream A — 3 demo races loaded; full season pending |
 | Replay engine funcional con fixture | ⏳ | Día 3 | Stream B |
 | Dashboard mock conectado a `/sessions` | ⏳ | Día 3 | Stream C |
-| Curva de degradación scipy ajustada | ⏳ | Día 5 | Stream A |
+| Curva de degradación scipy ajustada | ⏳ | Día 5 | Stream A — Day 4 foundation persists coefficients; R² still below target |
 | Motor undercut V1 con `ScipyPredictor` | ⏳ | Día 5 | Stream B |
 | Pipeline end-to-end con datos reales | ⏳ | Día 7 | Todos |
 | **XGBoost entrenado y serializado** | ⏳ | Día 8 | Stream A |
@@ -48,6 +48,9 @@
 - [x] Stream A: `scripts/ingest_season.py` funcional para 1 ronda.
       Day 2 scope narrowed to one FastF1 race/session: default Monaco 2024 round 8 session R,
       dry-run writer under `data/processed/`, DB mode deferred until Stream D DB/Alembic utilities land.
+      Implemented FastF1 cache setup (`FASTF1_CACHE_DIR`, default `data/cache`),
+      defensive normalization for metadata/drivers/laps/stints/pit stops/weather,
+      timedelta-to-ms conversion, and null cleanup at write boundaries.
 - [x] Stream A: Notebook 01_explore_fastf1.
       Implemented as `notebooks/01_explore_fastf1.md` to avoid noisy notebook JSON before exploratory plots exist.
 - [ ] Stream B: `RaceFeed` interface + `ReplayFeed` con fixture sintético.
@@ -58,22 +61,37 @@
       Loaded Bahrain 2024 R (`bahrain_2024_R`), Monaco 2024 R (`monaco_2024_R`),
       and Hungary 2024 R (`hungarian_2024_R`) through idempotent DB upserts.
       `make validate-demo` checks laps, stints, pit stops, weather, and clean lap availability.
+      Latest local validation: Bahrain 1129 laps/63 stints/86 pit stops/157 weather rows;
+      Monaco 1237/43/46/200; Hungary 1355/60/82/155.
 - [x] Stream A: Alembic + migraciones reproducibles.
       Initial migration lives under `backend/src/pitwall/db/migrations/`, creates
       TimescaleDB/pgcrypto extensions, schema v1 tables, `laps` hypertable, and
       `clean_air_lap_times` materialized view. Repro path: `make db-up && make migrate`.
+      DB utilities live in `backend/src/pitwall/db/engine.py`; Make targets cover
+      DB lifecycle, migration, ingestion, validation, tests, and lint.
 - [ ] Stream B: ReplayFeed leyendo de DB real (no fixture).
 - [ ] Stream C: SessionPicker + RaceTable mock funcional.
 - [ ] Stream D: Dockerfile multi-stage para backend.
 
 ### Día 4
-- [ ] Stream A: `fit_degradation.py` funcional, R² reportado.
+- [x] Stream A: `fit_degradation.py` funcional, R² reportado.
+      Added clean-air diagnostic materialized view refresh, quadratic
+      `quadratic_v1` fits by `(circuit_id, compound)`, idempotent persistence
+      into `degradation_coefficients`, `make fit-degradation`, and
+      `make validate-degradation`. Local DB validation on 2026-05-10 loaded
+      8 coefficient rows from 3 demo races; all groups currently warn below
+      R² 0.60 (best observed: Monaco MEDIUM R²=0.362, RMSE=1701 ms), so Day 5
+      should improve filtering/normalization or document the limitation.
+      Added Alembic `0002_clean_air_lap_times.py`, degradation unit tests, and
+      `notebooks/02_fit_degradation.md`.
 - [ ] Stream B: Motor undercut esqueleto + RaceState.
 - [ ] Stream C: Cliente API + hook WS esqueleto.
 - [ ] Stream D: Logs estructurados, /health endpoint.
 
 ### Día 5 — Hito S1
 - [ ] Stream A: Coeficientes en DB + notebook 02 con R² ≥ 0.6.
+      Day 4 created `notebooks/02_fit_degradation.md`; Day 5 should confirm
+      persisted demo coefficients and document actual R² thresholds/plots.
 - [ ] Stream B: Motor calculando undercut V1 con `ScipyPredictor`.
 - [ ] Stream C: DegradationChart con datos mock.
 - [ ] Stream D: CI verde con tests reales.

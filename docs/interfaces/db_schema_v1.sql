@@ -20,6 +20,8 @@
 -- ============================================================================
 -- CHANGELOG
 --   2026-05-09  v1   Initial schema (Day 1 kickoff).
+--   2026-05-10  v2   Day 4 degradation metrics and clean-air fitting
+--                    diagnostics mirrored from Alembic 0002.
 -- ============================================================================
 
 CREATE EXTENSION IF NOT EXISTS timescaledb;
@@ -170,12 +172,19 @@ CREATE TABLE degradation_coefficients (
     circuit_id              TEXT        NOT NULL REFERENCES circuits(circuit_id),
     compound                TEXT        NOT NULL CHECK (compound IN
                                             ('SOFT','MEDIUM','HARD','INTER','WET')),
+    model_type              TEXT        NOT NULL DEFAULT 'quadratic_v1',
     a                       DOUBLE PRECISION NOT NULL,
     b                       DOUBLE PRECISION NOT NULL,
     c                       DOUBLE PRECISION NOT NULL,
     r_squared               REAL        CHECK (r_squared IS NULL
                                                 OR (r_squared >= 0 AND r_squared <= 1)),
+    rmse_ms                 REAL        CHECK (rmse_ms IS NULL OR rmse_ms >= 0),
     n_samples               INT         CHECK (n_samples IS NULL OR n_samples > 0),
+    n_laps                  INT         CHECK (n_laps IS NULL OR n_laps > 0),
+    min_tyre_age            INT         CHECK (min_tyre_age IS NULL OR min_tyre_age >= 0),
+    max_tyre_age            INT         CHECK (max_tyre_age IS NULL
+                                                OR max_tyre_age >= min_tyre_age),
+    source_sessions         TEXT[],
     fitted_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (circuit_id, compound)
 );
@@ -268,23 +277,59 @@ CREATE TABLE known_undercuts (
 
 CREATE MATERIALIZED VIEW clean_air_lap_times AS
 SELECT
-    session_id,
-    driver_code,
-    lap_number,
-    lap_time_ms,
-    compound,
-    tyre_age,
-    position,
-    ts
-FROM laps
-WHERE is_valid     = TRUE
-  AND is_pit_in    = FALSE
-  AND is_pit_out   = FALSE
-  AND track_status = 'GREEN'
-  AND lap_time_ms BETWEEN 60000 AND 180000;
+    l.session_id,
+    e.circuit_id,
+    l.driver_code,
+    d.team_code,
+    l.compound,
+    l.tyre_age,
+    l.lap_number,
+    st.stint_number,
+    l.lap_time_ms,
+    l.track_status,
+    l.is_pit_in AS is_pit_in_lap,
+    l.is_pit_out AS is_pit_out_lap,
+    NOT l.is_valid AS is_deleted,
+    CASE
+        WHEN l.lap_time_ms IS NULL THEN FALSE
+        WHEN l.compound IS NULL OR l.compound NOT IN ('SOFT','MEDIUM','HARD') THEN FALSE
+        WHEN l.tyre_age IS NULL THEN FALSE
+        WHEN l.tyre_age < 1 THEN FALSE
+        WHEN l.is_pit_in THEN FALSE
+        WHEN l.is_pit_out THEN FALSE
+        WHEN NOT l.is_valid THEN FALSE
+        WHEN l.track_status IS NOT NULL AND l.track_status <> 'GREEN' THEN FALSE
+        WHEN l.lap_time_ms NOT BETWEEN 60000 AND 180000 THEN FALSE
+        ELSE TRUE
+    END AS fitting_eligible,
+    CASE
+        WHEN l.lap_time_ms IS NULL THEN 'missing_lap_time'
+        WHEN l.compound IS NULL OR l.compound NOT IN ('SOFT','MEDIUM','HARD')
+            THEN 'unsupported_compound'
+        WHEN l.tyre_age IS NULL THEN 'missing_tyre_age'
+        WHEN l.tyre_age < 1 THEN 'tyre_age_lt_1'
+        WHEN l.is_pit_in THEN 'pit_in_lap'
+        WHEN l.is_pit_out THEN 'pit_out_lap'
+        WHEN NOT l.is_valid THEN 'deleted_lap'
+        WHEN l.track_status IS NOT NULL AND l.track_status <> 'GREEN'
+            THEN 'non_green_track_status'
+        WHEN l.lap_time_ms NOT BETWEEN 60000 AND 180000 THEN 'invalid_lap_time'
+        ELSE NULL
+    END AS exclusion_reason,
+    l.ts
+FROM laps l
+JOIN sessions s ON s.session_id = l.session_id
+JOIN events e ON e.event_id = s.event_id
+LEFT JOIN drivers d ON d.driver_code = l.driver_code
+LEFT JOIN stints st
+    ON st.session_id = l.session_id
+   AND st.driver_code = l.driver_code
+   AND l.lap_number BETWEEN st.lap_start AND COALESCE(st.lap_end, l.lap_number);
 
 CREATE INDEX idx_clean_air_session_driver
     ON clean_air_lap_times (session_id, driver_code, lap_number);
+CREATE INDEX idx_clean_air_fit_group
+    ON clean_air_lap_times (circuit_id, compound, fitting_eligible);
 
 -- Refresh after each ingest run:
 --   REFRESH MATERIALIZED VIEW clean_air_lap_times;

@@ -85,3 +85,13 @@ make validate-demo
 `make validate-demo` prints counts for `laps`, `stints`, `pit_stops`, and
 `weather`, then prints clean lap availability by `(session_id, compound)` using
 the same filter planned for Day 4 degradation inputs.
+
+## Day 4 degradation workflow
+
+```bash
+make migrate
+make fit-degradation
+make validate-degradation
+```
+
+Details live in `notebooks/02_fit_degradation.md`.

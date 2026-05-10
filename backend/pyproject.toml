@@ -13,9 +13,11 @@ authors = [{ name = "PitWall Team" }]
 dependencies = [
     "alembic>=1.13",
     "fastf1==3.8.3",
+    "numpy>=1.26",
     "polars>=1.0",
     "psycopg[binary]>=3.1",
     "python-dotenv>=1.0",
+    "scipy>=1.11",
     "sqlalchemy>=2.0",
 ]
 
