@@ -45,8 +45,11 @@
 ### Día 2
 - [ ] Stream D: docker-compose up funcional (3 servicios up sin errores).
 - [ ] Stream D: GitHub Actions lint + test corriendo en PR.
-- [ ] Stream A: `scripts/ingest_season.py` funcional para 1 ronda.
-- [ ] Stream A: Notebook 01_explore_fastf1.
+- [x] Stream A: `scripts/ingest_season.py` funcional para 1 ronda.
+      Day 2 scope narrowed to one FastF1 race/session: default Monaco 2024 round 8 session R,
+      dry-run writer under `data/processed/`, DB mode deferred until Stream D DB/Alembic utilities land.
+- [x] Stream A: Notebook 01_explore_fastf1.
+      Implemented as `notebooks/01_explore_fastf1.md` to avoid noisy notebook JSON before exploratory plots exist.
 - [ ] Stream B: `RaceFeed` interface + `ReplayFeed` con fixture sintético.
 - [ ] Stream C: Vite app + TanStack Query consultando `/sessions`.
 
