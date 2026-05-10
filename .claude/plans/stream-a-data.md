@@ -59,22 +59,68 @@ docs/adr/0009-xgboost-vs-scipy-resultados.md
 
 ### Día 2 — Ingesta (E2)
 
-- [ ] `scripts/ingest_season.py --year 2024 --rounds 1,8,13` funcional.
-- [ ] Activar `fastf1.Cache.enable_cache(./data/cache)`.
-- [ ] Pin `fastf1==X.Y.Z` en pyproject.
-- [ ] Notebook `notebooks/01_explore_fastf1.ipynb` mostrando estructura.
+- [x] `scripts/ingest_season.py` funcional para 1 ronda.
+  - Scope real de Day 2: una carrera/sesión FastF1, no temporada completa.
+  - Default demo: Monaco 2024, round 8, session R (`monaco_2024_R`).
+  - Soporta dry-run/file output bajo `data/processed/`.
+- [x] Activar `fastf1.Cache.enable_cache(./data/cache)`.
+  - Cache configurable con `FASTF1_CACHE_DIR`.
+  - `data/cache` y `data/processed` quedan fuera de git.
+- [x] Pin `fastf1==3.8.3` en `backend/pyproject.toml`.
+- [x] Normalización defensiva de metadata, drivers, laps, stints, pit stops y weather.
+  - Timedeltas a milisegundos enteros.
+  - `NaN`/`NaT` a `None` antes de write boundaries.
+  - Pit-in, pit-out y vueltas borradas preservadas como flags.
+- [x] Tests unitarios de normalización en `backend/tests/unit/ingest/test_normalize.py`.
+- [x] Notebook/markdown `notebooks/01_explore_fastf1.md` mostrando estructura y workflow.
 
 ### Día 3 — DB & Stints (E2/E4)
-- [ ] Cargar 3 carreras de demo a DB local.
-- [ ] Reconstruir stints en `ingest/stints.py`.
-- [ ] Validar conteos: ~30k vueltas/temporada, ~50 stints/carrera.
-- [ ] Filtrar vueltas inválidas en `normalize.py`.
+- [x] Soporte local TimescaleDB/Postgres reproducible.
+  - `docker-compose.yaml` con TimescaleDB/Postgres 15, usuario/db `pitwall`, healthcheck y volumen `pgdata`.
+  - `.env.example` con `DATABASE_URL`, `FASTF1_CACHE_DIR` y `PITWALL_PROCESSED_DIR`.
+- [x] Alembic inicial reproducible.
+  - `backend/src/pitwall/db/migrations/versions/0001_initial_schema.py`.
+  - Crea extensiones `timescaledb`/`pgcrypto`, schema v1, hypertable `laps` por `ts`, y materialized view `clean_air_lap_times`.
+- [x] DB connection utilities en `backend/src/pitwall/db/engine.py`.
+- [x] Writer DB idempotente para ingesta.
+  - Mantiene dry-run/file output.
+  - Inserta en orden de FK y usa `ON CONFLICT`.
+- [x] Cargar 3 carreras demo a DB local.
+  - Bahrain 2024 R: `bahrain_2024_R`.
+  - Monaco 2024 R: `monaco_2024_R`.
+  - Hungary 2024 R: `hungarian_2024_R`.
+- [x] Reconstruir stints desde lap data en la normalización Day 2/3.
+  - Implementado dentro de `backend/src/pitwall/ingest/normalize.py`, no como `ingest/stints.py`.
+- [x] Validar conteos de demo con `scripts/validate_demo_ingest.py` / `make validate-demo`.
+  - Última validación local: Bahrain 1129 laps/63 stints, Monaco 1237 laps/43 stints, Hungary 1355 laps/60 stints.
+  - Day 3 cargó 3 carreras demo, no la temporada completa (~30k laps).
+- [x] Make targets reproducibles: `db-up`, `db-down`, `migrate`, `ingest-monaco`, `ingest-demo`, `validate-demo`, `test`, `lint`.
 
 ### Día 4 — Degradación scipy (E3)
-- [ ] `scripts/fit_degradation.py` con `scipy.optimize.curve_fit`.
-- [ ] Persistir coefs en `degradation_coefficients`.
-- [ ] Reportar R² por (circuito × compuesto) con warning si < 0.6.
-- [ ] Notebook `02_fit_degradation.ipynb`.
+- [x] Paquete `backend/src/pitwall/degradation/`.
+  - `dataset.py`: extracción/diagnóstico de clean-air laps desde DB.
+  - `fit.py`: ajuste cuadrático `quadratic_v1` con `scipy.optimize.curve_fit`.
+  - `models.py`: resultados tipados de ajuste.
+  - `writer.py`: persistencia idempotente de coeficientes.
+- [x] `scripts/fit_degradation.py`.
+  - Soporta `--session monaco_2024_R`.
+  - Soporta `--all-demo`.
+  - `make fit-degradation` corre las 3 carreras demo.
+- [x] Refresh path de `clean_air_lap_times`.
+  - Migración `0002_clean_air_lap_times.py` enriquece la materialized view con `fitting_eligible` y `exclusion_reason`.
+  - La vista conserva filas excluidas para diagnóstico.
+- [x] Persistir coefs en `degradation_coefficients`.
+  - Migración 0002 agrega `model_type`, `rmse_ms`, `n_laps`, `min_tyre_age`, `max_tyre_age` y `source_sessions`.
+  - Upsert idempotente por `(circuit_id, compound)`.
+- [x] Reportar R² por (circuito × compuesto) con warning si < 0.6.
+  - Última validación local: 8 coeficientes persistidos.
+  - Todos los fits actuales quedan `fitted_warn`; mejor observado Monaco MEDIUM R²=0.362, RMSE=1701 ms.
+- [x] `scripts/validate_degradation.py` / `make validate-degradation`.
+- [x] Tests unitarios:
+  - `backend/tests/unit/degradation/test_dataset.py`.
+  - `backend/tests/unit/degradation/test_fit.py`.
+  - `backend/tests/unit/degradation/test_degradation_writer.py`.
+- [x] Notebook/markdown `notebooks/02_fit_degradation.md`.
 - [ ] Definir interfaz `PacePredictor` (con B):
   ```python
   class PacePredictor(Protocol):
