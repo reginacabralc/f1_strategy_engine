@@ -23,7 +23,7 @@ streams (see ``AGENTS.md``).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Protocol, runtime_checkable
+from typing import Literal, Protocol, cast, runtime_checkable
 
 Compound = Literal["SOFT", "MEDIUM", "HARD", "INTER", "WET"]
 """Tyre compound identifier as reported by FastF1 and OpenF1.
@@ -123,6 +123,18 @@ class UnsupportedContextError(LookupError):
     """
 
 
+COLD_TYRE_PENALTIES_MS: tuple[int, ...] = (800, 300, 0)
+"""Out-lap and warm-up lap time penalties for a driver on fresh tyres.
+
+Index 0 (j=1): out-lap  → +800 ms
+Index 1 (j=2): warm-up  → +300 ms
+Index 2+ (j≥3): no penalty
+
+Source: master plan §6.5.  Calibrated from 2022-2024 FastF1 pit-out laps;
+the penalty decays to zero after two laps on the new compound.
+"""
+
+
 @runtime_checkable
 class PacePredictor(Protocol):
     """Predicts a driver's lap time given a :class:`PaceContext`.
@@ -160,3 +172,55 @@ class PacePredictor(Protocol):
         never raise.
         """
         ...
+
+
+def project_pace(
+    driver_code: str,
+    circuit_id: str,
+    compound: str,
+    start_age: int,
+    k: int,
+    predictor: PacePredictor,
+    *,
+    apply_cold_tyre_penalty: bool = False,
+) -> list[int]:
+    """Project *k* lap times (ms) forward from tyre age *start_age*.
+
+    For the **defender** staying out on worn tyres::
+
+        project_pace(defender.driver_code, circuit_id, defender.compound,
+                     start_age=defender.tyre_age, k=5, predictor,
+                     apply_cold_tyre_penalty=False)
+
+    For the **attacker** on fresh tyres after a pit stop::
+
+        project_pace(attacker.driver_code, circuit_id, next_compound,
+                     start_age=0, k=5, predictor,
+                     apply_cold_tyre_penalty=True)
+
+    The out-lap and warm-up lap penalties (``COLD_TYRE_PENALTIES_MS``) are
+    added only when *apply_cold_tyre_penalty* is ``True``.
+
+    Returns:
+        A list of *k* integers; element ``j-1`` is the projected lap time
+        at ``tyre_age = start_age + j``.
+
+    Raises:
+        UnsupportedContextError: if the predictor has no model for
+            ``(circuit_id, compound)``.
+    """
+    times: list[int] = []
+    for j in range(1, k + 1):
+        ctx = PaceContext(
+            driver_code=driver_code,
+            circuit_id=circuit_id,
+            compound=cast(Compound, compound),
+            tyre_age=start_age + j,
+        )
+        lap_ms = predictor.predict(ctx).predicted_lap_time_ms
+        if apply_cold_tyre_penalty:
+            penalty_idx = j - 1
+            if penalty_idx < len(COLD_TYRE_PENALTIES_MS):
+                lap_ms += COLD_TYRE_PENALTIES_MS[penalty_idx]
+        times.append(lap_ms)
+    return times

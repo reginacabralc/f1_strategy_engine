@@ -168,19 +168,69 @@ canonicalized by Stream A migrations `0003_canonical_hungary_slug.py`
 and `0004_canonical_hungary_coefficient_sources.py`, so existing local
 DB volumes can run `make migrate` instead of being wiped.
 
-### Día 4 — Estado del motor (E6 prep)
-- [ ] `RaceState` y `DriverState` dataclasses.
-- [ ] `RaceState.apply(event)` con tests para cada tipo de evento.
-- [ ] `compute_relevant_pairs(state)` con filtros (gap < 30s, no doblados, etc.).
-- [ ] Tests con escenarios sintéticos.
+### Day 4 — Estado del motor (E6 prep) ✅
 
-### Día 5 — Motor V1 (E6) ⭐
-- [ ] `engine/projection.py` con `project_pace(driver, compound, age, k, predictor)`.
-- [ ] `engine/pit_loss.py` con lookup + fallbacks.
-- [ ] `engine/undercut.py::evaluate_undercut(state, atk, def_, predictor)`.
-- [ ] Decisión emite alerta si score > 0.4 AND confidence > 0.5.
-- [ ] WebSocket `/ws/v1/live` enviando `snapshot` + `alert`.
-- [ ] **Hito S1**: replay → motor con `ScipyPredictor` real → cliente WS recibe alerta.
+- [x] **`engine/state.py`** — `DriverState` + `RaceState` dataclasses.
+  `RaceState.apply(event)` dispatches on all 8 event types
+  (`session_start`, `session_end`, `lap_complete`, `pit_in`, `pit_out`,
+  `track_status_change`, `weather_update`, `data_stale`). Unknown types
+  silently ignored.
+  Key fields: `position`, `gap_to_leader_ms`, `gap_to_ahead_ms`
+  (3-lap rolling average), `last_lap_ms` (valid laps only),
+  `compound`, `tyre_age`, `is_in_pit`, `is_lapped`, `last_pit_lap`,
+  `stint_number`, `laps_in_stint`, `data_stale`.
+- [x] **`compute_relevant_pairs(state)`** — filters in-race drivers
+  (position known, not in pit, not lapped, not stale), sorts by
+  position, returns `(attacker, defender)` pairs with
+  `attacker.gap_to_ahead_ms < 30_000 ms`.
+- [x] **34 tests** in `backend/tests/unit/engine/test_state.py` —
+  all 8 event types, gap smoothing (1/2/3 samples + window rollover),
+  pit-out resets gap history, `compute_relevant_pairs` with all
+  filter combinations, empty/single-driver edge cases.
+- [x] **223 tests passing** total across the entire backend suite.
+
+### Day 5 — Motor V1 (E6) ✅ ⭐
+
+- [x] **`engine/projection.py`** extended — `COLD_TYRE_PENALTIES_MS = (800, 300, 0)`
+  and `project_pace(driver_code, circuit_id, compound, start_age, k, predictor, *,
+  apply_cold_tyre_penalty)` projecting k lap times forward.
+- [x] **`engine/pit_loss.py`** — `PitLossTable`, `DEFAULT_PIT_LOSS_MS = 21_000`,
+  `lookup_pit_loss(circuit, team, table)` with team → circuit median → constant
+  fallback chain.
+- [x] **`engine/undercut.py`** — `UndercutDecision` frozen dataclass +
+  `evaluate_undercut(state, atk, def_, predictor, pit_loss_ms)` implementing
+  §6.4–6.8 math: cumulative gap recovery over K_MAX=5 laps, score normalised by
+  pit_loss, confidence = min(R²_defender, R²_attacker). Alert when
+  `score > 0.4 AND confidence > 0.5`.
+- [x] **`engine/state.py`** — `DriverState.undercut_score: float | None = None` added;
+  reset to `None` and repopulated by the loop on each `lap_complete`.
+- [x] **`engine/loop.py`** — `EngineLoop` (background asyncio task):
+  reads `topics.events` → `RaceState.apply()` → on `lap_complete`:
+  evaluate all pairs → update `undercut_score` → broadcast `alert` messages →
+  broadcast `snapshot`. `Broadcaster` Protocol decouples engine from API layer.
+  `set_predictor()` for runtime swap.
+- [x] **`api/connections.py`** — `ConnectionManager`: `connect/disconnect/broadcast_json`
+  (1 s send timeout removes dead clients).
+- [x] **`api/ws.py`** — `WebSocket /ws/v1/live`: accepts, registers with
+  `ConnectionManager` via `websocket.app.state`, heartbeat ping every 15 s,
+  cleans up on disconnect.
+- [x] **`api/main.py`** updated — `ConnectionManager` + `EngineLoop` created
+  synchronously in `create_app()`; lifespan tries to reload `ScipyPredictor` from
+  DB at startup (silent fallback to empty predictor when DB unavailable).
+- [x] **`api/dependencies.py`** updated — `get_connection_manager`,
+  `get_engine_loop` providers added.
+- [x] **250 tests passing** (6 pit_loss + 5 project_pace + 9 undercut + 7 WS/CM
+  + all prior tests).
+
+#### Hito S1 integration path
+The full pipeline is wired: `POST /api/v1/replay/start` → `ReplayManager` →
+`topics.events` → `EngineLoop` → `ConnectionManager` → `/ws/v1/live` clients.
+To receive a live `UNDERCUT_VIABLE` alert:
+1. `make db-up && make migrate && make ingest-demo && make fit-degradation`
+   (loads real coefficients — R² target ≥ 0.5)
+2. `uvicorn pitwall.api.main:app` (lifespan loads predictor from DB)
+3. `wscat -c ws://localhost:8000/ws/v1/live`
+4. `POST /api/v1/replay/start` with a session that has degraded-tyre scenarios
 
 ### Día 6 — Endpoints REST (E7)
 - [ ] `/api/v1/sessions/{id}/snapshot`.
