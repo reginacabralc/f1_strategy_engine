@@ -63,3 +63,25 @@ data/processed/monaco_2024_R/
 - Connect the writer to real DB/Alembic utilities once Stream D lands them.
 - Prepare degradation-fitting inputs from normalized laps and stints.
 - Start the scipy degradation fit and document filtering choices.
+
+## Day 3 DB ingest workflow
+
+From a clean clone with Docker installed:
+
+```bash
+cp .env.example .env
+make db-up
+make migrate
+make ingest-demo
+make validate-demo
+```
+
+`make ingest-demo` writes the three demo races to local TimescaleDB:
+
+- Bahrain 2024, round 1, race session R
+- Monaco 2024, round 8, race session R
+- Hungary 2024, round 13, race session R
+
+`make validate-demo` prints counts for `laps`, `stints`, `pit_stops`, and
+`weather`, then prints clean lap availability by `(session_id, compound)` using
+the same filter planned for Day 4 degradation inputs.

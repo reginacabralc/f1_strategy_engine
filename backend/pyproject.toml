@@ -6,12 +6,17 @@ requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "PitWall Team" }]
 
-# Stream A, Day 2: FastF1 ingestion writes normalized local parquet outputs.
+# Stream A, Day 3: FastF1 ingestion writes normalized local parquet outputs
+# and idempotent rows into local TimescaleDB/Postgres.
 # Keep additions additive; do not reorganise this skeleton without coordinating
 # with Stream D.
 dependencies = [
+    "alembic>=1.13",
     "fastf1==3.8.3",
     "polars>=1.0",
+    "psycopg[binary]>=3.1",
+    "python-dotenv>=1.0",
+    "sqlalchemy>=2.0",
 ]
 
 [project.optional-dependencies]

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 from typing import Any
 
+from pitwall.db.engine import create_db_engine
 from pitwall.ingest.fastf1_client import load_race_session
 from pitwall.ingest.normalize import (
     build_session_id,
@@ -16,7 +18,7 @@ from pitwall.ingest.normalize import (
     normalize_weather,
     reconstruct_stints,
 )
-from pitwall.ingest.writer import ProcessedFileWriter, WriteSummary
+from pitwall.ingest.writer import DatabaseWriter, ProcessedFileWriter, WriteSummary
 
 DEFAULT_YEAR = 2024
 DEFAULT_ROUND = 8
@@ -24,6 +26,7 @@ DEFAULT_SESSION = "R"
 
 
 def build_parser() -> argparse.ArgumentParser:
+    load_dotenv_file()
     parser = argparse.ArgumentParser(
         description="Ingest one FastF1 race/session into normalized local outputs."
     )
@@ -31,24 +34,35 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--round", dest="round_number", type=int, default=DEFAULT_ROUND)
     parser.add_argument("--session", default=DEFAULT_SESSION)
     parser.add_argument("--cache-dir", type=Path, default=None)
-    parser.add_argument("--output-dir", type=Path, default=Path("data/processed"))
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path(os.environ.get("PITWALL_PROCESSED_DIR", "data/processed")),
+    )
     parser.add_argument(
         "--mode",
         choices=("dry-run", "database"),
         default="dry-run",
-        help="database mode is reserved until Stream D lands DB utilities.",
+        help="write mode; dry-run writes parquet/json files, database writes Postgres rows.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_const",
+        const="dry-run",
+        dest="mode",
+        help="alias for --mode dry-run",
+    )
+    parser.add_argument(
+        "--write-db",
+        action="store_const",
+        const="database",
+        dest="mode",
+        help="alias for --mode database",
     )
     return parser
 
 
-def ingest_one_round(args: argparse.Namespace) -> WriteSummary:
-    if args.mode == "database":
-        raise NotImplementedError(
-            "Database ingestion is intentionally deferred until Stream D lands "
-            "DB/Alembic utilities. "
-            "Use --mode dry-run to write normalized local outputs."
-        )
-
+def build_normalized_outputs(args: argparse.Namespace) -> tuple[str, dict[str, Any]]:
     session_data = load_race_session(
         year=args.year,
         round_number=args.round_number,
@@ -87,6 +101,13 @@ def ingest_one_round(args: argparse.Namespace) -> WriteSummary:
         "pit_stops": pit_stops,
         "weather": weather,
     }
+    return session_id, outputs
+
+
+def ingest_one_round(args: argparse.Namespace) -> WriteSummary:
+    session_id, outputs = build_normalized_outputs(args)
+    if args.mode == "database":
+        return DatabaseWriter(create_db_engine()).write_session(outputs)
     return ProcessedFileWriter(args.output_dir).write_session(session_id, outputs)
 
 
@@ -94,7 +115,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     summary = ingest_one_round(args)
-    print(f"Wrote normalized outputs to {summary.output_dir}")
+    if summary.output_dir is not None:
+        print(f"Wrote normalized outputs to {summary.output_dir}")
+    else:
+        print("Wrote normalized outputs to database")
     for name, count in sorted(summary.counts.items()):
         print(f"{name}: {count}")
     return 0
+
+
+def load_dotenv_file() -> None:
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+    load_dotenv()

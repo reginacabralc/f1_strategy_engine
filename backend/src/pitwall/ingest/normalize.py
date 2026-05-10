@@ -158,10 +158,10 @@ def build_session_id(event: Mapping[str, Any] | Any, year: int, session_code: st
     """Build a deterministic session id such as ``monaco_2024_R``."""
 
     event_record = dict(event) if isinstance(event, Mapping) else {}
-    location = first_present(event_record, "Location", "EventName", "OfficialEventName", "Name")
-    if location is None and hasattr(event, "get"):
-        location = event.get("Location") or event.get("EventName")
-    return f"{slugify(str(location or 'unknown'))}_{year}_{session_code}"
+    event_name = first_present(event_record, "EventName", "OfficialEventName", "Name", "Location")
+    if event_name is None and hasattr(event, "get"):
+        event_name = event.get("EventName") or event.get("Location")
+    return f"{slugify(str(event_name or 'unknown'))}_{year}_{session_code}"
 
 
 def normalize_laps(

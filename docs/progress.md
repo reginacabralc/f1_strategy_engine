@@ -9,7 +9,7 @@
 | Andamiaje docs creado | ✅ | Día 0 | Este commit |
 | Setup repo + Docker + CI verde | ⏳ | Día 2 | Stream D |
 | Kickoff e interfaces acordadas | ⏳ | Día 1 | Todos |
-| 1 temporada (2024) ingerida en DB | ⏳ | Día 3 | Stream A |
+| 1 temporada (2024) ingerida en DB | ⏳ | Día 3 | Stream A — 3 demo races loaded; full season pending |
 | Replay engine funcional con fixture | ⏳ | Día 3 | Stream B |
 | Dashboard mock conectado a `/sessions` | ⏳ | Día 3 | Stream C |
 | Curva de degradación scipy ajustada | ⏳ | Día 5 | Stream A |
@@ -54,8 +54,14 @@
 - [ ] Stream C: Vite app + TanStack Query consultando `/sessions`.
 
 ### Día 3
-- [ ] Stream A: 2024 cargado a DB (3 carreras demo).
-- [ ] Stream A: Alembic + migraciones reproducibles.
+- [x] Stream A: 2024 cargado a DB (3 carreras demo).
+      Loaded Bahrain 2024 R (`bahrain_2024_R`), Monaco 2024 R (`monaco_2024_R`),
+      and Hungary 2024 R (`hungarian_2024_R`) through idempotent DB upserts.
+      `make validate-demo` checks laps, stints, pit stops, weather, and clean lap availability.
+- [x] Stream A: Alembic + migraciones reproducibles.
+      Initial migration lives under `backend/src/pitwall/db/migrations/`, creates
+      TimescaleDB/pgcrypto extensions, schema v1 tables, `laps` hypertable, and
+      `clean_air_lap_times` materialized view. Repro path: `make db-up && make migrate`.
 - [ ] Stream B: ReplayFeed leyendo de DB real (no fixture).
 - [ ] Stream C: SessionPicker + RaceTable mock funcional.
 - [ ] Stream D: Dockerfile multi-stage para backend.
