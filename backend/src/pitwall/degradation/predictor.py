@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib import import_module
@@ -9,6 +10,8 @@ from typing import Any, Protocol
 
 from pitwall.engine.projection import PaceContext, PacePrediction, UnsupportedContextError
 from pitwall.ingest.normalize import clean_nulls, slugify
+
+logger = logging.getLogger(__name__)
 
 COEFFICIENT_SQL = """
     SELECT
@@ -92,6 +95,15 @@ class ScipyPredictor:
         if coefficient is None:
             raise UnsupportedContextError(
                 f"no scipy coefficient for ({ctx.circuit_id}, {ctx.compound})"
+            )
+        raw_ms = coefficient.a + coefficient.b * ctx.tyre_age + coefficient.c * ctx.tyre_age**2
+        if raw_ms <= 0:
+            logger.warning(
+                "negative_prediction_clamped circuit=%s compound=%s tyre_age=%d raw_ms=%.1f",
+                ctx.circuit_id,
+                ctx.compound,
+                ctx.tyre_age,
+                raw_ms,
             )
         return PacePrediction(
             predicted_lap_time_ms=coefficient.predict_ms(ctx.tyre_age),
