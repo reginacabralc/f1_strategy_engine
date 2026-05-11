@@ -1,0 +1,30 @@
+.git
+.venv
+__pycache__
+*.py[cod]
+*.egg-info/
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.coverage
+htmlcov/
+
+# FastF1 cache and processed outputs (several GB, not needed in image)
+data/cache/
+data/processed/
+data/raw/
+
+# Serialised models (regenerated with make train-xgb)
+models/*.json
+models/*.bin
+models/*.ubj
+
+# Frontend build artifacts (service not wired until Stream C scaffolds it)
+frontend/
+node_modules/
+
+# Local env overrides
+.env
+.env.local
+.env.*.local
+docker-compose.override.yaml

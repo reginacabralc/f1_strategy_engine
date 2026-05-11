@@ -27,7 +27,7 @@ db-wait: db-up
 db-down:
 	docker compose down
 
-## Full-stack compose targets (backend + frontend Dockerfiles land in Day 4)
+## Full-stack compose targets. Backend Dockerfile added Day 2; frontend pending Stream C.
 up:
 	docker compose up -d
 
@@ -78,7 +78,8 @@ replay: install db-wait
 	$(PYTHON) scripts/ingest_season.py --year 2024 --round 8 --session R --write-db
 	@echo "Replay via API: POST /api/v1/replay/start  (Stream B Day 3 target)"
 
-## demo: bring up DB, migrate, seed, and open backend. Frontend Dockerfile lands Day 4.
+## demo: DB up (Docker), migrations and seed via local venv.
+## Then start Docker backend with: docker compose up -d backend
+## Frontend pending Stream C. Requires: cp .env.example .env first.
 demo: db-up migrate seed
-	@echo "Backend: http://localhost:8000  (run 'uvicorn pitwall.api.main:app --port 8000' locally)"
-	@echo "Full docker demo available once backend/frontend Dockerfiles land (Stream D Day 4)"
+	@echo "Data ready. Run: docker compose up -d backend && open http://localhost:8000"

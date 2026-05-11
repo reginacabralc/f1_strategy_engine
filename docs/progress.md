@@ -61,7 +61,12 @@
       Next: Stream D Day 2 — `docker/backend.Dockerfile` multi-stage + `docker compose up` all 4 services.
 
 ### Día 2
-- [ ] Stream D: docker-compose up funcional (3 servicios up sin errores). DB-only currently; backend+frontend Dockerfiles pending.
+- [x] **Stream D**: `docker compose up` funcional — `db` + `migrate` + `backend` (3 of 4 services; frontend pending Stream C).
+      `docker/backend.Dockerfile` (python:3.12-slim, single-stage), `docker/postgres-init.sql`
+      (timescaledb + pgcrypto), `.dockerignore`. `docker-compose.yaml` updated with `migrate`
+      (one-shot, depends_on db healthy) and `backend` (depends_on migrate completed_successfully,
+      `/health` healthcheck, port 8000). Smoke test: `/health`, `/ready`, `/api/v1/sessions` all
+      respond 200 from container. `make test` (280 passed) and `make lint` remain green.
 - [x] **Stream D**: GitHub Actions `lint.yml` + `test.yml` added (Day 1 carry-over, landed with audit PR).
 - [x] **Stream B**: `RaceFeed` Protocol + event payload `TypedDict`s
       in `backend/src/pitwall/feeds/base.py`; `ReplayFeed` skeleton in
