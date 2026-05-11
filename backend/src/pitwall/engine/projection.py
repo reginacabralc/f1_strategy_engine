@@ -177,6 +177,7 @@ def project_pace(
     predictor: PacePredictor,
     *,
     apply_cold_tyre_penalty: bool = False,
+    cold_tyre_penalties: tuple[int, ...] | None = None,
 ) -> list[int]:
     """Project *k* lap times (ms) forward from tyre age *start_age*.
 
@@ -192,8 +193,17 @@ def project_pace(
                      start_age=0, k=5, predictor,
                      apply_cold_tyre_penalty=True)
 
-    The out-lap and warm-up lap penalties (``COLD_TYRE_PENALTIES_MS``) are
-    added only when *apply_cold_tyre_penalty* is ``True``.
+    The out-lap and warm-up lap penalties are added only when
+    *apply_cold_tyre_penalty* is ``True``.  The default penalties come from
+    :data:`COLD_TYRE_PENALTIES_MS`.  Pass *cold_tyre_penalties* to override
+    with values calibrated from historical data (see
+    :func:`~pitwall.engine.calibration.calibrate_cold_tyre_penalties`).
+
+    Args:
+        cold_tyre_penalties: Override the module-level
+            :data:`COLD_TYRE_PENALTIES_MS`.  ``None`` (default) uses the
+            module constant.  Stream A can pass empirically calibrated values
+            from ``make compute-cold-tyre-penalties``.
 
     Returns:
         A list of *k* integers; element ``j-1`` is the projected lap time
@@ -203,6 +213,7 @@ def project_pace(
         UnsupportedContextError: if the predictor has no model for
             ``(circuit_id, compound)``.
     """
+    penalties = COLD_TYRE_PENALTIES_MS if cold_tyre_penalties is None else cold_tyre_penalties
     times: list[int] = []
     for j in range(1, k + 1):
         ctx = PaceContext(
@@ -214,7 +225,7 @@ def project_pace(
         lap_ms = predictor.predict(ctx).predicted_lap_time_ms
         if apply_cold_tyre_penalty:
             penalty_idx = j - 1
-            if penalty_idx < len(COLD_TYRE_PENALTIES_MS):
-                lap_ms += COLD_TYRE_PENALTIES_MS[penalty_idx]
+            if penalty_idx < len(penalties):
+                lap_ms += penalties[penalty_idx]
         times.append(lap_ms)
     return times

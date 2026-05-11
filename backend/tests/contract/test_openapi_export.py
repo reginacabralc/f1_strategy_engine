@@ -52,6 +52,7 @@ IMPLEMENTED: dict[str, set[str]] = {
     "/api/v1/replay/stop": {"post"},
     "/api/v1/degradation": {"get"},
     "/api/v1/config/predictor": {"post"},
+    "/api/v1/backtest/{session_id}": {"get"},
 }
 
 

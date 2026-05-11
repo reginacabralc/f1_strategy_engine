@@ -373,16 +373,97 @@ SC/GREEN transition verified: SUSPENDED_SC during SC, UNDERCUT_VIABLE after gree
 Rain/pit edge cases verified inline. XGBoostPredictor Protocol compliance verified.
 `brew install libomp` required locally (macOS only); ubuntu-latest CI has it pre-installed.
 
-### Día 9 — Confidence y filtros finales (E7)
-- [ ] `data_quality_factor` real (no constante).
-- [ ] Cold tyre penalty calibrado del histórico.
-- [ ] Tests property-based con `hypothesis` para invariantes.
-- [ ] Endpoint `/api/v1/backtest/{session_id}` (delega a Stream A).
+### Día 9 — Confidence y filtros finales (E7) ✅
 
-### Día 10 — Demo
-- [ ] Dry-run completo Mónaco con ambos predictores.
-- [ ] Smoke tests E2E pasan.
-- [ ] WebSocket reconexión funciona tras reinicio del backend.
+- [x] **`data_quality_factor` real.** `_data_quality_factor(attacker)` function added to
+  `engine/undercut.py`. Reduces confidence when stint < 8 laps (linear ramp `laps/8`)
+  and when traffic gap < 1500 ms (−0.2 penalty). Clamped to [0, 1].
+  Applied in `evaluate_undercut()`: `confidence = min(R²_def, R²_atk) * data_quality_factor(atk)`.
+- [x] **Calibratable cold-tyre penalties.** `project_pace()` in `engine/projection.py` now
+  accepts optional `cold_tyre_penalties: tuple[int, ...] | None` parameter. When `None`,
+  uses module-level `COLD_TYRE_PENALTIES_MS = (800, 300, 0)`.
+  New module `engine/calibration.py` exports `calibrate_cold_tyre_penalties(outlap_deltas, n_penalty_laps)`:
+  takes list of per-lap delta lists → median per lap → clamp negatives to 0.
+- [x] **Property-based tests with `hypothesis`.**
+  `tests/unit/engine/test_undercut_properties.py` with 5 `@given` tests:
+  - `test_no_viable_when_equal_pace_predictor` (300 ex): equal pace → score = 0.
+  - `test_no_viable_when_attacker_faster_than_defender` (300 ex): faster defender → score = 0.
+  - `test_no_alert_when_confidence_below_threshold` (200 ex): R² < 0.5 → should_alert = False.
+  - `test_score_always_in_zero_one` (400 ex): score ∈ [0, 1] always.
+  - `test_should_alert_iff_both_thresholds_exceeded` (500 ex): alert ↔ both thresholds.
+- [x] **`GET /api/v1/backtest/{session_id}`** (`getBacktestResult`, tag `backtest`).
+  Returns 404 until Stream A populates the curated undercut table (E9-E10).
+  Accepts optional `predictor: PredictorName | None` query param; unknown value → 422.
+  `BacktestResult` + `UndercutMatch` schemas added to `api/schemas.py`.
+  Wired in `api/main.py` + added to `IMPLEMENTED` in contract test.
+
+#### New / modified files — Day 9
+
+- `backend/src/pitwall/engine/calibration.py` — new module.
+- `backend/src/pitwall/engine/undercut.py` — `_data_quality_factor`, `_FULL_QUALITY_LAPS`,
+  `_TRAFFIC_GAP_MS`, `_TRAFFIC_CONFIDENCE_PENALTY` constants; confidence updated.
+- `backend/src/pitwall/engine/projection.py` — `cold_tyre_penalties` optional param.
+- `backend/src/pitwall/api/routes/backtest.py` — `getBacktestResult` 404 stub.
+- `backend/src/pitwall/api/schemas.py` — `UndercutMatch`, `BacktestResult`.
+- `backend/src/pitwall/api/main.py` — `backtest_routes.router` included.
+- `backend/tests/contract/test_openapi_export.py` — backtest path added to `IMPLEMENTED`.
+- `backend/tests/unit/engine/test_undercut_properties.py` — 5 hypothesis tests.
+- `backend/tests/unit/engine/test_data_quality.py` — 25 unit tests.
+
+#### Smoke run — Day 9
+
+**265 tests passing (231 unit + 34 contract).** ruff clean, mypy clean (89 source files).
+All 9 implemented endpoints match static OpenAPI spec. Hypothesis tests: 1700 total examples
+across 5 invariants. `data_quality_factor` verified: short-stint lowers confidence, traffic
+lowers confidence, both together can suppress alerts below threshold. Calibration roundtrip
+verified.
+
+### Día 10 — Demo ✅
+
+- [x] **Snapshot on WS (re)connect.** `ws.py` now sends `EngineLoop.get_snapshot()` to each
+  client immediately after `cm.connect()`. Returns `None` when no session is active (no
+  message sent); returns the full `snapshot` dict when a session has started.
+  Per spec: "After reconnecting, the client receives a fresh snapshot."
+  `EngineLoop.get_snapshot()` method added to `engine/loop.py`.
+- [x] **`replay_state` WS broadcast on start/stop.** `api/routes/replay.py` updated:
+  `start_replay` broadcasts `replay_state(started)` after `replay_manager.start()`.
+  `stop_replay` broadcasts `replay_state(stopped)` after `replay_manager.stop()`.
+  Session/run_id captured from private `_session_id`/`_run_id` before stop() clears them
+  (task may finish before stop() is called with short fixtures).
+  Response object built before the broadcast `await` to avoid `started_at=None` race.
+- [x] **End-to-end in-process pipeline tests.** `tests/unit/engine/test_e2e_pipeline.py`
+  (13 tests, no DB, no real WS connections):
+  - `test_one_snapshot_per_lap_complete` — 1 snapshot/lap invariant.
+  - `test_snapshot_contains_active_predictor_scipy` — predictor name in payload.
+  - `test_snapshot_drivers_sorted_by_position` — driver ordering invariant.
+  - `test_snapshot_get_snapshot_method_reflects_state` — `get_snapshot()` None/dict lifecycle.
+  - `test_predictor_switch_reflected_in_snapshots` — scipy → xgboost mid-session.
+  - `test_set_predictor_name_reflected_on_get_snapshot` — get_snapshot() after switch.
+  - `test_unsupported_predictor_does_not_crash_loop` — UnsupportedContextError is handled.
+  - `test_xgboost_stub_satisfies_protocol` — XGBoostPredictor isinstance(PacePredictor).
+  - `test_xgboost_stub_predict_raises_unsupported` — stub behavior verified.
+  - `test_viable_undercut_alert_emitted_with_scipy` — ScipyPredictor end-to-end shape check.
+  - `test_alert_payload_has_required_fields` — UNDERCUT_VIABLE alert field completeness.
+  - `test_replay_start_broadcasts_replay_state` — HTTP + WS integration.
+  - `test_replay_stop_broadcasts_replay_state` — HTTP + WS integration.
+- [x] **WS reconnect tests.** `tests/unit/api/test_ws.py` extended:
+  - `test_ws_sends_snapshot_on_connect_when_session_active` — snapshot received on connect.
+  - `test_ws_no_snapshot_sent_when_no_session_active` — no message when idle.
+
+#### New / modified files — Day 10
+
+- `backend/src/pitwall/engine/loop.py` — `get_snapshot()` method.
+- `backend/src/pitwall/api/ws.py` — snapshot sent on connect via `engine_loop.get_snapshot()`.
+- `backend/src/pitwall/api/routes/replay.py` — `replay_state` broadcasts; `started_at` race fix.
+- `backend/tests/unit/engine/test_e2e_pipeline.py` — 13 new tests.
+- `backend/tests/unit/api/test_ws.py` — 2 new reconnect tests + `_MockEngineLoop` helper.
+
+#### Smoke run — Day 10
+
+**280 tests passing (246 unit + 34 contract), ruff clean, mypy clean (90 source files).**
+Full pipeline verified with ScipyPredictor and XGBoostPredictor stub end-to-end.
+`replay_state(started)` + `replay_state(stopped)` confirmed in WS stream.
+Snapshot on reconnect confirmed via `_MockEngineLoop` injection.
 
 ## Definition of Done por tarea
 - Código + tests + docs.

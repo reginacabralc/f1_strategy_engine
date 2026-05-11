@@ -111,6 +111,16 @@ class EngineLoop:
         """Name of the currently active pace predictor."""
         return self._predictor_name
 
+    def get_snapshot(self) -> dict[str, Any] | None:
+        """Return a ``snapshot`` WS message for the current race state.
+
+        Returns ``None`` when no session has started yet (session_id is empty).
+        Used by the WS handler to push the current state to newly connected clients.
+        """
+        if not self._state.session_id:
+            return None
+        return _snapshot_message(self._state, self._predictor_name)
+
     # ------------------------------------------------------------------
     # Background task
     # ------------------------------------------------------------------
