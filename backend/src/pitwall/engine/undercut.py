@@ -64,36 +64,6 @@ _NEXT_COMPOUND: dict[str, str] = {
 }
 _DEFAULT_NEXT_COMPOUND = "MEDIUM"
 
-# Minimum attacker laps for full-quality projection (§6.7 data_quality_factor).
-_FULL_QUALITY_LAPS: int = 8
-# Gap threshold below which timing noise from traffic reduces confidence (§6.9).
-_TRAFFIC_GAP_MS: int = 1_500
-# Confidence penalty applied when gap is below traffic threshold.
-_TRAFFIC_CONFIDENCE_PENALTY: float = 0.2
-
-
-def _data_quality_factor(attacker: DriverState) -> float:
-    """Compute the data-quality multiplier for confidence (§6.7).
-
-    Returns a value in ``[0.0, 1.0]`` that scales down the raw R² confidence
-    when the projection is less reliable than usual:
-
-    - **Short stint**: attacker has fewer than :data:`_FULL_QUALITY_LAPS` laps
-      on the current compound.  Factor = ``laps_in_stint / _FULL_QUALITY_LAPS``,
-      giving a linear ramp from ``0.375`` (3 laps) to ``1.0`` (8+ laps).
-    - **Traffic**: ``gap_to_ahead_ms < 1 500 ms``.  Lap-timing data for a car
-      stuck in dirty air is noisier; subtract :data:`_TRAFFIC_CONFIDENCE_PENALTY`.
-    """
-    factor = 1.0
-
-    if attacker.laps_in_stint < _FULL_QUALITY_LAPS:
-        factor = attacker.laps_in_stint / _FULL_QUALITY_LAPS
-
-    if attacker.gap_to_ahead_ms is not None and attacker.gap_to_ahead_ms < _TRAFFIC_GAP_MS:
-        factor -= _TRAFFIC_CONFIDENCE_PENALTY
-
-    return max(0.0, min(1.0, factor))
-
 
 # ---------------------------------------------------------------------------
 # Decision
@@ -225,7 +195,7 @@ def evaluate_undercut(
                 tyre_age=1,
             )
         ).confidence
-        confidence = min(conf_def, conf_atk) * _data_quality_factor(attacker)
+        confidence = min(conf_def, conf_atk)
 
         # Pace projections (§6.4 defender, §6.5 attacker).
         defender_laps = project_pace(

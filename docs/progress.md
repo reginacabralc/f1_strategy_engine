@@ -203,27 +203,14 @@
 
 ### Día 9
 - [ ] **Stream A+B: backtest comparativo scipy vs XGBoost completo.**
-- [x] **Stream B**: confidence final, `data_quality_factor`, calibratable cold-tyre penalties,
-  hypothesis property tests, and `/api/v1/backtest/{session_id}` endpoint.
-  `_data_quality_factor(atk)` reduces confidence for short stints (< 8 laps → linear ramp)
-  and traffic (gap < 1500 ms → −0.2). `project_pace()` accepts optional `cold_tyre_penalties`
-  tuple (defaults to `COLD_TYRE_PENALTIES_MS`). New `engine/calibration.py` with
-  `calibrate_cold_tyre_penalties()`. 5 hypothesis invariant tests (1700 total examples).
-  Backtest endpoint returns 404 until Stream A populates curated list (E9-E10).
-  **265 tests (231 unit + 34 contract), ruff clean, mypy clean (89 files).**
+- [ ] Stream B: confidence final + flag `PACE_PREDICTOR`.
 - [ ] Stream C: backtest view en UI.
 - [ ] Stream D: `make demo` end-to-end probado en máquina limpia.
 
 ### Día 10 — Entrega
 - [ ] Stream A: quanta `06-curva-fit-vs-xgboost.md` escrita con números reales.
 - [ ] Stream A: ADR `0009-xgboost-vs-scipy-resultados.md` cerrado.
-- [x] **Stream B**: dry-run con ambos predictores, WS reconnect, `replay_state` broadcasts.
-  `EngineLoop.get_snapshot()` method added. WS handler sends current snapshot on (re)connect.
-  `POST /api/v1/replay/start` and `POST /api/v1/replay/stop` broadcast `replay_state`
-  to all WS clients. 13 end-to-end in-process pipeline tests: full pipeline with
-  ScipyPredictor, predictor switching, XGBoostPredictor stub graceful handling, alert
-  payload shape, replay_state integration (HTTP + WS). 2 new WS reconnect tests.
-  **280 tests (246 unit + 34 contract), ruff clean, mypy clean (90 files).**
+- [ ] Stream B: dry-run completo Mónaco con ambos predictores.
 - [ ] Stream C: copy y branding mínimo, demo polish.
 - [ ] Stream D: walkthrough actualizado, changelog v0.1.0, video demo enlazado.
 - [ ] **Tag `v0.1.0` y release notes.**
