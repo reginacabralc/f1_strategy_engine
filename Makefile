@@ -1,7 +1,7 @@
 PYTHON ?= .venv/bin/python
 PIP ?= $(PYTHON) -m pip
 
-.PHONY: install db-up db-down up down down-v logs ps migrate \
+.PHONY: install db-up db-wait db-down up down down-v logs ps migrate \
         ingest-monaco ingest-demo validate-demo seed \
         fit-degradation validate-degradation \
         replay test lint demo
@@ -16,6 +16,13 @@ install: .venv/.installed
 
 db-up:
 	docker compose up -d db
+
+db-wait: db-up
+	@echo "Waiting for Postgres to be ready..."
+	@until docker compose exec -T db pg_isready -U pitwall -d pitwall >/dev/null 2>&1; do \
+		sleep 1; \
+	done
+	@echo "Postgres is ready."
 
 db-down:
 	docker compose down
@@ -36,26 +43,26 @@ logs:
 ps:
 	docker compose ps
 
-migrate: install
+migrate: install db-wait
 	cd backend && ../$(PYTHON) -m alembic -c alembic.ini upgrade head
 
-ingest-monaco: install
+ingest-monaco: install db-wait
 	$(PYTHON) scripts/ingest_season.py --year 2024 --round 8 --session R --write-db
 
-ingest-demo: install
+ingest-demo: install db-wait
 	$(PYTHON) scripts/ingest_season.py --year 2024 --round 1 --session R --write-db
 	$(PYTHON) scripts/ingest_season.py --year 2024 --round 8 --session R --write-db
 	$(PYTHON) scripts/ingest_season.py --year 2024 --round 13 --session R --write-db
 
-validate-demo: install
+validate-demo: install db-wait
 	$(PYTHON) scripts/validate_demo_ingest.py
 
 seed: ingest-demo
 
-fit-degradation: install
+fit-degradation: install db-wait
 	$(PYTHON) scripts/fit_degradation.py --all-demo
 
-validate-degradation: install
+validate-degradation: install db-wait
 	$(PYTHON) scripts/validate_degradation.py
 
 test: install
@@ -67,7 +74,7 @@ lint: install
 
 ## SPEED ?= 30  (replay speed multiplier)
 ## SESSION ?= monaco_2024_R
-replay: install
+replay: install db-wait
 	$(PYTHON) scripts/ingest_season.py --year 2024 --round 8 --session R --write-db
 	@echo "Replay via API: POST /api/v1/replay/start  (Stream B Day 3 target)"
 
