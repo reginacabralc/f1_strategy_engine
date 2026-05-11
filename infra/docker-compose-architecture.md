@@ -28,32 +28,33 @@
 
 ### `db`
 
-- **Imagen**: `timescale/timescaledb:latest-pg15`
-- **Puerto**: 5432 (interno solo, no expuesto al host por defecto)
+- **Imagen**: `timescale/timescaledb:2.17.2-pg15`
+- **Puerto**: 5432 (expuesto al host para scripts locales de ingesta)
 - **Volumen**: `pgdata:/var/lib/postgresql/data`
-- **Init**: `docker/postgres-init.sql` con `CREATE EXTENSION timescaledb`
-- **Healthcheck**: `pg_isready -U pitwall` cada 5s
-- **Recursos**: ~200 MB RAM en steady state, ~500 MB con 1 temporada cargada
+- **Init**: `docker/postgres-init.sql` — `timescaledb` + `pgcrypto` (belt-and-suspenders; migration 0001 también los crea)
+- **Healthcheck**: `pg_isready -U pitwall -d pitwall` cada 5s
 
 ### `migrate`
 
-- **Imagen**: misma que `backend` (target `dev`)
-- **Comando**: `alembic upgrade head`
-- **Tipo**: one-shot (corre, termina)
-- **`depends_on`**: `db` healthy
-- **Razón de existir como servicio separado**: idempotencia, no quieres que el backend levante con DB no migrada
+- **Imagen**: `docker/backend.Dockerfile` (misma que `backend`)
+- **Comando**: `python -m alembic -c alembic.ini upgrade head`
+- **Tipo**: one-shot (`restart: "no"`)
+- **`depends_on`**: `db` → `service_healthy`
+- **Razón**: el backend nunca levanta sin esquema completo
 
 ### `backend`
 
-- **Imagen**: build local de `docker/backend.Dockerfile`
-- **Puerto**: 8000 (expuesto)
-- **Comando dev**: `uvicorn pitwall.api.main:app --reload --host 0.0.0.0 --port 8000`
-- **Comando prod**: `uvicorn pitwall.api.main:app --host 0.0.0.0 --port 8000 --workers 1` (1 worker porque hay estado in-memory)
-- **`depends_on`**: `migrate` `service_completed_successfully`
-- **Volúmenes** (dev): bind mount de `backend/src` para hot reload
-- **Volúmenes** (prod): solo `./data/cache` y `./models`
-- **Healthcheck**: `curl -f http://localhost:8000/health`
-- **Recursos**: ~400-500 MB RAM en steady state
+- **Imagen**: build local de `docker/backend.Dockerfile` (python:3.12-slim, single-stage)
+- **Puerto**: 8000
+- **Comando**: `uvicorn pitwall.api.main:app --host 0.0.0.0 --port 8000 --workers 1`
+- **`depends_on`**: `migrate` → `service_completed_successfully`
+- **Healthcheck**: `python -c "urllib.request.urlopen('http://localhost:8000/health')"` cada 10s
+- **Estado in-memory**: 1 worker obligatorio en V1 (RaceState no es serializable)
+
+### `frontend` _(pendiente Stream C)_
+
+- No wired yet — `frontend/` directory does not exist.
+- Will use `docker/frontend.Dockerfile` (Stream D Day 7).
 
 ### `frontend`
 
