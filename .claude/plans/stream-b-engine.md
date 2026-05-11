@@ -275,11 +275,47 @@ To receive a live `UNDERCUT_VIABLE` alert:
 `operationId`s match the static OpenAPI spec. `EngineLoop` end-to-end pipeline
 verified: events → state → undercut_score written per lap_complete.
 
-### Día 7 — OpenAPI y polish
-- [ ] Auto-export OpenAPI a `docs/interfaces/openapi_v1.yaml` en CI.
-- [ ] Validador `openapi-spec-validator` en CI.
-- [ ] Toggle `PACE_PREDICTOR` vía env var → log en startup.
-- [ ] Endpoint `POST /api/v1/config/predictor` para cambio en runtime.
+### Día 7 — OpenAPI y polish ✅
+
+- [x] **OpenAPI validation in CI.** `test.yml` `ruff-mypy` job now includes a
+  dedicated "Validate live OpenAPI spec" step that instantiates `create_app()`,
+  calls `.openapi()`, and passes the result to `openapi_spec_validator.validate()`.
+  Fails CI if the generated spec is not valid OpenAPI 3.0. Contract test extended
+  with `test_live_spec_is_valid_openapi` (runs in both CI jobs via pytest).
+- [x] **`PACE_PREDICTOR` toggle → structlog at startup.** `main.py` lifespan now
+  emits a `pitwall_startup` structured log event with `pace_predictor` and
+  `version` fields immediately before the engine loop starts. A `pitwall_shutdown`
+  event is logged on graceful exit. Uses `get_logger(__name__)` from `core.logging`.
+- [x] **`POST /api/v1/config/predictor`** (`setActivePredictor`, tag `config`).
+  - `scipy` → always succeeds: reloads `ScipyPredictor` from DB (empty fallback if
+    DB unreachable). Calls `engine_loop.set_predictor(predictor, "scipy")`.
+  - `xgboost` → 409 when `models/xgb_pace_v1.json` is missing (run
+    `make train-xgb`). 409 from `ImportError` when model exists but
+    `pitwall.ml.predictor.XGBoostPredictor` is not yet implemented (Day 8-10).
+  - Returns `SetPredictorResponse { active_predictor }`.
+  - Unknown predictor name (not in `Literal["scipy", "xgboost"]`) → 422 from
+    Pydantic validation (FastAPI standard).
+
+#### New / modified files
+
+- `backend/src/pitwall/api/routes/config.py` — new route file.
+- `backend/src/pitwall/api/schemas.py` — added `SetPredictorRequest`,
+  `SetPredictorResponse`.
+- `backend/src/pitwall/core/config.py` — added `xgb_model_path` setting
+  (default `"models/xgb_pace_v1.json"`).
+- `backend/pyproject.toml` — added `ignore_missing_imports = true` to
+  `[tool.mypy]` so local `mypy src tests` and CI `mypy src tests` are identical
+  (no more `--ignore-missing-imports` flag divergence).
+- `backend/src/pitwall/api/main.py` — config router included; startup/shutdown
+  structlog events added.
+- `backend/tests/contract/test_openapi_export.py` — `test_live_spec_is_valid_openapi`
+  added; `/api/v1/config/predictor` added to `IMPLEMENTED`.
+- `backend/tests/unit/api/test_config.py` — 8 tests.
+- `.github/workflows/test.yml` — "Validate live OpenAPI spec" step added.
+
+#### Smoke run — Day 7
+
+**210 tests passing.** ruff clean, mypy clean (80 source files, no `--ignore-missing-imports` flag required). 8 implemented paths in live spec, all valid OpenAPI 3.0.
 
 ### Día 8 — Edge cases (E6)
 - [ ] SC/VSC: emite `SUSPENDED_SC` / `SUSPENDED_VSC`, no calcula undercut.

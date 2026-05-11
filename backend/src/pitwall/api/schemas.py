@@ -132,3 +132,17 @@ class DegradationCurve(BaseModel):
     r_squared: float | None = Field(default=None, ge=0.0, le=1.0)
     n_samples: int
     sample_points: list[DegradationSamplePoint] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Config schemas (mirror of SetPredictorRequest / SetPredictorResponse in
+# openapi_v1.yaml).
+# ---------------------------------------------------------------------------
+
+
+class SetPredictorRequest(BaseModel):
+    predictor: PredictorName
+
+
+class SetPredictorResponse(BaseModel):
+    active_predictor: PredictorName

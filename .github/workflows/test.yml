@@ -31,6 +31,15 @@ jobs:
       - name: mypy
         run: .venv/bin/python -m mypy src tests
 
+      - name: Validate live OpenAPI spec
+        run: |
+          .venv/bin/python -c "
+          from pitwall.api.main import create_app
+          from openapi_spec_validator import validate
+          validate(create_app().openapi())
+          print('live OpenAPI spec: valid')
+          "
+
   pytest:
     runs-on: ubuntu-latest
     defaults:

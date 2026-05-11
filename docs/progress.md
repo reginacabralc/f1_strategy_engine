@@ -174,7 +174,15 @@
 
 ### Día 7
 - [ ] Stream A: dataset XGBoost preparado (features + split LORO).
-- [ ] Stream B: OpenAPI exportado y validado en CI.
+- [x] **Stream B**: OpenAPI exportado y validado en CI.
+  `POST /api/v1/config/predictor` (`setActivePredictor`) implemented — switches
+  `scipy`/`xgboost` at runtime; 409 when XGBoost model missing; 422 on unknown name.
+  Startup structlog events (`pitwall_startup` with `pace_predictor` field,
+  `pitwall_shutdown`). `test_live_spec_is_valid_openapi` added to contract suite.
+  "Validate live OpenAPI spec" step added to `ruff-mypy` CI job.
+  `ignore_missing_imports = true` added to `[tool.mypy]` — no flag divergence.
+  `xgb_model_path` setting added to `Settings`.
+  **210 tests, ruff clean, mypy clean (80 files).**
 - [ ] Stream C: AlertFeed funcional + toggle predictor.
 - [ ] Stream D: Dockerfile frontend + nginx prod.
 
