@@ -8,17 +8,29 @@ One replay runs at a time in V1.  The routes read the active
 :class:`~pitwall.repositories.events.SessionEventLoader` from FastAPI
 dependency injection so tests can substitute either without touching the
 application code.
+
+Both routes broadcast a ``replay_state`` WebSocket message when the replay
+lifecycle changes, so connected clients can update their "replay active"
+indicator without polling REST.
 """
 
 from __future__ import annotations
 
-from typing import Annotated
+from datetime import UTC, datetime
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from pitwall.api.dependencies import get_event_loader, get_replay_manager
+from pitwall.api.connections import ConnectionManager
+from pitwall.api.dependencies import (
+    get_connection_manager,
+    get_engine_loop,
+    get_event_loader,
+    get_replay_manager,
+)
 from pitwall.api.schemas import ReplayRun, ReplayStartRequest, ReplayStopResponse
 from pitwall.core.config import get_settings
+from pitwall.engine.loop import EngineLoop
 from pitwall.engine.replay_manager import ReplayManager
 from pitwall.repositories.events import SessionEventLoader
 
@@ -26,6 +38,29 @@ router = APIRouter(prefix="/api/v1/replay", tags=["replay"])
 
 ReplayManagerDep = Annotated[ReplayManager, Depends(get_replay_manager)]
 SessionEventLoaderDep = Annotated[SessionEventLoader, Depends(get_event_loader)]
+ConnectionManagerDep = Annotated[ConnectionManager, Depends(get_connection_manager)]
+EngineLoopDep = Annotated[EngineLoop, Depends(get_engine_loop)]
+
+
+def _replay_state_message(
+    state: str,
+    run_id: str,
+    session_id: str,
+    speed_factor: float,
+    pace_predictor: str,
+) -> dict[str, Any]:
+    return {
+        "v": 1,
+        "type": "replay_state",
+        "ts": datetime.now(UTC).isoformat(),
+        "payload": {
+            "run_id": run_id,
+            "session_id": session_id,
+            "state": state,
+            "speed_factor": speed_factor,
+            "pace_predictor": pace_predictor,
+        },
+    }
 
 
 @router.post(
@@ -44,6 +79,8 @@ async def start_replay(
     body: ReplayStartRequest,
     replay_manager: ReplayManagerDep,
     event_loader: SessionEventLoaderDep,
+    cm: ConnectionManagerDep,
+    engine_loop: EngineLoopDep,
 ) -> ReplayRun:
     if replay_manager.is_running:
         raise HTTPException(
@@ -63,13 +100,27 @@ async def start_replay(
 
     run_id = await replay_manager.start(body.session_id, body.speed_factor, events)
 
-    return ReplayRun(
+    # Build response before the next await: the replay task may finish (draining a
+    # short fixture) and set is_running=False, which would make started_at return None.
+    response = ReplayRun(
         run_id=run_id,
         session_id=body.session_id,
         speed_factor=body.speed_factor,
         started_at=replay_manager.started_at,  # type: ignore[arg-type]
         pace_predictor=get_settings().pace_predictor,
     )
+
+    await cm.broadcast_json(
+        _replay_state_message(
+            state="started",
+            run_id=str(run_id),
+            session_id=body.session_id,
+            speed_factor=body.speed_factor,
+            pace_predictor=engine_loop.predictor_name,
+        )
+    )
+
+    return response
 
 
 @router.post(
@@ -81,6 +132,27 @@ async def start_replay(
 )
 async def stop_replay(
     replay_manager: ReplayManagerDep,
+    cm: ConnectionManagerDep,
+    engine_loop: EngineLoopDep,
 ) -> ReplayStopResponse:
+    # Read internal state BEFORE stop() clears it.  current_session_id gates on
+    # is_running, which may already be False if the replay task finished on its own
+    # (short fixture or speed_factor=∞).  The private attributes always hold the
+    # last value until stop() resets them.
+    session_id: str | None = replay_manager._session_id
+    speed_factor: float = replay_manager._speed_factor or 1.0
+
     run_id = await replay_manager.stop()
+
+    if run_id is not None and session_id is not None:
+        await cm.broadcast_json(
+            _replay_state_message(
+                state="stopped",
+                run_id=str(run_id),
+                session_id=session_id,
+                speed_factor=speed_factor,
+                pace_predictor=engine_loop.predictor_name,
+            )
+        )
+
     return ReplayStopResponse(stopped=run_id is not None, run_id=run_id)
