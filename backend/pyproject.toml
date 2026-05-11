@@ -69,6 +69,7 @@ known-first-party = ["pitwall"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
+ignore_missing_imports = true
 files = ["src", "tests"]
 
 [tool.pytest.ini_options]

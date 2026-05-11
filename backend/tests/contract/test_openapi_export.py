@@ -51,6 +51,7 @@ IMPLEMENTED: dict[str, set[str]] = {
     "/api/v1/replay/start": {"post"},
     "/api/v1/replay/stop": {"post"},
     "/api/v1/degradation": {"get"},
+    "/api/v1/config/predictor": {"post"},
 }
 
 
@@ -71,12 +72,17 @@ def live_spec() -> dict[str, Any]:
 
 
 # --------------------------------------------------------------------------
-# Static spec health
+# Spec validity (static AND live)
 # --------------------------------------------------------------------------
 
 
 def test_static_spec_is_valid_openapi(static_spec: dict[str, Any]) -> None:
     validate(static_spec)
+
+
+def test_live_spec_is_valid_openapi(live_spec: dict[str, Any]) -> None:
+    """The FastAPI-generated spec must itself be a valid OpenAPI 3.0 document."""
+    validate(live_spec)
 
 
 # --------------------------------------------------------------------------

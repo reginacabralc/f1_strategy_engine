@@ -37,6 +37,14 @@ class Settings(BaseSettings):
     # --- Predictor selection -----------------------------------------
     pace_predictor: PredictorName = "scipy"
 
+    # --- ML model paths ----------------------------------------------
+    # Path to the serialised XGBoost pace model. Relative paths are
+    # resolved from the process working directory (repo root in dev,
+    # /app in Docker). The file is only required when
+    # PACE_PREDICTOR=xgboost; setting the env var without training
+    # first returns 409 from POST /api/v1/config/predictor.
+    xgb_model_path: str = "models/xgb_pace_v1.json"
+
     # --- Replay defaults ---------------------------------------------
     replay_default_session: str = "monaco_2024_R"
     replay_default_speed: float = 30.0
