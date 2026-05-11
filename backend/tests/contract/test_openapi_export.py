@@ -47,8 +47,10 @@ IMPLEMENTED: dict[str, set[str]] = {
     "/health": {"get"},
     "/ready": {"get"},
     "/api/v1/sessions": {"get"},
+    "/api/v1/sessions/{session_id}/snapshot": {"get"},
     "/api/v1/replay/start": {"post"},
     "/api/v1/replay/stop": {"post"},
+    "/api/v1/degradation": {"get"},
 }
 
 

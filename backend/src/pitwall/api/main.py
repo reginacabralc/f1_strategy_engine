@@ -29,6 +29,7 @@ from fastapi import FastAPI
 
 from pitwall import __version__
 from pitwall.api.connections import ConnectionManager
+from pitwall.api.routes import degradation as degradation_routes
 from pitwall.api.routes import replay as replay_routes
 from pitwall.api.routes import sessions as sessions_routes
 from pitwall.api.schemas import Health
@@ -136,6 +137,7 @@ def create_app() -> FastAPI:
 
     app.include_router(sessions_routes.router)
     app.include_router(replay_routes.router)
+    app.include_router(degradation_routes.router)
     app.include_router(ws_router)
 
     return app

@@ -106,6 +106,11 @@ class EngineLoop:
     def is_running(self) -> bool:
         return self._task is not None and not self._task.done()
 
+    @property
+    def predictor_name(self) -> str:
+        """Name of the currently active pace predictor."""
+        return self._predictor_name
+
     # ------------------------------------------------------------------
     # Background task
     # ------------------------------------------------------------------

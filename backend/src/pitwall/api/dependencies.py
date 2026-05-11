@@ -25,6 +25,7 @@ from pitwall.api.connections import ConnectionManager
 from pitwall.core.topics import Topics
 from pitwall.engine.loop import EngineLoop
 from pitwall.engine.replay_manager import ReplayManager
+from pitwall.repositories.degradation import DegradationRepository, InMemoryDegradationRepository
 from pitwall.repositories.events import InMemorySessionEventLoader, SessionEventLoader
 from pitwall.repositories.sessions import InMemorySessionRepository, SessionRepository
 
@@ -37,6 +38,16 @@ def get_session_repository() -> SessionRepository:
     Stream A can replace this body with a SQL-backed implementation.
     """
     return InMemorySessionRepository()
+
+
+@lru_cache(maxsize=1)
+def get_degradation_repository() -> DegradationRepository:
+    """Return the active :class:`DegradationRepository`.
+
+    V1 default: in-memory (empty → 404 until DB is seeded).
+    Stream A wires a SQL implementation once ``make fit-degradation`` has run.
+    """
+    return InMemoryDegradationRepository()
 
 
 @lru_cache(maxsize=1)

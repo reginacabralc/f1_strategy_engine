@@ -8,6 +8,7 @@ from importlib import import_module
 from typing import Any, Protocol, cast
 
 from pitwall.feeds.base import Event
+from pitwall.repositories.degradation import CoefficientRow
 from pitwall.repositories.sessions import SessionRow
 
 SESSION_SQL = """
@@ -188,6 +189,46 @@ class SqlSessionEventLoader:
                 "rainfall": row["rainfall"],
             },
         }
+
+
+COEFFICIENT_SQL = """
+    SELECT circuit_id, compound, a, b, c, r_squared, n_laps
+    FROM degradation_coefficients
+    WHERE circuit_id = :circuit_id
+      AND compound = :compound
+      AND model_type = 'quadratic_v1'
+    LIMIT 1
+"""
+
+
+class SqlDegradationRepository:
+    """Read degradation coefficients from Stream A's ``degradation_coefficients`` table."""
+
+    def __init__(self, engine: EngineLike) -> None:
+        self.engine = engine
+
+    async def get_coefficient(
+        self, circuit_id: str, compound: str
+    ) -> CoefficientRow | None:
+        with self.engine.connect() as connection:
+            rows = list(
+                connection.execute(
+                    _sql_text(COEFFICIENT_SQL),
+                    {"circuit_id": circuit_id.lower(), "compound": compound.upper()},
+                )
+            )
+        if not rows:
+            return None
+        row = dict(rows[0]._mapping)
+        return CoefficientRow(
+            circuit_id=str(row["circuit_id"]),
+            compound=str(row["compound"]).upper(),
+            a=float(row["a"]),
+            b=float(row["b"]),
+            c=float(row["c"]),
+            r_squared=float(row["r_squared"]) if row.get("r_squared") is not None else None,
+            n_laps=int(row["n_laps"]) if row.get("n_laps") is not None else None,
+        )
 
 
 def _event_order(event_type: str) -> int:
