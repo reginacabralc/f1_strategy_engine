@@ -5,6 +5,7 @@ PIP ?= $(PYTHON) -m pip
         ingest-monaco ingest-demo validate-demo seed \
         fit-degradation validate-degradation report-degradation \
         fit-pit-loss validate-pit-loss \
+        fit-driver-offsets validate-driver-offsets \
         replay test lint demo
 
 install: .venv/.installed
@@ -73,6 +74,12 @@ fit-pit-loss: install db-wait
 
 validate-pit-loss: install db-wait
 	$(PYTHON) scripts/validate_pit_loss.py
+
+fit-driver-offsets: install db-wait
+	$(PYTHON) scripts/fit_driver_offsets.py
+
+validate-driver-offsets: install db-wait
+	$(PYTHON) scripts/validate_driver_offsets.py
 
 test: install
 	cd backend && ../$(PYTHON) -m pytest tests/unit -q

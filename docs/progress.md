@@ -164,6 +164,20 @@
 
 ## Semana 2
 
+### Día 6.5
+- [x] Stream A: driver/team pace offsets calculados y persistidos.
+      Added `backend/src/pitwall/pace_offsets/` package (`models.py`, `estimation.py`,
+      `writer.py`), `scripts/fit_driver_offsets.py`, `scripts/validate_driver_offsets.py`,
+      `make fit-driver-offsets`, and `make validate-driver-offsets`.
+      Method: group fitting-eligible clean-air laps by (circuit_id, compound); compute
+      reference pace as median(all laps); driver offset = median(driver_lap_time_ms −
+      reference_ms); persist only if n_samples ≥ 5; idempotent upsert.
+      Local result on 3 demo races: 3503 clean-air laps → 103 offsets persisted, 4 skipped
+      (insufficient data). Notable: VER monaco HARD −3782 ms, HAM monaco HARD −3685 ms,
+      SAR monaco HARD +1852 ms. 25 unit tests added, all passing. No schema change needed —
+      `driver_skill_offsets` table already existed. Added `notebooks/04_driver_team_offsets.md`.
+      Next: Day 7 XGBoost dataset builder joins this table as attacker/defender pace features.
+
 ### Día 6
 - [x] Stream A: pit loss por (circuito, equipo) calculado y persistido.
       Added `scripts/fit_pit_loss.py`, `scripts/validate_pit_loss.py`,
