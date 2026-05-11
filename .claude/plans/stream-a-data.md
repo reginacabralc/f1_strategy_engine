@@ -28,7 +28,7 @@ backend/src/pitwall/db/migrations/   # con review de D
 notebooks/
 scripts/ingest_*.py
 scripts/fit_*.py
-scripts/compute_pit_loss.py
+scripts/fit_pit_loss.py
 scripts/train_xgb.py
 scripts/load_known_undercuts.py
 docs/quanta/02-degradacion-neumatico.md
@@ -146,18 +146,41 @@ docs/adr/0009-xgboost-vs-scipy-resultados.md
     Monaco MEDIUM age 10. Última validación Docker: 81,366 ms con confidence
     0.362.
 
-### Día 5 — Skill offsets + integración (E3)
+### Día 5 — Baseline scipy estable + reporte (E3)
+- [x] Coeficientes persistidos en DB y reporte `notebooks/02_fit_degradation.md`
+  con métricas reales.
+  - Última corrida limpia: 8 coeficientes `quadratic_v1`, 3,503 vueltas
+    elegibles, mejor ajuste Monaco MEDIUM R²=0.362/RMSE=1701 ms.
+  - El objetivo R² ≥ 0.6 no se alcanzó; queda documentado como limitación
+    del baseline, no se maquilló.
+- [x] Comando de reporte reproducible.
+  - `make report-degradation` reutiliza `scripts/validate_degradation.py`
+    para imprimir tabla de coeficientes y smoke de `ScipyPredictor`.
+- [x] Validación de compatibilidad con Stream B.
+  - Tests unitarios cubren carga desde filas estilo DB, contrato
+    `PacePredictor`, `UnsupportedContextError`, clamp de confianza y llamada
+    de `engine.undercut.evaluate_undercut()` usando `ScipyPredictor`.
 - [ ] Calcular `driver_skill_offsets` por (driver × circuito × compuesto).
+  - Diferido: requiere acordar estrategia de normalización/split antes de
+    convertirlo en input de entrenamiento.
 - [ ] Test unitario con datos reales/fixtures: ScipyPredictor reproduce vueltas conocidas con MAE < 0.5s.
-  - Ya existen tests sintéticos de contrato/cuadrática; falta fixture real o
-    snapshot pequeño para medir MAE.
-- [ ] Hito S1: motor B corre con `ScipyPredictor` real.
+  - Diferido: el baseline actual es funcional, pero la MAE real debe medirse
+    con fixture/snapshot curado para no mezclar entrenamiento y evaluación.
 
 ### Día 6 — Pit loss (E9 setup)
-- [ ] `scripts/compute_pit_loss.py` con mediana por (circuito, equipo).
-- [ ] Persistir en `pit_loss_estimates`.
-- [ ] Notebook `03_pit_loss.ipynb`.
+- [x] `scripts/fit_pit_loss.py` con mediana por (circuito, equipo).
+  - Usa `pit_stops.pit_loss_ms` si existe; si no, estima de forma conservadora
+    con vueltas pit-in/pit-out y mediana de vueltas limpias cercanas.
+  - Última corrida demo: 87 samples realistas, 28 filas persistidas.
+- [x] Persistir en `pit_loss_estimates`.
+  - Se agregó fallback de circuito con `team_code IS NULL` vía migración
+    `0005_pit_loss_circuit_fallback.py`.
+  - El loader `load_pit_loss_table()` devuelve la forma de Stream B:
+    `{circuit_id: {team_code: pit_loss_ms, None: circuit_median_ms}}`.
+  - `api/main.py` carga la tabla al iniciar y la inyecta en `EngineLoop`.
+- [x] Notebook/markdown `notebooks/03_pit_loss_estimation.md`.
 - [ ] Curaduría manual de ~15 undercuts conocidos en `data/known_undercuts.csv`.
+  - Fuera del scope solicitado para Day 6 actual; queda para E9/backtest.
 - [ ] `scripts/load_known_undercuts.py` que carga el CSV a DB.
 
 ### Día 7 — Dataset XGBoost (E10 prep)

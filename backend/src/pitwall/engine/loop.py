@@ -91,6 +91,10 @@ class EngineLoop:
         self._predictor = predictor
         self._predictor_name = name
 
+    def set_pit_loss_table(self, pit_loss_table: PitLossTable) -> None:
+        """Swap the active pit-loss lookup table at runtime."""
+        self._pit_loss_table = pit_loss_table
+
     async def start(self) -> None:
         if self._task is None or self._task.done():
             self._task = asyncio.create_task(self._run(), name="engine-loop")

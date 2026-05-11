@@ -39,9 +39,12 @@ from pitwall.api.ws import router as ws_router
 from pitwall.core.config import get_settings
 from pitwall.core.logging import configure_logging, get_logger
 from pitwall.core.topics import Topics
+from pitwall.db.engine import create_db_engine
 from pitwall.engine.loop import EngineLoop
+from pitwall.engine.pit_loss import PitLossTable
 from pitwall.engine.projection import PacePredictor
 from pitwall.engine.replay_manager import ReplayManager
+from pitwall.pit_loss.estimation import load_pit_loss_table
 
 
 def _build_predictor() -> PacePredictor:
@@ -49,11 +52,18 @@ def _build_predictor() -> PacePredictor:
     from pitwall.degradation.predictor import ScipyPredictor
 
     try:
-        from pitwall.db.engine import create_db_engine
-
         return ScipyPredictor.from_engine(create_db_engine())
     except Exception:
         return ScipyPredictor([])
+
+
+def _build_pit_loss_table() -> PitLossTable:
+    """Try to load Stream A pit-loss estimates from DB; fall back to empty."""
+    try:
+        with create_db_engine().connect() as connection:
+            return load_pit_loss_table(connection)
+    except Exception:
+        return {}
 
 
 _log = get_logger(__name__)
@@ -73,11 +83,12 @@ def create_app() -> FastAPI:
     replay_manager = ReplayManager(topics)
     connection_manager = ConnectionManager()
     predictor = _build_predictor()
+    pit_loss_table = _build_pit_loss_table()
     engine_loop = EngineLoop(
         topics,
         connection_manager,
         predictor,
-        {},  # pit_loss_table — Stream A populates Day 6
+        pit_loss_table,
         settings.pace_predictor,
     )
 
@@ -93,6 +104,7 @@ def create_app() -> FastAPI:
                 ScipyPredictor.from_engine(create_db_engine()),
                 settings.pace_predictor,
             )
+            engine_loop.set_pit_loss_table(_build_pit_loss_table())
         except Exception:
             pass  # keep the predictor we already have
 

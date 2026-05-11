@@ -12,7 +12,7 @@
 | 1 temporada (2024) ingerida en DB | ⏳ | Día 3 | Stream A — 3 demo races loaded; full season pending |
 | Replay engine funcional con fixture | ⏳ | Día 3 | Stream B |
 | Dashboard mock conectado a `/sessions` | ⏳ | Día 3 | Stream C |
-| Curva de degradación scipy ajustada | ⏳ | Día 5 | Stream A — Day 4 foundation persists coefficients; R² still below target |
+| Curva de degradación scipy ajustada | ✅ | Día 5 | Stream A — functional baseline persisted and reported; R² remains below target |
 | Motor undercut V1 con `ScipyPredictor` | ⏳ | Día 5 | Stream B |
 | Pipeline end-to-end con datos reales | ⏳ | Día 7 | Todos |
 | **XGBoost entrenado y serializado** | ⏳ | Día 8 | Stream A |
@@ -151,11 +151,17 @@
 - [ ] Stream D: Logs estructurados, /health endpoint.
 
 ### Día 5 — Hito S1
-- [ ] Stream A: Coeficientes en DB + notebook 02 con R² ≥ 0.6.
-      Day 4 created `notebooks/02_fit_degradation.md`; Day 5 should confirm
-      persisted demo coefficients and document actual R² thresholds/plots.
-      `ScipyPredictor` exists now, but the real-data MAE target and engine
-      integration remain pending.
+- [x] Stream A: Coeficientes en DB + notebook/reporte 02 con R²/RMSE reales.
+      Clean DB verification on 2026-05-10 passed:
+      `make test`, `make lint`, `make down-v`, `make migrate`,
+      `make ingest-demo`, `make validate-demo`, `make fit-degradation`,
+      and `make validate-degradation`. Persisted 8 `quadratic_v1`
+      coefficient rows from 3 demo races. Best current fit remains Monaco
+      MEDIUM (R²=0.362, RMSE=1701 ms); no group reaches the original R² ≥ 0.6
+      target. This is documented as a functional low-R² MVP baseline, not as
+      a tuned/high-quality degradation model. Added `make report-degradation`
+      and explicit tests for `ScipyPredictor` DB-row loading, confidence clamp,
+      missing coefficients, and Stream B `evaluate_undercut()` compatibility.
 - [ ] Stream B: Motor calculando undercut V1 con `ScipyPredictor`.
 - [ ] Stream C: DegradationChart con datos mock.
 - [ ] Stream D: CI verde con tests reales.
@@ -163,8 +169,35 @@
 
 ## Semana 2
 
+### Día 6.5
+- [x] Stream A: driver/team pace offsets calculados y persistidos.
+      Added `backend/src/pitwall/pace_offsets/` package (`models.py`, `estimation.py`,
+      `writer.py`), `scripts/fit_driver_offsets.py`, `scripts/validate_driver_offsets.py`,
+      `make fit-driver-offsets`, and `make validate-driver-offsets`.
+      Method: group fitting-eligible clean-air laps by (circuit_id, compound); compute
+      reference pace as median(all laps); driver offset = median(driver_lap_time_ms −
+      reference_ms); persist only if n_samples ≥ 5; idempotent upsert.
+      Local result on 3 demo races: 3503 clean-air laps → 103 offsets persisted, 4 skipped
+      (insufficient data). Notable: VER monaco HARD −3782 ms, HAM monaco HARD −3685 ms,
+      SAR monaco HARD +1852 ms. 25 unit tests added, all passing. No schema change needed —
+      `driver_skill_offsets` table already existed. Added `notebooks/04_driver_team_offsets.md`.
+      Next: Day 7 XGBoost dataset builder joins this table as attacker/defender pace features.
+
 ### Día 6
-- [ ] Stream A: pit loss por (circuito, equipo) calculado y persistido.
+- [x] Stream A: pit loss por (circuito, equipo) calculado y persistido.
+      Added `scripts/fit_pit_loss.py`, `scripts/validate_pit_loss.py`,
+      `make fit-pit-loss`, `make validate-pit-loss`, Alembic
+      `0005_pit_loss_circuit_fallback.py`, and runtime loading into the
+      Stream B `EngineLoop` pit-loss table. Current clean DB fit uses 87
+      realistic samples from the 3 demo races and writes 28 rows to
+      `pit_loss_estimates`: Bahrain circuit median 25,071 ms, Monaco
+      20,414 ms, Hungary 20,393 ms. Monaco has 6 usable samples after one
+      extreme plausible outlier is quarantined, so its
+      estimate is functional but still noisy. Follow-up refinement keeps
+      runtime estimates median-based, adds outlier quarantine diagnostics,
+      IQR/std/min/max reporting, quality labels, source labels, diagnostic
+      trimmed/winsorized means, and a `__global__` conservative fallback for
+      unseen tracks (23,274 ms on the demo set) without changing the DB schema.
 - [ ] Stream A: lista curada de ~15 undercuts conocidos.
 - [x] **Stream B**: endpoints REST conectados al estado real.
   `GET /api/v1/sessions/{session_id}/snapshot` returns live `RaceState` (404 when
