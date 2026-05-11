@@ -28,7 +28,7 @@ backend/src/pitwall/db/migrations/   # con review de D
 notebooks/
 scripts/ingest_*.py
 scripts/fit_*.py
-scripts/compute_pit_loss.py
+scripts/fit_pit_loss.py
 scripts/train_xgb.py
 scripts/load_known_undercuts.py
 docs/quanta/02-degradacion-neumatico.md
@@ -168,10 +168,19 @@ docs/adr/0009-xgboost-vs-scipy-resultados.md
     con fixture/snapshot curado para no mezclar entrenamiento y evaluación.
 
 ### Día 6 — Pit loss (E9 setup)
-- [ ] `scripts/compute_pit_loss.py` con mediana por (circuito, equipo).
-- [ ] Persistir en `pit_loss_estimates`.
-- [ ] Notebook `03_pit_loss.ipynb`.
+- [x] `scripts/fit_pit_loss.py` con mediana por (circuito, equipo).
+  - Usa `pit_stops.pit_loss_ms` si existe; si no, estima de forma conservadora
+    con vueltas pit-in/pit-out y mediana de vueltas limpias cercanas.
+  - Última corrida demo: 87 samples realistas, 28 filas persistidas.
+- [x] Persistir en `pit_loss_estimates`.
+  - Se agregó fallback de circuito con `team_code IS NULL` vía migración
+    `0005_pit_loss_circuit_fallback.py`.
+  - El loader `load_pit_loss_table()` devuelve la forma de Stream B:
+    `{circuit_id: {team_code: pit_loss_ms, None: circuit_median_ms}}`.
+  - `api/main.py` carga la tabla al iniciar y la inyecta en `EngineLoop`.
+- [x] Notebook/markdown `notebooks/03_pit_loss_estimation.md`.
 - [ ] Curaduría manual de ~15 undercuts conocidos en `data/known_undercuts.csv`.
+  - Fuera del scope solicitado para Day 6 actual; queda para E9/backtest.
 - [ ] `scripts/load_known_undercuts.py` que carga el CSV a DB.
 
 ### Día 7 — Dataset XGBoost (E10 prep)

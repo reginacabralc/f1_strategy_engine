@@ -6,7 +6,7 @@ time during the tyre change, and any time lost in the pit-lane speed limiter
 zone relative to racing speed.
 
 V1 uses a constant lookup table populated by Stream A's
-``scripts/compute_pit_loss.py`` once the demo races are ingested. Until
+``scripts/fit_pit_loss.py`` once the demo races are ingested. Until
 that table is populated the fallback constant of 21 s is used, which is
 typical for Monaco (a slow-pit-lane circuit).  Stream A's Day 6 task
 ("pit loss por (circuito, equipo) calculado y persistido") writes the real
@@ -18,6 +18,8 @@ Table shape
 
 ``None`` as a team key stores the circuit-level median — used when the
 specific team is not in the table.  All values are in whole milliseconds.
+The optional ``"__global__"`` circuit stores a conservative global fallback
+for unseen tracks while preserving the same nested-dict shape.
 """
 
 from __future__ import annotations
@@ -30,6 +32,9 @@ Monaco typically sees 22-24 s; high-speed circuits (Monza, Spa) can be
 as low as 18 s.  The bound errs on the side of *underestimating* the
 viability of an undercut, which is the safer direction.
 """
+
+GLOBAL_FALLBACK_CIRCUIT_ID = "__global__"
+"""Reserved circuit key for the global fallback in ``PitLossTable``."""
 
 PitLossTable = dict[str, dict[str | None, int]]
 """Pit-loss estimates keyed by ``{circuit_id: {team_code | None: ms}}``.
@@ -51,7 +56,8 @@ def lookup_pit_loss(
     Fallback chain:
     1. Exact ``(circuit_id, team_code)`` entry.
     2. Circuit-level median (``table[circuit_id][None]``).
-    3. ``default`` (hard-coded constant).
+    3. Global conservative median (``table["__global__"][None]``).
+    4. ``default`` (hard-coded constant).
 
     Args:
         circuit_id:  Circuit slug (e.g. ``"monaco"``).
@@ -67,4 +73,7 @@ def lookup_pit_loss(
         return circuit_table[team_code]
     if None in circuit_table:
         return circuit_table[None]
+    global_table = table.get(GLOBAL_FALLBACK_CIRCUIT_ID, {})
+    if None in global_table:
+        return global_table[None]
     return default

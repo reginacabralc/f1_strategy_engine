@@ -25,7 +25,9 @@ El pit loss es la **barrera** que el undercut tiene que superar. Si subestimamos
 
 ### V1 (entregable)
 
-Calculamos la **mediana histórica por (circuito, equipo)** sobre 2022-2024:
+Calculamos la **mediana histórica por (circuito, equipo)** con los datos
+ingeridos disponibles. En Day 6 el alcance real es el set demo 2024
+(Bahrain, Monaco, Hungary):
 
 ```sql
 SELECT 
@@ -38,13 +40,37 @@ WHERE n_samples >= 5  -- solo estimaciones con suficientes muestras
 GROUP BY circuit_id, team_code;
 ```
 
-Persistido en tabla `pit_loss_estimates`.
+Persistido en tabla `pit_loss_estimates`. También se persiste un fallback
+por circuito con `team_code IS NULL`.
 
 ### Fallbacks (en orden)
 
 1. Mediana específica `(circuit_id, team_code)`.
 2. Si `n_samples < 5`, mediana del circuito (todos los equipos).
-3. Si tampoco hay datos, valor de referencia teórico del circuito (`circuits.pit_lane_loss_seconds`).
+3. Si tampoco hay datos, constante conservadora del motor (`DEFAULT_PIT_LOSS_MS = 21_000`).
+
+## Estimación Day 6
+
+El fitting actual prefiere `pit_stops.pit_loss_ms` cuando FastF1 lo provee.
+Si no existe, estima de forma conservadora:
+
+```text
+pit_loss_ms = pit_in_lap_ms + pit_out_lap_ms - 2 * median_nearby_clean_lap_ms
+```
+
+Las vueltas limpias cercanas son del mismo piloto y sesión, no son pit-in/out,
+son válidas, tienen pista verde cuando el dato existe y quedan entre 60-180 s.
+Se descartan muestras fuera de 10-40 s antes de calcular medianas.
+
+Última corrida demo:
+
+| Circuito | Fallback circuito | Samples |
+|----------|-------------------|---------|
+| bahrain | 25,071 ms | 40 |
+| monaco | 20,561 ms | 7 |
+| hungary | 20,393 ms | 40 |
+
+Monaco queda funcional pero ruidoso por pocos samples.
 
 ## Por qué varía
 
@@ -77,7 +103,8 @@ Si en V1 estimamos pit loss de Mercedes en Mónaco con solo 2 samples (n_samples
 
 ## Implementación
 
-- Cálculo histórico: [`scripts/compute_pit_loss.py`](../../scripts/compute_pit_loss.py)
+- Cálculo histórico: [`scripts/fit_pit_loss.py`](../../scripts/fit_pit_loss.py)
+- Validación: [`scripts/validate_pit_loss.py`](../../scripts/validate_pit_loss.py)
 - Tabla: `pit_loss_estimates` (ver [`docs/interfaces/db_schema_v1.sql`](../interfaces/db_schema_v1.sql))
 - Lookup en runtime: [`backend/src/pitwall/engine/pit_loss.py`](../../backend/src/pitwall/engine/pit_loss.py)
 

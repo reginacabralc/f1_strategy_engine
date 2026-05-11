@@ -4,6 +4,7 @@ PIP ?= $(PYTHON) -m pip
 .PHONY: install db-up db-wait db-down up down down-v logs ps migrate \
         ingest-monaco ingest-demo validate-demo seed \
         fit-degradation validate-degradation report-degradation \
+        fit-pit-loss validate-pit-loss \
         replay test lint demo
 
 install: .venv/.installed
@@ -66,6 +67,12 @@ validate-degradation: install db-wait
 	$(PYTHON) scripts/validate_degradation.py
 
 report-degradation: validate-degradation
+
+fit-pit-loss: install db-wait
+	$(PYTHON) scripts/fit_pit_loss.py
+
+validate-pit-loss: install db-wait
+	$(PYTHON) scripts/validate_pit_loss.py
 
 test: install
 	cd backend && ../$(PYTHON) -m pytest tests/unit -q

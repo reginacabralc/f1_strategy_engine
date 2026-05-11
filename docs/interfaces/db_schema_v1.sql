@@ -191,12 +191,15 @@ CREATE TABLE degradation_coefficients (
 
 CREATE TABLE pit_loss_estimates (
     circuit_id              TEXT        NOT NULL REFERENCES circuits(circuit_id),
-    team_code               TEXT        NOT NULL REFERENCES teams(team_code),
+    -- NULL team_code stores the circuit-level fallback median consumed by
+    -- engine.pit_loss.lookup_pit_loss when no team-specific row exists.
+    team_code               TEXT        REFERENCES teams(team_code),
     pit_loss_ms             INT         NOT NULL CHECK (pit_loss_ms > 0),
     n_samples               INT         CHECK (n_samples IS NULL OR n_samples > 0),
-    computed_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (circuit_id, team_code)
+    computed_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE UNIQUE INDEX ux_pit_loss_estimates_circuit_team
+    ON pit_loss_estimates (circuit_id, COALESCE(team_code, '__circuit__'));
 
 CREATE TABLE driver_skill_offsets (
     driver_code             TEXT        NOT NULL,

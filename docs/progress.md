@@ -165,7 +165,20 @@
 ## Semana 2
 
 ### Día 6
-- [ ] Stream A: pit loss por (circuito, equipo) calculado y persistido.
+- [x] Stream A: pit loss por (circuito, equipo) calculado y persistido.
+      Added `scripts/fit_pit_loss.py`, `scripts/validate_pit_loss.py`,
+      `make fit-pit-loss`, `make validate-pit-loss`, Alembic
+      `0005_pit_loss_circuit_fallback.py`, and runtime loading into the
+      Stream B `EngineLoop` pit-loss table. Current clean DB fit uses 87
+      realistic samples from the 3 demo races and writes 28 rows to
+      `pit_loss_estimates`: Bahrain circuit median 25,071 ms, Monaco
+      20,414 ms, Hungary 20,393 ms. Monaco has 6 usable samples after one
+      extreme plausible outlier is quarantined, so its
+      estimate is functional but still noisy. Follow-up refinement keeps
+      runtime estimates median-based, adds outlier quarantine diagnostics,
+      IQR/std/min/max reporting, quality labels, source labels, diagnostic
+      trimmed/winsorized means, and a `__global__` conservative fallback for
+      unseen tracks (23,274 ms on the demo set) without changing the DB schema.
 - [ ] Stream A: lista curada de ~15 undercuts conocidos.
 - [x] **Stream B**: endpoints REST conectados al estado real.
   `GET /api/v1/sessions/{session_id}/snapshot` returns live `RaceState` (404 when
