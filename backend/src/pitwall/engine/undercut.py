@@ -208,13 +208,15 @@ def evaluate_undercut(
 
     try:
         # Confidence: one representative call per (circuit, compound) cell.
-        # For ScipyPredictor, confidence (R²) is constant regardless of tyre_age.
+        # Sample at the defender's *current* tyre age — the start of the projection
+        # window. (For ScipyPredictor R² is constant, but future predictors may
+        # return tyre-age-dependent confidence.)
         conf_def = predictor.predict(
             PaceContext(
                 driver_code=defender.driver_code,
                 circuit_id=circuit_id,
                 compound=cast(Compound, def_compound),
-                tyre_age=max(1, defender.tyre_age + 1),
+                tyre_age=max(1, defender.tyre_age),
             )
         ).confidence
         conf_atk = predictor.predict(
@@ -254,10 +256,11 @@ def evaluate_undercut(
     estimated_gain_ms = gap_recuperable_ms - pit_loss_ms
 
     # Normalised score (§6.7).  The MARGIN ensures marginal undercuts don't
-    # trigger an alert.
+    # trigger an alert.  Guard against pit_loss_ms=0 (shouldn't happen in
+    # practice but prevents ZeroDivisionError from a misconfigured table).
     raw_score = (
         gap_recuperable_ms - pit_loss_ms - gap_actual_ms - UNDERCUT_MARGIN_MS
-    ) / pit_loss_ms
+    ) / max(1, pit_loss_ms)
     score = max(0.0, min(1.0, raw_score))
 
     should_alert = score > SCORE_THRESHOLD and confidence > CONFIDENCE_THRESHOLD
