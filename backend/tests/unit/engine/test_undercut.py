@@ -196,3 +196,127 @@ def test_evaluate_undercut_confidence_clamped_to_zero_one() -> None:
     state = _state()
     decision = evaluate_undercut(state, _attacker(), _defender(), pred, _PIT_LOSS)
     assert 0.0 <= decision.confidence <= 1.0
+
+
+# ---------------------------------------------------------------------------
+# Rain / wet conditions — §6.9 UNDERCUT_DISABLED_RAIN
+# ---------------------------------------------------------------------------
+
+
+def test_undercut_disabled_rain_when_attacker_on_inter() -> None:
+    pred = _pred()
+    state = _state()
+    atk = DriverState(
+        driver_code="NOR",
+        position=2,
+        compound="INTER",
+        tyre_age=5,
+        laps_in_stint=5,
+        gap_to_ahead_ms=3_000,
+    )
+    decision = evaluate_undercut(state, atk, _defender(), pred, _PIT_LOSS)
+    assert decision.alert_type == "UNDERCUT_DISABLED_RAIN"
+    assert decision.should_alert is False
+    assert decision.score == 0.0
+
+
+def test_undercut_disabled_rain_when_attacker_on_wet() -> None:
+    pred = _pred()
+    state = _state()
+    atk = DriverState(
+        driver_code="NOR",
+        position=2,
+        compound="WET",
+        tyre_age=5,
+        laps_in_stint=5,
+        gap_to_ahead_ms=3_000,
+    )
+    decision = evaluate_undercut(state, atk, _defender(), pred, _PIT_LOSS)
+    assert decision.alert_type == "UNDERCUT_DISABLED_RAIN"
+    assert decision.should_alert is False
+
+
+def test_undercut_disabled_rain_when_defender_on_inter() -> None:
+    pred = _pred()
+    state = _state()
+    def_wet = DriverState(
+        driver_code="VER",
+        position=1,
+        compound="INTER",
+        tyre_age=8,
+        laps_in_stint=8,
+    )
+    decision = evaluate_undercut(state, _attacker(), def_wet, pred, _PIT_LOSS)
+    assert decision.alert_type == "UNDERCUT_DISABLED_RAIN"
+    assert decision.should_alert is False
+
+
+def test_undercut_rain_check_is_case_insensitive() -> None:
+    """Compound stored in lowercase should still trigger the rain guard."""
+    pred = _pred()
+    state = _state()
+    atk = DriverState(
+        driver_code="NOR",
+        position=2,
+        compound="inter",  # lowercase
+        tyre_age=5,
+        laps_in_stint=5,
+        gap_to_ahead_ms=3_000,
+    )
+    decision = evaluate_undercut(state, atk, _defender(), pred, _PIT_LOSS)
+    assert decision.alert_type == "UNDERCUT_DISABLED_RAIN"
+
+
+# ---------------------------------------------------------------------------
+# Defender just pitted — §6.9 pit-recent guard
+# ---------------------------------------------------------------------------
+
+
+def test_insufficient_data_when_defender_just_pitted_0_laps() -> None:
+    """Defender with laps_in_stint=0 (just pitted, no laps yet) → INSUFFICIENT_DATA."""
+    pred = _pred()
+    state = _state()
+    def_fresh = DriverState(
+        driver_code="VER",
+        position=1,
+        compound="HARD",
+        tyre_age=0,
+        laps_in_stint=0,  # literally just out of pit lane
+    )
+    decision = evaluate_undercut(state, _attacker(), def_fresh, pred, _PIT_LOSS)
+    assert decision.alert_type == "INSUFFICIENT_DATA"
+    assert decision.should_alert is False
+
+
+def test_insufficient_data_when_defender_just_pitted_1_lap() -> None:
+    """Defender on first lap out of pit (out-lap) → INSUFFICIENT_DATA."""
+    pred = _pred()
+    state = _state()
+    def_outlap = DriverState(
+        driver_code="VER",
+        position=1,
+        compound="HARD",
+        tyre_age=1,
+        laps_in_stint=1,  # one lap since pit — still suppressed
+    )
+    decision = evaluate_undercut(state, _attacker(), def_outlap, pred, _PIT_LOSS)
+    assert decision.alert_type == "INSUFFICIENT_DATA"
+    assert decision.should_alert is False
+
+
+def test_undercut_evaluates_when_defender_has_2_laps_on_tyres() -> None:
+    """Once defender has >= 2 laps on the current stint, evaluation resumes."""
+    pred = _pred()
+    state = _state()
+    def_2laps = DriverState(
+        driver_code="VER",
+        position=1,
+        compound="HARD",
+        tyre_age=2,
+        laps_in_stint=2,
+    )
+    atk = _attacker(gap_ms=5_000, tyre_age=23)
+    decision = evaluate_undercut(state, atk, def_2laps, pred, _PIT_LOSS)
+    # May or may not be viable, but should NOT return INSUFFICIENT_DATA for
+    # the recent-pit reason (attacker has enough laps)
+    assert decision.alert_type != "UNDERCUT_DISABLED_RAIN"

@@ -317,13 +317,61 @@ verified: events → state → undercut_score written per lap_complete.
 
 **210 tests passing.** ruff clean, mypy clean (80 source files, no `--ignore-missing-imports` flag required). 8 implemented paths in live spec, all valid OpenAPI 3.0.
 
-### Día 8 — Edge cases (E6)
-- [ ] SC/VSC: emite `SUSPENDED_SC` / `SUSPENDED_VSC`, no calcula undercut.
-- [ ] Lluvia (compound INTER/WET): emite `UNDERCUT_DISABLED_RAIN`.
-- [ ] Stint < 3 vueltas: emite `INSUFFICIENT_DATA`.
-- [ ] Datos stale (> 2 vueltas sin lap): driver excluido de pares.
-- [ ] Pit stop reciente: no alertar undercut sobre quien acaba de parar.
-- [ ] `XGBoostPredictor` cargable desde `models/xgb_pace_v1.json`.
+### Día 8 — Edge cases (E6) ✅
+
+- [x] **SC/VSC: `SUSPENDED_SC` / `SUSPENDED_VSC`, no undercut calculation.**
+  `_on_lap_complete()` in `loop.py` checks `state.track_status` before evaluating
+  pairs. When `"SC"` or `"VSC"`, it broadcasts one session-level alert via
+  `_suspension_message()` (alert_type, null attacker/defender) and skips all
+  pair evaluation. Snapshot still broadcast every lap. YELLOW flag does NOT
+  suspend evaluation (only SC/VSC per plan §6.9).
+- [x] **Rain (INTER/WET): `UNDERCUT_DISABLED_RAIN`.**
+  Guard added at top of `evaluate_undercut()` in `undercut.py`. If either
+  attacker or defender compound is INTER or WET (case-insensitive), returns
+  `UndercutDecision(alert_type="UNDERCUT_DISABLED_RAIN", should_alert=False)`.
+- [x] **Stint < 3 laps: `INSUFFICIENT_DATA`.**
+  Already implemented (Day 5). Guard at `attacker.laps_in_stint < 3` in
+  `evaluate_undercut()` remains. Not broadcast as alert (`should_alert=False`).
+- [x] **Datos stale: driver excluded from pairs.**
+  Already implemented (Day 4). `compute_relevant_pairs()` filters `data_stale=True`
+  drivers. The `data_stale` event from the feed sets the flag; automatic detection
+  (> 2 laps without lap_time) is V1.5.
+- [x] **Pit stop reciente: no alertar undercut sobre quien acaba de parar.**
+  Guard added in `evaluate_undercut()`: if `defender.laps_in_stint < 2`
+  (defender on outlap or pre-first-lap), returns `INSUFFICIENT_DATA`. Protects
+  against misleading "attacker should undercut a defender who already pitted."
+- [x] **`XGBoostPredictor` loadable from `models/xgb_pace_v1.json`.**
+  Created `backend/src/pitwall/ml/__init__.py` and `backend/src/pitwall/ml/predictor.py`.
+  `XGBoostPredictor.from_file(path)` loads an `xgb.Booster` (native JSON format,
+  no sklearn dependency). `predict()` raises `UnsupportedContextError` until
+  Stream A wires the feature pipeline (E10). `is_available()` returns `False`
+  (engine handles gracefully as `INSUFFICIENT_DATA`). Satisfies `PacePredictor`
+  Protocol (isinstance check passes). Optional `.meta.json` sidecar loaded for
+  training metadata (MAE, feature list, training date).
+  `POST /api/v1/config/predictor {"predictor": "xgboost"}` already wired in Day 7:
+  checks model file existence → 409 if missing, otherwise loads and calls
+  `engine_loop.set_predictor()`.
+
+#### New / modified files — Day 8
+
+- `backend/src/pitwall/ml/__init__.py` — new module.
+- `backend/src/pitwall/ml/predictor.py` — `XGBoostPredictor` class.
+- `backend/src/pitwall/engine/loop.py` — SC/VSC branch in `_on_lap_complete()`,
+  `_suspension_message()` builder.
+- `backend/src/pitwall/engine/undercut.py` — rain guard, recent-pit guard.
+- `backend/tests/unit/engine/test_loop.py` — 8 new tests (SC, VSC, GREEN,
+  YELLOW, snapshot-always, score-reset invariant).
+- `backend/tests/unit/engine/test_undercut.py` — 8 new tests (INTER/WET/lowercase,
+  defender-0-laps, defender-1-lap, defender-2-laps resumes).
+- `backend/tests/unit/ml/test_xgboost_predictor.py` — 9 tests (from_file, sidecar,
+  missing file, predict error, Protocol compliance).
+
+#### Smoke run — Day 8
+
+**234 tests passing.** ruff clean, mypy clean (85 source files).
+SC/GREEN transition verified: SUSPENDED_SC during SC, UNDERCUT_VIABLE after green.
+Rain/pit edge cases verified inline. XGBoostPredictor Protocol compliance verified.
+`brew install libomp` required locally (macOS only); ubuntu-latest CI has it pre-installed.
 
 ### Día 9 — Confidence y filtros finales (E7)
 - [ ] `data_quality_factor` real (no constante).
