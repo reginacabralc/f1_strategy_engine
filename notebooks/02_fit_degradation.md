@@ -2,9 +2,13 @@
 
 ## Goal
 
-Day 4 builds the baseline tyre degradation fit from the three demo races already
-loaded into local TimescaleDB. It does not train XGBoost and does not touch the
-replay engine.
+Day 5 stabilizes the baseline tyre degradation fit from the three demo races
+loaded into local TimescaleDB. This report documents persisted coefficients,
+real R2/RMSE, and the `ScipyPredictor` smoke path expected by the Stream B
+engine/API flow.
+
+This does not train XGBoost, create training splits, compute pit loss, or change
+the undercut engine internals.
 
 The V1 model is:
 
@@ -15,16 +19,24 @@ lap_time_ms = a + b * tyre_age + c * tyre_age^2
 Groups are fitted by `(circuit_id, compound)` with a session-id fallback in code
 if circuit metadata is unavailable.
 
-## Workflow
+## Reproducible Workflow
 
 ```bash
 cp .env.example .env
-make db-up
+make test
+make lint
+make down-v
 make migrate
 make ingest-demo
+make validate-demo
 make fit-degradation
 make validate-degradation
 ```
+
+`make migrate`, `make ingest-demo`, `make validate-demo`,
+`make fit-degradation`, and `make validate-degradation` all depend on
+`db-wait`, so the DB container is started and checked with `pg_isready` before
+SQL commands run.
 
 Single-session fit:
 
@@ -36,6 +48,12 @@ All demo sessions:
 
 ```bash
 .venv/bin/python scripts/fit_degradation.py --all-demo
+```
+
+Report persisted coefficients and predictor smoke:
+
+```bash
+make report-degradation
 ```
 
 ## Clean-air eligibility
@@ -83,9 +101,17 @@ The predictor loads `quadratic_v1` rows from `degradation_coefficients`, applies
 `a + b * tyre_age + c * tyre_age^2`, rounds to whole milliseconds, and uses R²
 as prediction confidence.
 
-## Current Day 4 local validation
+## Current Day 5 local validation
 
-On the local demo DB after `make fit-degradation` and `make validate-degradation`:
+On a clean local DB after:
+
+```bash
+make down-v
+make migrate
+make ingest-demo
+make fit-degradation
+make validate-degradation
+```
 
 - Diagnostic lap rows: 3,721
 - Eligible fitting rows: 3,503
@@ -93,10 +119,29 @@ On the local demo DB after `make fit-degradation` and `make validate-degradation
 - Monaco coefficient rows: 3
 - Best observed demo fit: Monaco MEDIUM, R² 0.362, RMSE 1701 ms
 
-All current Day 4 fits are `fitted_warn` because the raw per-circuit/per-compound
-quadratic is still mixing driver/team/fuel effects. That is acceptable for Day 4
-foundation, but Day 5 should either improve the clean-air normalization or
-document why the R² ≥ 0.6 target is not realistic for a given group.
+Persisted coefficient table:
+
+| circuit_id | compound | n_laps | R2    | RMSE_ms | source_sessions |
+|------------|----------|--------|-------|---------|-----------------|
+| bahrain | HARD | 731 | 0.017 | 1058 | `bahrain_2024_R` |
+| bahrain | SOFT | 312 | 0.125 | 2125 | `bahrain_2024_R` |
+| hungary | HARD | 823 | 0.040 | 1318 | `hungary_2024_R` |
+| hungary | MEDIUM | 412 | 0.128 | 2047 | `hungary_2024_R` |
+| hungary | SOFT | 38 | 0.084 | 2872 | `hungary_2024_R` |
+| monaco | HARD | 764 | 0.190 | 1988 | `monaco_2024_R` |
+| monaco | MEDIUM | 391 | 0.362 | 1701 | `monaco_2024_R` |
+| monaco | SOFT | 32 | 0.032 | 1460 | `monaco_2024_R` |
+
+All current fits are `fitted_warn` because R2 is below 0.60. This is acceptable
+for the MVP baseline because it proves the end-to-end data/model contract:
+clean-air rows are extracted, coefficients are persisted idempotently, and the
+engine can consume the `PacePredictor` shape. It is not acceptable to present
+these curves as high-quality tyre models yet.
+
+The main limitation is that the current per-circuit/per-compound quadratic still
+mixes driver skill, team pace, fuel load, traffic, and race phase effects. Those
+factors inflate residual variance even after pit laps, deleted laps, invalid lap
+times, and non-green track-status rows are excluded.
 
 After the predictor addition, rerun this DB smoke:
 
@@ -106,12 +151,20 @@ make validate-degradation
 ```
 
 The validation script now also instantiates `ScipyPredictor` and predicts Monaco
-MEDIUM at tyre age 10 when coefficients exist. Latest local smoke after a fresh
-Docker DB ingest:
+MEDIUM at tyre age 10 when coefficients exist. Latest clean-DB smoke:
 
 ```text
 ScipyPredictor smoke: monaco MEDIUM age 10 -> 81366 ms (confidence 0.362)
 ```
+
+Unit coverage also verifies:
+
+- `ScipyPredictor` loads persisted-style coefficient rows.
+- It satisfies the runtime-checkable `PacePredictor` Protocol.
+- Missing coefficients raise `UnsupportedContextError`.
+- R2 is clamped into the `PacePrediction.confidence` `[0, 1]` range.
+- `engine.undercut.evaluate_undercut()` accepts a DB-loaded `ScipyPredictor`
+  without a shape mismatch.
 
 ## Stream B integration checkpoint
 
@@ -134,7 +187,12 @@ stop 200 {'stopped': True, ...}
 
 ## Day 5 notes
 
-- Use `ScipyPredictor` from persisted coefficients inside the undercut engine.
-- Add richer notebook plots and call out where R² is below 0.6.
-- Prepare driver skill offsets once the baseline curve is stable.
+- Day 5 Stream A is complete as a functional baseline/report, not as a
+  high-R2 model.
+- Recommended next step is Day 6 pit-loss estimation. This supports the engine
+  decision threshold without changing the pace-model data split or starting
+  XGBoost work.
+- After pit loss, revisit model quality with explicit driver/team/fuel
+  normalization. Do not choose a train/test split or XGBoost feature plan
+  without a separate review.
 - Keep the XGBoost dataset work separate until the Day 7/8 tasks.

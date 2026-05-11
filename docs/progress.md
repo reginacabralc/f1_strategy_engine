@@ -12,7 +12,7 @@
 | 1 temporada (2024) ingerida en DB | ⏳ | Día 3 | Stream A — 3 demo races loaded; full season pending |
 | Replay engine funcional con fixture | ⏳ | Día 3 | Stream B |
 | Dashboard mock conectado a `/sessions` | ⏳ | Día 3 | Stream C |
-| Curva de degradación scipy ajustada | ⏳ | Día 5 | Stream A — Day 4 foundation persists coefficients; R² still below target |
+| Curva de degradación scipy ajustada | ✅ | Día 5 | Stream A — functional baseline persisted and reported; R² remains below target |
 | Motor undercut V1 con `ScipyPredictor` | ⏳ | Día 5 | Stream B |
 | Pipeline end-to-end con datos reales | ⏳ | Día 7 | Todos |
 | **XGBoost entrenado y serializado** | ⏳ | Día 8 | Stream A |
@@ -146,11 +146,17 @@
 - [ ] Stream D: Logs estructurados, /health endpoint.
 
 ### Día 5 — Hito S1
-- [ ] Stream A: Coeficientes en DB + notebook 02 con R² ≥ 0.6.
-      Day 4 created `notebooks/02_fit_degradation.md`; Day 5 should confirm
-      persisted demo coefficients and document actual R² thresholds/plots.
-      `ScipyPredictor` exists now, but the real-data MAE target and engine
-      integration remain pending.
+- [x] Stream A: Coeficientes en DB + notebook/reporte 02 con R²/RMSE reales.
+      Clean DB verification on 2026-05-10 passed:
+      `make test`, `make lint`, `make down-v`, `make migrate`,
+      `make ingest-demo`, `make validate-demo`, `make fit-degradation`,
+      and `make validate-degradation`. Persisted 8 `quadratic_v1`
+      coefficient rows from 3 demo races. Best current fit remains Monaco
+      MEDIUM (R²=0.362, RMSE=1701 ms); no group reaches the original R² ≥ 0.6
+      target. This is documented as a functional low-R² MVP baseline, not as
+      a tuned/high-quality degradation model. Added `make report-degradation`
+      and explicit tests for `ScipyPredictor` DB-row loading, confidence clamp,
+      missing coefficients, and Stream B `evaluate_undercut()` compatibility.
 - [ ] Stream B: Motor calculando undercut V1 con `ScipyPredictor`.
 - [ ] Stream C: DegradationChart con datos mock.
 - [ ] Stream D: CI verde con tests reales.

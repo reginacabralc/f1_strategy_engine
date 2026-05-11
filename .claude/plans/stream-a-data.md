@@ -146,12 +146,26 @@ docs/adr/0009-xgboost-vs-scipy-resultados.md
     Monaco MEDIUM age 10. Última validación Docker: 81,366 ms con confidence
     0.362.
 
-### Día 5 — Skill offsets + integración (E3)
+### Día 5 — Baseline scipy estable + reporte (E3)
+- [x] Coeficientes persistidos en DB y reporte `notebooks/02_fit_degradation.md`
+  con métricas reales.
+  - Última corrida limpia: 8 coeficientes `quadratic_v1`, 3,503 vueltas
+    elegibles, mejor ajuste Monaco MEDIUM R²=0.362/RMSE=1701 ms.
+  - El objetivo R² ≥ 0.6 no se alcanzó; queda documentado como limitación
+    del baseline, no se maquilló.
+- [x] Comando de reporte reproducible.
+  - `make report-degradation` reutiliza `scripts/validate_degradation.py`
+    para imprimir tabla de coeficientes y smoke de `ScipyPredictor`.
+- [x] Validación de compatibilidad con Stream B.
+  - Tests unitarios cubren carga desde filas estilo DB, contrato
+    `PacePredictor`, `UnsupportedContextError`, clamp de confianza y llamada
+    de `engine.undercut.evaluate_undercut()` usando `ScipyPredictor`.
 - [ ] Calcular `driver_skill_offsets` por (driver × circuito × compuesto).
+  - Diferido: requiere acordar estrategia de normalización/split antes de
+    convertirlo en input de entrenamiento.
 - [ ] Test unitario con datos reales/fixtures: ScipyPredictor reproduce vueltas conocidas con MAE < 0.5s.
-  - Ya existen tests sintéticos de contrato/cuadrática; falta fixture real o
-    snapshot pequeño para medir MAE.
-- [ ] Hito S1: motor B corre con `ScipyPredictor` real.
+  - Diferido: el baseline actual es funcional, pero la MAE real debe medirse
+    con fixture/snapshot curado para no mezclar entrenamiento y evaluación.
 
 ### Día 6 — Pit loss (E9 setup)
 - [ ] `scripts/compute_pit_loss.py` con mediana por (circuito, equipo).
