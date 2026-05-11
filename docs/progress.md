@@ -161,7 +161,14 @@
 ### Día 6
 - [ ] Stream A: pit loss por (circuito, equipo) calculado y persistido.
 - [ ] Stream A: lista curada de ~15 undercuts conocidos.
-- [ ] Stream B: endpoints REST conectados al estado real.
+- [x] **Stream B**: endpoints REST conectados al estado real.
+  `GET /api/v1/sessions/{session_id}/snapshot` returns live `RaceState` (404 when
+  no active replay for that session). `GET /api/v1/degradation?circuit=&compound=`
+  returns fitted quadratic coefficients (404 until `make fit-degradation` runs,
+  400 on unknown compound). `DegradationRepository` seam added (same pattern as
+  `SessionRepository`). `scripts/ws_demo_client.py` WebSocket demo client added.
+  Contract test extended to 7 implemented paths — all `operationId`s match static spec.
+  **198 tests, ruff clean, mypy clean.**
 - [ ] Stream C: tabla y feed conectados a WS real.
 - [ ] Stream D: pre-commit, badges, README mejorado.
 

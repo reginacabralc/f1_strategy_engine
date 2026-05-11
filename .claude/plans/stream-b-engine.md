@@ -232,11 +232,48 @@ To receive a live `UNDERCUT_VIABLE` alert:
 3. `wscat -c ws://localhost:8000/ws/v1/live`
 4. `POST /api/v1/replay/start` with a session that has degraded-tyre scenarios
 
-### Día 6 — Endpoints REST (E7)
-- [ ] `/api/v1/sessions/{id}/snapshot`.
-- [ ] `/api/v1/degradation?circuit=&compound=`.
-- [ ] OpenAPI export con todos los endpoints, validado en CI.
-- [ ] Cliente Python de prueba en `scripts/ws_demo_client.py`.
+### Día 6 — Endpoints REST (E7) ✅
+
+- [x] **`GET /api/v1/sessions/{session_id}/snapshot`** — returns the in-memory
+  `RaceState` for the session currently being replayed. 404 when no active replay
+  or replay is for a different session. Response serialises every `DriverState`
+  (position, gap, compound, tyre_age, undercut_score) plus `active_predictor` and
+  `last_event_ts`. Tested: 404 cases, shape, driver sorting by position, predictor
+  reflection.
+- [x] **`GET /api/v1/degradation?circuit=&compound=`** — returns fitted quadratic
+  coefficients (a, b, c) and R² from `degradation_coefficients`. 404 when the DB
+  has not been seeded. 400 on unknown compound. Case-insensitive for both query
+  params. Follows the same repository seam pattern as sessions: `InMemoryDegradationRepository`
+  as default (→ 404), `SqlDegradationRepository` wired when DB is available.
+  Tested: 404, 400, correct coefficient values, 5 valid compounds.
+- [x] **OpenAPI export with all 7 implemented endpoints, validated in CI.**
+  `test_openapi_export.py` `IMPLEMENTED` dict extended with the two new paths.
+  All 7 `operationId`s verified to match `docs/interfaces/openapi_v1.yaml` exactly.
+  23 contract tests passing.
+- [x] **`scripts/ws_demo_client.py`** — demo client that connects to `/ws/v1/live`
+  and prints `alert` messages (attacker, defender, score, confidence, estimated_gain_ms)
+  and `snapshot` messages (lap, track_status, driver count) in a human-readable format.
+  Requires `pip install websockets`.
+
+#### New files — Day 6
+
+- `backend/src/pitwall/repositories/degradation.py` — `CoefficientRow` dataclass,
+  `DegradationRepository` Protocol, `InMemoryDegradationRepository`.
+- `backend/src/pitwall/repositories/sql.py` extended — `SqlDegradationRepository`
+  queries `degradation_coefficients WHERE model_type = 'quadratic_v1'`.
+- `backend/src/pitwall/api/routes/degradation.py` — `getDegradationCurve` route.
+- `backend/src/pitwall/api/schemas.py` extended — `DriverStateOut`, `RaceSnapshotOut`,
+  `DegradationCoefficients`, `DegradationSamplePoint`, `DegradationCurve`,
+  `PredictorName`.
+- `backend/src/pitwall/engine/loop.py` extended — `predictor_name` property.
+- `backend/src/pitwall/api/dependencies.py` extended — `get_degradation_repository`.
+- `backend/src/pitwall/api/main.py` extended — `degradation_routes.router` included.
+
+#### Smoke run — Day 6
+
+**198 tests passing.** ruff clean, mypy clean (78 source files). All 7 implemented
+`operationId`s match the static OpenAPI spec. `EngineLoop` end-to-end pipeline
+verified: events → state → undercut_score written per lap_complete.
 
 ### Día 7 — OpenAPI y polish
 - [ ] Auto-export OpenAPI a `docs/interfaces/openapi_v1.yaml` en CI.
