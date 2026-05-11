@@ -130,17 +130,27 @@ class EngineLoop:
         for d in self._state.drivers.values():
             d.undercut_score = None
 
-        # Evaluate undercut for every relevant pair and update scores.
-        circuit_id = self._state.circuit_id
-        for atk, def_ in compute_relevant_pairs(self._state):
-            pit_loss = lookup_pit_loss(circuit_id, atk.team_code, self._pit_loss_table)
-            decision = evaluate_undercut(self._state, atk, def_, self._predictor, pit_loss)
-            self._state.drivers[atk.driver_code].undercut_score = decision.score
+        track_status = self._state.track_status
 
-            if decision.should_alert:
-                await self._broadcaster.broadcast_json(_alert_message(decision, self._state))
+        if track_status in ("SC", "VSC"):
+            # §6.9: Safety Car / Virtual Safety Car — suspend undercut calculation.
+            # Broadcast one session-level alert so the frontend can show the flag.
+            alert_type = "SUSPENDED_SC" if track_status == "SC" else "SUSPENDED_VSC"
+            await self._broadcaster.broadcast_json(
+                _suspension_message(alert_type, self._state)
+            )
+        else:
+            # Normal racing conditions: evaluate every relevant pair.
+            circuit_id = self._state.circuit_id
+            for atk, def_ in compute_relevant_pairs(self._state):
+                pit_loss = lookup_pit_loss(circuit_id, atk.team_code, self._pit_loss_table)
+                decision = evaluate_undercut(self._state, atk, def_, self._predictor, pit_loss)
+                self._state.drivers[atk.driver_code].undercut_score = decision.score
 
-        # Broadcast current snapshot (with updated undercut scores).
+                if decision.should_alert:
+                    await self._broadcaster.broadcast_json(_alert_message(decision, self._state))
+
+        # Always broadcast the snapshot so clients stay in sync.
         await self._broadcaster.broadcast_json(_snapshot_message(self._state, self._predictor_name))
 
 
@@ -189,6 +199,27 @@ def _snapshot_message(state: RaceState, predictor_name: str) -> dict[str, Any]:
             ),
             "active_predictor": predictor_name,
             "last_event_ts": (state.last_event_ts.isoformat() if state.last_event_ts else None),
+        },
+    }
+
+
+def _suspension_message(alert_type: str, state: RaceState) -> dict[str, Any]:
+    """Session-level suspension alert (SC or VSC active)."""
+    return {
+        "v": 1,
+        "type": "alert",
+        "ts": _now_iso(),
+        "payload": {
+            "alert_type": alert_type,
+            "attacker": None,
+            "defender": None,
+            "score": 0.0,
+            "confidence": 0.0,
+            "estimated_gain_ms": 0,
+            "pit_loss_ms": 0,
+            "gap_actual_ms": None,
+            "session_id": state.session_id,
+            "current_lap": state.current_lap,
         },
     }
 

@@ -145,6 +145,24 @@ def evaluate_undercut(
             should_alert=False,
         )
 
+    # Guard: rain / intermediate compounds — undercut is not calculable (§6.9).
+    _atk_compound = (attacker.compound or "").upper()
+    _def_compound = (defender.compound or "").upper()
+    if _atk_compound in ("INTER", "WET") or _def_compound in ("INTER", "WET"):
+        return UndercutDecision(
+            **_base,  # type: ignore[arg-type]
+            alert_type="UNDERCUT_DISABLED_RAIN",
+            score=0.0,
+            confidence=0.0,
+            estimated_gain_ms=0,
+            should_alert=False,
+        )
+
+    # Guard: defender just pitted — they already have fresh tyres, undercut
+    # is moot and the projection would be misleading (§6.9).
+    if defender.laps_in_stint < 2:
+        return _insufficient()
+
     # Guard: must have at least 3 laps of stint data to project reliably (§S6).
     if attacker.laps_in_stint < 3:
         return _insufficient()

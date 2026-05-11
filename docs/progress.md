@@ -188,7 +188,16 @@
 
 ### Día 8
 - [ ] **Stream A: XGBoost entrenado, serializado, métricas reportadas.**
-- [ ] Stream B: edge cases (SC/VSC/rain), `XGBoostPredictor` cargable.
+- [x] **Stream B**: edge cases (SC/VSC/rain), `XGBoostPredictor` cargable.
+  SC/VSC: `_on_lap_complete()` checks `track_status` — SC/VSC broadcasts
+  `SUSPENDED_SC`/`SUSPENDED_VSC` and skips pair evaluation; GREEN evaluates normally.
+  Rain: `evaluate_undercut()` returns `UNDERCUT_DISABLED_RAIN` when attacker or
+  defender is on INTER/WET (case-insensitive). Recent pit: `defender.laps_in_stint < 2`
+  returns `INSUFFICIENT_DATA`. `XGBoostPredictor` in `pitwall.ml.predictor`:
+  `from_file()` loads `xgb.Booster` (no sklearn), `predict()` raises
+  `UnsupportedContextError` (E10), `is_available()` returns `False`,
+  satisfies `PacePredictor` Protocol. Optional `.meta.json` sidecar support.
+  **234 tests, ruff clean, mypy clean (85 files).** 3 smoke tests pass.
 - [ ] Stream C: pulido visual mínimo, responsive.
 - [ ] Stream D: test suite verde, ADRs revisados.
 
