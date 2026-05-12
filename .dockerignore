@@ -13,6 +13,7 @@ htmlcov/
 data/cache/
 data/processed/
 data/raw/
+data/ml/
 
 # Serialised models (regenerated with make train-xgb)
 models/*.json

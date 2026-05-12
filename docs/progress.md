@@ -211,7 +211,16 @@
 - [ ] Stream D: pre-commit, badges, README mejorado.
 
 ### Día 7
-- [ ] Stream A: dataset XGBoost preparado (features + split LORO).
+- [x] Stream A: dataset XGBoost preparado (features + split LORO).
+      Added `backend/src/pitwall/ml/dataset.py`, `scripts/build_xgb_dataset.py`,
+      `scripts/validate_xgb_dataset.py`, `make build-xgb-dataset`, and
+      `make validate-xgb-dataset`. Target is `lap_time_delta_ms`, not raw
+      `lap_time_ms`. Split is leave-one-race-out by `session_id`; reference
+      pace and driver offsets are computed from fold training sessions only.
+      Pit loss is explicitly excluded from the lap-level pace dataset and
+      reserved for Day 9 undercut/backtest decision features. Artifacts are
+      written under gitignored `data/ml/`. Notebook/report:
+      `notebooks/05_xgb_dataset.md`.
 - [x] **Stream B**: OpenAPI exportado y validado en CI.
   `POST /api/v1/config/predictor` (`setActivePredictor`) implemented — switches
   `scipy`/`xgboost` at runtime; 409 when XGBoost model missing; 422 on unknown name.

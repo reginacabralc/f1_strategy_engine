@@ -184,9 +184,18 @@ docs/adr/0009-xgboost-vs-scipy-resultados.md
 - [ ] `scripts/load_known_undercuts.py` que carga el CSV a DB.
 
 ### Día 7 — Dataset XGBoost (E10 prep)
-- [ ] `backend/src/pitwall/ml/dataset.py` con split LORO.
-- [ ] `backend/src/pitwall/ml/features.py` con features documentadas en quanta 06.
-- [ ] Cuidado leakage: leer quanta 07 antes de implementar.
+- [x] `backend/src/pitwall/ml/dataset.py` con split LORO.
+  - Dataset lap-level exportado a `data/ml/xgb_pace_dataset.parquet`.
+  - Metadata exportada a `data/ml/xgb_pace_dataset.meta.json`.
+  - Split leave-one-race-out por `session_id`.
+- [x] Features documentadas en `notebooks/05_xgb_dataset.md`.
+  - Se mantuvo en `dataset.py` para no separar prematuramente `features.py`.
+  - Target: `lap_time_delta_ms = lap_time_ms - reference_lap_time_ms`.
+  - Incluye proxies de tráfico y offsets de piloto fold-safe.
+- [x] Cuidado leakage aplicado.
+  - Reference pace y driver offsets se calculan solo con sesiones de training
+    para cada fold.
+  - Pit loss queda fuera del dataset de pace; se reserva para Day 9.
 
 ### Día 8 — Entrenamiento XGBoost (E10) ⭐
 - [ ] `backend/src/pitwall/ml/train_xgb.py`.

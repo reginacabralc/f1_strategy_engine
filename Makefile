@@ -6,6 +6,7 @@ PIP ?= $(PYTHON) -m pip
         fit-degradation validate-degradation report-degradation \
         fit-pit-loss validate-pit-loss \
         fit-driver-offsets validate-driver-offsets \
+        build-xgb-dataset validate-xgb-dataset \
         replay test test-backend lint demo serve-api
 
 install: .venv/.installed
@@ -84,6 +85,12 @@ fit-driver-offsets: install db-wait
 
 validate-driver-offsets: install db-wait
 	$(PYTHON) scripts/validate_driver_offsets.py
+
+build-xgb-dataset: install db-wait
+	$(PYTHON) scripts/build_xgb_dataset.py
+
+validate-xgb-dataset: install
+	$(PYTHON) scripts/validate_xgb_dataset.py
 
 test: install
 	cd backend && ../$(PYTHON) -m pytest tests/unit -q

@@ -56,6 +56,7 @@ docker-compose.override.yaml
 data/cache/
 data/raw/
 data/processed/
+data/ml/
 
 # Modelos serializados grandes (regenerables)
 models/*.json

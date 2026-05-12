@@ -64,7 +64,7 @@ PitWall es un sistema event-driven con un único proceso backend (FastAPI + asyn
 |---|------------|----------|-------|-------|
 | 1 | Ingestor histórico | Python (Polars + FastF1) | Stream A | CLI scripts; carga 2024 a TimescaleDB |
 | 2 | Degradation fit (scipy) | Python | Stream A | Cuadrática por (circuito × compuesto) |
-| 3 | XGBoost trainer | Python | Stream A | Dataset LORO; serializa a JSON; metadata en DB |
+| 3 | XGBoost trainer | Python | Stream A | Dataset LORO con target `lap_time_delta_ms`; serializa a JSON; metadata en DB |
 | 4 | RaceFeed interface | Python (abstract) | Stream B | Contrato común para replay y futuro live |
 | 5 | ReplayFeed | Python (asyncio) | Stream B | Lee DB, emite eventos al ritmo del factor |
 | 6 | OpenF1Feed (stub V1) | Python | Stream B | Implementación dummy; real en V2 |
