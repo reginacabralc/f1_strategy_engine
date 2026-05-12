@@ -1,6 +1,6 @@
 # PitWall — F1 Strategy Engine
 
-> Motor en tiempo real que detecta oportunidades de **undercut** durante una carrera de F1, comparando un baseline heurístico (`scipy`) contra un modelo ML (`XGBoost`) detrás de la misma interfaz, con dashboard React, WebSocket y replay reproducible de carreras históricas.
+> Motor en tiempo real que detecta oportunidades de **undercut** durante una carrera de F1, comparando un baseline heurístico (`scipy`) contra un modelo ML (`XGBoost`) detrás de la misma interfaz. El backend, WebSocket y replay histórico ya existen; el dashboard React y el demo de navegador siguen en construcción.
 
 [![Lint](https://img.shields.io/badge/lint-pending-lightgrey)](.github/workflows/lint.yml)
 [![Tests](https://img.shields.io/badge/tests-pending-lightgrey)](.github/workflows/test.yml)
@@ -18,7 +18,8 @@ Cuando un piloto entra a boxes pierde ~21 segundos. Para que un *undercut* (para
 └─────────────────┘      └────────────────┘      └──────┬───────┘
                                                          │
                                                   ┌──────▼─────┐
-                                                  │  React UI  │
+                                                  │ React UI   │
+                                                  │ (pending)  │
                                                   └────────────┘
 ```
 
@@ -26,7 +27,7 @@ Más detalle: [`docs/architecture.md`](docs/architecture.md).
 
 ## Quickstart
 
-Pre-requisitos: Docker Desktop, GNU Make, ~10 GB libres.
+Pre-requisitos: Docker Desktop, GNU Make, Python 3.12 recomendado, ~10 GB libres, internet para descargar datos de FastF1 la primera vez.
 
 ```bash
 git clone https://github.com/reginacabralc/f1_strategy_engine.git
@@ -35,13 +36,30 @@ cp .env.example .env
 make demo
 ```
 
-Esto levanta la base de datos, corre migraciones, carga 1 carrera de demo (Mónaco 2024), arranca backend en `http://localhost:8000` y frontend en `http://localhost:5173`. Ver más en [`docs/walkthrough.md`](docs/walkthrough.md).
+Estado actual de `make demo`: levanta TimescaleDB, crea `.venv`, instala el backend, corre migraciones y carga las 3 carreras demo de 2024: Bahrain, Monaco y Hungary. No arranca todavía el frontend; `frontend/` no existe.
+
+Para levantar la API después del seed:
+
+```bash
+docker compose up -d backend
+```
+
+Luego abre <http://localhost:8000/docs> o prueba:
+
+```bash
+curl http://localhost:8000/health
+curl http://localhost:8000/api/v1/sessions
+```
+
+Ver más en [`docs/walkthrough.md`](docs/walkthrough.md).
 
 ## Replay another race
 
 ```bash
 make ingest YEAR=2024 ROUND=13   # Hungarian GP (round 13 of 2024)
-make replay SESSION=hungary_2024_R SPEED=30
+curl -X POST http://localhost:8000/api/v1/replay/start \
+  -H 'Content-Type: application/json' \
+  -d '{"session_id":"hungary_2024_R","speed_factor":30}'
 ```
 
 Demo race round numbers for 2024: **Bahrain = 1**, **Monaco = 8**, **Hungary = 13**.
@@ -50,7 +68,7 @@ Demo race round numbers for 2024: **Bahrain = 1**, **Monaco = 8**, **Hungary = 1
 
 - **Backend**: Python 3.12, FastAPI, asyncio, Polars, scipy, **XGBoost**
 - **DB**: PostgreSQL 15 + TimescaleDB
-- **Frontend**: React + Vite + TypeScript + TanStack Query + Tailwind + Recharts
+- **Frontend**: React + Vite + TypeScript + TanStack Query + Tailwind + Recharts (planned, not present yet)
 - **Infra**: docker-compose
 - **CI**: GitHub Actions
 - **Datos abiertos**: [FastF1](https://docs.fastf1.dev/), [OpenF1](https://openf1.org), [Jolpica](https://github.com/jolpica/jolpica-f1) (sucesor de Ergast)

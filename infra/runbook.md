@@ -12,12 +12,9 @@ curl http://localhost:8000/health
 
 curl http://localhost:8000/api/v1/sessions
 # [{"session_id":"monaco_2024_R", ...}]
-
-curl http://localhost:5173/ -I
-# HTTP/1.1 200 OK
 ```
 
-Si los 3 responden bien, el sistema está sano.
+Si ambos responden bien, el backend demo está sano. El frontend todavía no existe en el repo.
 
 ---
 
@@ -57,8 +54,7 @@ docker compose logs backend | tail -50
    - Verifica `DATABASE_URL`.
    - `docker compose ps db` debe mostrar `(healthy)`.
 2. **Modelo XGBoost no cargado** y `PACE_PREDICTOR=xgb`.
-   - `make train-xgb` para regenerar el modelo.
-   - O cambiar a `PACE_PREDICTOR=scipy` temporalmente.
+   - Cambiar a `PACE_PREDICTOR=scipy` temporalmente; el entrenamiento XGBoost sigue pendiente.
 3. **Migraciones no aplicadas**.
    - `docker compose run migrate alembic current`.
 
@@ -71,9 +67,7 @@ docker compose logs backend | tail -50
 **Diagnóstico:**
 
 ```bash
-# Probar con websocat
-docker compose exec backend pip install websocat || true
-websocat ws://localhost:8000/ws/v1/live
+.venv/bin/python scripts/ws_demo_client.py ws://localhost:8000/ws/v1/live
 ```
 
 **Causas:**
@@ -89,6 +83,18 @@ websocat ws://localhost:8000/ws/v1/live
 
 ## Problema: la UI muestra "No active replay"
 
+Pendiente: el frontend aún no existe. Para probar el replay usa la API:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/replay/start \
+  -H 'Content-Type: application/json' \
+  -d '{"session_id": "monaco_2024_R", "speed_factor": 30}'
+```
+
+---
+
+<!-- Future frontend note kept here so it can be re-enabled when Stream C lands. -->
+
 **Síntoma:** Tabla vacía, sin alertas.
 
 **Causa:** No has iniciado un replay.
@@ -101,7 +107,7 @@ curl -X POST http://localhost:8000/api/v1/replay/start \
   -d '{"session_id": "monaco_2024_R", "speed_factor": 30}'
 ```
 
-O usa el botón "Play" en la UI.
+Cuando el frontend exista, el botón "Play" debería llamar al mismo endpoint.
 
 ---
 
@@ -127,8 +133,10 @@ O usa el botón "Play" en la UI.
 **Solución:**
 
 ```bash
-docker compose exec backend python scripts/load_known_undercuts.py
+# Pendiente: este script/flujo todavía no existe.
 ```
+
+Nota: este flujo de backtest todavía está pendiente de implementación.
 
 ---
 
@@ -165,19 +173,9 @@ docker compose logs -f backend | grep -i "alert\|undercut\|engine"
 
 ---
 
-## Problema: `make train-xgb` se queda colgado
+## Problema: `make train-xgb` no existe
 
-**Diagnóstico:**
-
-```bash
-docker compose exec backend python -c "import xgboost; print(xgboost.__version__)"
-```
-
-**Causas:**
-
-1. **XGBoost en CPU paralelizando mal**: setear `n_jobs=4` o `OMP_NUM_THREADS=4`.
-2. **Dataset enorme**: V1 entrena con ~30k vueltas, debería tardar < 60s. Si tarda más, hay problema de I/O o features mal construidas.
-3. **Memoria**: si la máquina tiene < 4GB libre, swap mata el entrenamiento.
+El entrenamiento XGBoost está planificado, pero aún no implementado en el Makefile actual. Usa `PACE_PREDICTOR=scipy` para el demo backend.
 
 ---
 

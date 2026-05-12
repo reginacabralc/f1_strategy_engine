@@ -263,7 +263,12 @@
   payload shape, replay_state integration (HTTP + WS). 2 new WS reconnect tests.
   **280 tests (246 unit + 34 contract), ruff clean, mypy clean (90 files).**
 - [ ] Stream C: copy y branding mínimo, demo polish.
-- [ ] Stream D: walkthrough actualizado, changelog v0.1.0, video demo enlazado.
+- [x] **Stream D**: quickstart/runbook corrected to match current implementation.
+  README, walkthrough, infra README, runbook, and docker-compose architecture now state
+  the current truth: `make demo` is DB + local migration + 3-race ingest, backend can be
+  started with `docker compose up -d backend`, and frontend/browser demo remains pending.
+  Added Makefile targets `ingest`, `test-backend`, and `serve-api` so documented commands exist.
+- [ ] Stream D: changelog v0.1.0, video demo enlazado.
 - [ ] **Tag `v0.1.0` y release notes.**
 
 ## Bloqueos activos

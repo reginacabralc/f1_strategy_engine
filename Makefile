@@ -2,11 +2,11 @@ PYTHON ?= .venv/bin/python
 PIP ?= $(PYTHON) -m pip
 
 .PHONY: install db-up db-wait db-down up down down-v logs ps migrate \
-        ingest-monaco ingest-demo validate-demo seed \
+        ingest ingest-monaco ingest-demo validate-demo seed \
         fit-degradation validate-degradation report-degradation \
         fit-pit-loss validate-pit-loss \
         fit-driver-offsets validate-driver-offsets \
-        replay test lint demo
+        replay test test-backend lint demo serve-api
 
 install: .venv/.installed
 
@@ -29,7 +29,7 @@ db-wait: db-up
 db-down:
 	docker compose down
 
-## Full-stack compose targets. Backend Dockerfile added Day 2; frontend pending Stream C.
+## Compose currently includes db, migrate, and backend; frontend is pending Stream C.
 up:
 	docker compose up -d
 
@@ -50,6 +50,10 @@ migrate: install db-wait
 
 ingest-monaco: install db-wait
 	$(PYTHON) scripts/ingest_season.py --year 2024 --round 8 --session R --write-db
+
+## YEAR ?= 2024  ROUND ?= 8  SESSION_CODE ?= R
+ingest: install db-wait
+	$(PYTHON) scripts/ingest_season.py --year $(or $(YEAR),2024) --round $(or $(ROUND),8) --session $(or $(SESSION_CODE),R) --write-db
 
 ingest-demo: install db-wait
 	$(PYTHON) scripts/ingest_season.py --year 2024 --round 1 --session R --write-db
@@ -84,9 +88,14 @@ validate-driver-offsets: install db-wait
 test: install
 	cd backend && ../$(PYTHON) -m pytest tests/unit -q
 
+test-backend: test
+
 lint: install
 	cd backend && ../$(PYTHON) -m ruff check .
 	cd backend && ../$(PYTHON) -m mypy src tests
+
+serve-api: install
+	$(PYTHON) -m uvicorn pitwall.api.main:app --reload --port 8000
 
 ## SPEED ?= 30  (replay speed multiplier)
 ## SESSION ?= monaco_2024_R
@@ -98,4 +107,6 @@ replay: install db-wait
 ## Then start Docker backend with: docker compose up -d backend
 ## Frontend pending Stream C. Requires: cp .env.example .env first.
 demo: db-up migrate seed
-	@echo "Data ready. Run: docker compose up -d backend && open http://localhost:8000"
+	@echo "Data ready. Start the backend with: docker compose up -d backend"
+	@echo "Then open: http://localhost:8000/docs"
+	@echo "Frontend/browser demo is pending Stream C."
