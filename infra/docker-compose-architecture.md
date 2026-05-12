@@ -51,10 +51,11 @@
 - **Healthcheck**: `python -c "urllib.request.urlopen('http://localhost:8000/health')"` cada 10s
 - **Estado in-memory**: 1 worker obligatorio en V1 (RaceState no es serializable)
 
-### `frontend` _(pendiente Stream C)_
+### `frontend` _(pendiente Stream D Day 7)_
 
-- No wired yet — `frontend/` directory does not exist.
-- Will use `docker/frontend.Dockerfile` (Stream D Day 7).
+- `frontend/` directory now exists (Stream C Day 2+3 catch-up).
+- Dev server: `pnpm dev` (Vite proxy → backend `:8000`).
+- Production: `docker/frontend.Dockerfile` + nginx to be added in Stream D Day 7.
 
 ## Dependencias
 

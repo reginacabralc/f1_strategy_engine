@@ -11,7 +11,7 @@
 | Kickoff e interfaces acordadas | ⏳ | Día 1 | Todos |
 | 1 temporada (2024) ingerida en DB | ⏳ | Día 3 | Stream A — 3 demo races loaded; full season pending |
 | Replay engine funcional con fixture | ⏳ | Día 3 | Stream B |
-| Dashboard mock conectado a `/sessions` | ⏳ | Día 3 | Stream C |
+| Dashboard mock conectado a `/sessions` | ✅ | Día 3 | Stream C — Day 2+3 catch-up done |
 | Curva de degradación scipy ajustada | ✅ | Día 5 | Stream A — functional baseline persisted and reported; R² remains below target |
 | Motor undercut V1 con `ScipyPredictor` | ⏳ | Día 5 | Stream B |
 | Pipeline end-to-end con datos reales | ⏳ | Día 7 | Todos |
@@ -98,7 +98,17 @@
       timedelta-to-ms conversion, and null cleanup at write boundaries.
 - [x] Stream A: Notebook 01_explore_fastf1.
       Implemented as `notebooks/01_explore_fastf1.md` to avoid noisy notebook JSON before exploratory plots exist.
-- [ ] Stream C: Vite app + TanStack Query consultando `/sessions`.
+- [x] Stream C: Vite app + TanStack Query consultando `/sessions`.
+      `frontend/` bootstrapped from scratch: Vite 5 + React 18 + TypeScript 5 (strict),
+      TanStack Query v5, Tailwind CSS 3 dark-theme, Recharts installed for later use.
+      `src/api/types.ts` — hand-typed `SessionSummary`, `DriverState`, `RaceSnapshot`,
+      `PredictorName`, `Compound`, `TrackStatus` from `openapi_v1.yaml` (TODO: codegen).
+      `src/api/client.ts` — typed fetch helper, empty base URL (Vite proxy → `:8000`).
+      `src/hooks/useSessions.ts` — TanStack Query hook, `staleTime: 60s`.
+      `src/components/SessionPicker.tsx` — real sessions dropdown with loading/error/empty states.
+      `src/components/RaceTable.tsx` — 7-column mock table with compound colour, undercut score bar.
+      `src/App.tsx` — header + picker + table + WS-coming-soon panel.
+      `pnpm build` ✅ · ESLint clean ✅ · Vitest 2 passed ✅ · `tsc` strict ✅.
 
 ### Día 3
 - [x] Stream A: 2024 cargado a DB (3 carreras demo).
@@ -124,7 +134,7 @@
       configured. Local API smoke with Docker DB: `/api/v1/sessions` returned
       `bahrain_2024_R`, `monaco_2024_R`, `hungary_2024_R`; replay start/stop
       for `monaco_2024_R` returned 202/200 using DB events.
-- [ ] Stream C: SessionPicker + RaceTable mock funcional.
+- [x] Stream C: SessionPicker + RaceTable mock funcional.
 - [ ] Stream D: Dockerfile multi-stage para backend.
 
 ### Día 4
