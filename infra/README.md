@@ -15,12 +15,19 @@ El profesor solo exige `docker-compose` local. Terraform / Pulumi / Ansible / Ku
 
 ## Servicios
 
+Estado actual de `docker-compose.yaml`:
+
 ```text
 docker-compose
-├── db          (timescale/timescaledb:latest-pg15)   :5432
+├── db          (timescale/timescaledb:2.17.2-pg15)   :5432
 ├── migrate     (one-shot, alembic upgrade head)
-├── backend     (Python + FastAPI)                     :8000
-└── frontend    (React + Vite/nginx)                   :5173
+└── backend     (Python + FastAPI)                     :8000
+```
+
+Servicio pendiente:
+
+```text
+frontend    (React + Vite/nginx)                       :5173
 ```
 
 ## Variables de entorno
@@ -29,14 +36,14 @@ Ver `.env.example` en raíz. Las críticas:
 
 | Var | Default | Quién la usa |
 |-----|---------|--------------|
-| `DATABASE_URL` | `postgresql://pitwall:pitwall@db:5432/pitwall` | backend, migrate |
+| `DATABASE_URL` | `postgresql+psycopg://pitwall:pitwall@localhost:5432/pitwall` local / `postgresql+psycopg://pitwall:pitwall@db:5432/pitwall` compose | backend, migrate, scripts |
 | `LOG_LEVEL` | `INFO` | backend |
-| `PACE_PREDICTOR` | `xgb` | backend |
+| `PACE_PREDICTOR` | `scipy` | backend |
 | `REPLAY_DEFAULT_SESSION` | `monaco_2024_R` | backend |
 | `REPLAY_DEFAULT_SPEED` | `30` | backend |
-| `FASTF1_CACHE_DIR` | `/data/cache` | scripts ingesta |
-| `VITE_API_URL` | `http://localhost:8000` | frontend |
-| `VITE_WS_URL` | `ws://localhost:8000/ws/v1/live` | frontend |
+| `FASTF1_CACHE_DIR` | `data/cache` | scripts ingesta |
+| `VITE_API_URL` | `http://localhost:8000` | frontend futuro |
+| `VITE_WS_URL` | `ws://localhost:8000/ws/v1/live` | frontend futuro |
 
 ## Persistencia
 

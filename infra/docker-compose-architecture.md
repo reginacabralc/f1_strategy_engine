@@ -1,20 +1,20 @@
 # docker-compose Architecture
 
-> Diagrama y descripción de los servicios. Si tocas `docker-compose.yaml`, actualiza este doc.
+> Diagrama y descripción de los servicios. Si tocas `docker-compose.yaml`, actualiza este doc. Estado actual: `db`, `migrate` y `backend` existen; `frontend` sigue pendiente.
 
 ## Diagrama
 
 ```text
         host (laptop / VM)
         │
-        │   :5173                  :8000                  :5432 (interno)
+        │                          :8000                  :5432
         ▼   ▼                      ▼                      ▼
-   ┌────────────────┐    ┌───────────────────┐    ┌──────────────────┐
-   │   frontend     │    │     backend       │    │       db         │
-   │ React + Vite   │───▶│ FastAPI + uvicorn │───▶│ TimescaleDB pg15 │
-   │ (dev) o nginx  │ HTTP│ asyncio engine    │ TCP│  + ext timescale │
-   │ (prod)         │ WS │ replay + motor    │    │  pgdata volume   │
-   └────────────────┘    └─────────┬─────────┘    └────────┬─────────┘
+                         ┌───────────────────┐    ┌──────────────────┐
+                         │     backend       │    │       db         │
+                         │ FastAPI + uvicorn │───▶│ TimescaleDB pg15 │
+                         │ asyncio engine    │ TCP│  + ext timescale │
+                         │ replay + motor    │    │  pgdata volume   │
+                         └─────────┬─────────┘    └────────┬─────────┘
                                    │                        │
                                    │ depends_on             │
                                    ▼                        │
@@ -56,22 +56,12 @@
 - No wired yet — `frontend/` directory does not exist.
 - Will use `docker/frontend.Dockerfile` (Stream D Day 7).
 
-### `frontend`
-
-- **Imagen**: build local de `docker/frontend.Dockerfile`
-- **Puerto**: 5173 (expuesto)
-- **Dev**: `vite dev` con HMR
-- **Prod**: `nginx` sirviendo `dist/` estático
-- **`depends_on`**: `backend` healthy (no estricto, frontend puede mostrar estado degradado)
-- **Volúmenes** (dev): bind mount de `frontend/src`
-
 ## Dependencias
 
 ```text
 db (healthy)
   → migrate (run-to-completion)
     → backend (healthy)
-      → frontend (healthy, opcional)
 ```
 
 ## Networks
@@ -86,7 +76,7 @@ Una sola red por defecto (`default`). Servicios se ven entre sí por nombre (`ba
 | `./data/cache` | Bind mount | Cache de FastF1 (varios GB) |
 | `./models` | Bind mount | Modelos XGBoost serializados |
 | `./backend/src` | Bind mount (dev) | Hot reload del backend |
-| `./frontend/src` | Bind mount (dev) | HMR del frontend |
+| `./frontend/src` | Bind mount futuro | HMR del frontend cuando exista |
 
 ## Por qué un solo worker en backend
 
@@ -102,8 +92,9 @@ make down        # docker compose down (preserva volúmenes)
 make down-v      # docker compose down -v (borra volúmenes)
 make logs        # docker compose logs -f
 make ps          # docker compose ps
-make restart-backend
-make demo        # up + seed + open browser
+make migrate     # alembic upgrade head desde .venv local
+make ingest      # ingiere YEAR/ROUND/SESSION_CODE a DB
+make demo        # db + migrate + seed de 3 carreras demo
 ```
 
 ## CI
