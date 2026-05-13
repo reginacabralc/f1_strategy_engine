@@ -94,14 +94,6 @@ function ScoreBar({ score }: { score: number | null }) {
   );
 }
 
-function msToLapTime(ms: number | null): string {
-  if (ms === null) return "—";
-  const totalSec = ms / 1000;
-  const mins = Math.floor(totalSec / 60);
-  const secs = (totalSec % 60).toFixed(3).padStart(6, "0");
-  return `${mins}:${secs}`;
-}
-
 function msToGap(ms: number | null): string {
   if (ms === null || ms === 0) return "—";
   return `+${(ms / 1000).toFixed(3)}s`;
@@ -120,10 +112,10 @@ export function RaceTable({ drivers = MOCK_DRIVERS }: Props) {
             <th className="px-4 py-3 text-left w-8">P</th>
             <th className="px-4 py-3 text-left">Driver</th>
             <th className="px-4 py-3 text-left">Team</th>
-            <th className="px-4 py-3 text-right">Last Lap</th>
             <th className="px-4 py-3 text-right">Gap</th>
-            <th className="px-4 py-3 text-left">Tyre</th>
-            <th className="px-4 py-3 text-left">Undercut Risk</th>
+            <th className="px-4 py-3 text-left">Compound</th>
+            <th className="px-4 py-3 text-right">Tyre Age</th>
+            <th className="px-4 py-3 text-left">Score</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-pitwall-border">
@@ -139,9 +131,6 @@ export function RaceTable({ drivers = MOCK_DRIVERS }: Props) {
               <td className="px-4 py-3 text-pitwall-muted">
                 {d.team_code ?? "—"}
               </td>
-              <td className="px-4 py-3 text-right font-mono tabular-nums">
-                {msToLapTime(d.last_lap_ms)}
-              </td>
               <td className="px-4 py-3 text-right font-mono tabular-nums text-pitwall-muted">
                 {msToGap(d.gap_to_leader_ms)}
               </td>
@@ -149,11 +138,11 @@ export function RaceTable({ drivers = MOCK_DRIVERS }: Props) {
                 <span
                   className={`font-semibold ${COMPOUND_COLORS[d.compound] ?? ""}`}
                 >
-                  {d.compound.charAt(0)}
+                  {d.compound}
                 </span>
-                <span className="text-pitwall-muted ml-1 text-xs">
-                  +{d.tyre_age}
-                </span>
+              </td>
+              <td className="px-4 py-3 text-right font-mono tabular-nums text-pitwall-muted">
+                {d.tyre_age}
               </td>
               <td className="px-4 py-3">
                 <ScoreBar score={d.undercut_score} />
