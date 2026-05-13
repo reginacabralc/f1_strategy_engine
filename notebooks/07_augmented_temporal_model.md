@@ -19,6 +19,9 @@ make fit-pit-loss
 make fit-driver-offsets
 make build-xgb-dataset SPLIT_STRATEGY=temporal_expanding
 make validate-xgb-dataset
+make diagnose-xgb-shift
+make evaluate-xgb-baselines
+make run-xgb-ablations
 make tune-xgb
 make train-xgb
 make validate-xgb-model
@@ -30,6 +33,9 @@ For a fast local smoke on whatever races are already in DB:
 ```bash
 make build-xgb-dataset SPLIT_STRATEGY=temporal_expanding
 make validate-xgb-dataset
+make diagnose-xgb-shift
+make evaluate-xgb-baselines
+make run-xgb-ablations
 make tune-xgb
 make train-xgb
 make validate-xgb-model
@@ -53,10 +59,45 @@ claim. Full quality assessment requires the enabled 2024/2025 manifest races.
 
 - Treat LORO as stress-test evidence only.
 - Treat temporal expanding CV as the main model-quality signal.
+- Treat Day 8.2 diagnostics as a gate before Day 9: XGBoost must beat
+  zero-delta and train-mean baselines on aggregate temporal CV.
 - Do not use validation/test sessions to compute reference pace or driver
   offsets.
 - Do not tune on the final test set.
 - Do not add pit-loss features to the lap-level pace model.
+
+## Day 8.2 target/reference diagnostics
+
+The first full-manifest run showed the model remained weak even after adding
+2024/2025 coverage. The most important symptom was target/reference shift:
+early temporal folds had target means around -9.6 s and +12.0 s. Day 8.2
+therefore adds:
+
+- `reports/ml/xgb_dataset_shift_report.json` and `.md` for fold/session target
+  distributions, reference source counts, driver offset source counts, failed
+  ingestions, and zero-usable sessions.
+- `reports/ml/baseline_ladder.json` so XGBoost is compared against zero,
+  train-mean, circuit+compound, tyre-age curve, and driver/team-adjusted
+  baselines.
+- `reports/ml/feature_ablation_report.json` for controlled feature group
+  checks.
+- `TARGET_STRATEGY` experiments for session-normalized, stint-relative,
+  absolute-lap-time, and season+circuit+compound targets.
+
+Known data edge cases are explicit: the rerun loaded 2024 Qatar successfully,
+while 2024 Sao Paulo ingested but produced zero dry usable rows because FastF1
+exposed blank/WET compound data under non-standard conditions.
+
+Observed final Day 8.2 result:
+
+- Selected target: `session_normalized_delta`.
+- Selected feature set: `no_reference_lap_time_ms`.
+- Selected XGBoost config: depth 2, eta 0.02, subsample 0.8, colsample 0.8,
+  min-child-weight 20, lambda 20, alpha 5, 200 rounds.
+- Aggregate temporal CV: MAE 1,561.9 ms, RMSE 4,614.4 ms, R² 0.007.
+- Baselines: zero-delta MAE 1,762.7 ms; train-mean MAE 1,612.9 ms.
+- Gate: passed by 200.8 ms vs zero-delta (11.4%) and by 51.0 ms vs
+  train-mean; all five folds improve over zero-delta.
 
 ## Figures
 

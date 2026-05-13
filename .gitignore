@@ -59,6 +59,7 @@ data/processed/
 data/ml/*.json
 data/ml/*.parquet
 reports/figures/
+reports/ml/
 
 
 # Modelos serializados grandes (regenerables)

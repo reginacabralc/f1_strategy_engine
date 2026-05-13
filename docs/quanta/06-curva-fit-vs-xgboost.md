@@ -110,6 +110,37 @@ leave-one-circuit-out. La decisión nueva está en
 [ADR 0010](../adr/0010-temporal-expanding-xgboost-validation.md): usar 2024/2025
 recientes, validación temporal y tuning pequeño antes de Day 9.
 
+## Day 8.2 — antes de backtesting
+
+La primera corrida temporal ampliada mostró que más datos no basta si el target
+sigue mal normalizado. Los folds tempranos tuvieron medias del target de varios
+segundos, señal de shift entre `lap_time_ms` y `reference_lap_time_ms`.
+
+Para que XGBoost sea defendible antes de Day 9:
+
+- `make diagnose-xgb-shift` debe explicar target/reference shift por fold y
+  sesión.
+- `make evaluate-xgb-baselines` define el ladder de baselines que XGBoost debe
+  vencer.
+- `make run-xgb-ablations` verifica si las features dominantes realmente ayudan
+  o solo memorizan offsets de circuito.
+- `TARGET_STRATEGY=... make build-xgb-dataset` permite probar targets
+  alternativos sin mezclar backtesting.
+
+El gate de calidad queda explícito: XGBoost debe vencer zero-delta y train-mean
+en CV temporal agregado, idealmente por al menos 500 ms o 7% de MAE, y no puede
+degradar más de 100 ms vs zero-delta en más de un fold.
+
+Resultado Day 8.2 observado: el target `session_normalized_delta` corrigió el
+shift principal; `lap_time_delta` mantenía folds con medias de -9.6 s y +12.0 s.
+La mejor ablation fue `no_reference_lap_time_ms`, lo que confirma que
+`reference_lap_time_ms` era parte del problema de estabilidad. Con 151,363 filas
+usables, 47 sesiones y cinco folds temporales, XGBoost obtuvo MAE/RMSE/R² de
+1,561.9 ms / 4,614.4 ms / 0.007. Ganó a zero-delta por 200.8 ms (11.4%) y a
+train-mean por 51.0 ms. El gate queda aprobado para pasar a Day 9, con la
+advertencia de que la ventaja sigue siendo moderada y debe validarse en
+backtesting de estrategia.
+
 | Métrica | scipy | XGBoost | Δ |
 |---------|-------|---------|---|
 | MAE@k=3 (ms) | _TBD_ | _TBD_ | _TBD_ |
@@ -125,8 +156,9 @@ Recomendaciones (post-experimento):
   explica si el modelo fue entrenado solo con las tres demos o con el manifiesto completo.
 - **Debug de motor**: usa `scipy` (predicciones interpretables).
 - **Carreras con datos pobres**: scipy es más estable.
-- **Carreras con muchos datos recientes**: XGBoost es el candidato principal,
-  pero debe ganar en CV temporal antes de hacerlo default de calidad.
+- **Carreras con muchos datos recientes**: XGBoost ya pasó el gate temporal de
+  Day 8.2, pero debe confirmarse en backtesting Day 9 antes de hacerlo default
+  de calidad estratégica.
 
 ## Implementación
 

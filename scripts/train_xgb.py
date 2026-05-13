@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
+from pitwall.ml.ablation import resolve_ablation_feature_columns
 from pitwall.ml.train import (
     DEFAULT_DATASET_METADATA_PATH,
     DEFAULT_DATASET_PATH,
@@ -28,11 +30,13 @@ def main() -> int:
     parser.add_argument("--tuning-report", type=Path, default=DEFAULT_TUNING_REPORT_PATH)
     parser.add_argument("--ignore-tuning-report", action="store_true")
     parser.add_argument("--rounds", type=int, default=None)
+    parser.add_argument("--feature-set", default=os.getenv("FEATURE_SET", "full"))
     args = parser.parse_args()
     selected_config = None if args.ignore_tuning_report else load_selected_tuning_config(args.tuning_report)
     selected_params = selected_config[0] if selected_config else None
     selected_rounds = selected_config[1] if selected_config else None
     num_boost_round = args.rounds or selected_rounds or 250
+    feature_columns = resolve_ablation_feature_columns(args.feature_set)
 
     result = train_xgb_model(
         dataset_path=args.dataset,
@@ -41,6 +45,8 @@ def main() -> int:
         metadata_path=args.model_meta,
         hyperparameters=selected_params,
         num_boost_round=num_boost_round,
+        feature_columns=feature_columns,
+        feature_set_name=args.feature_set,
     )
 
     metadata = result.metadata
@@ -55,6 +61,7 @@ def main() -> int:
     aggregate = metadata["aggregate_metrics"]
     print()
     print("aggregate:")
+    print(f"  feature_set: {args.feature_set}")
     print(f"  rows: {aggregate['holdout_rows']}")
     print(f"  train_mae_ms: {aggregate['train_mae_ms']:.1f}")
     print(f"  train_rmse_ms: {aggregate['train_rmse_ms']:.1f}")

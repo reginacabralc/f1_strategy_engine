@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from collections.abc import Iterable
+from pathlib import Path
 from typing import Any
 
 from pitwall.db.engine import create_db_engine
@@ -17,12 +18,17 @@ from pitwall.degradation.dataset import (
 from pitwall.degradation.fit import fit_degradation
 from pitwall.degradation.models import DegradationFitResult
 from pitwall.degradation.writer import write_fit_results
+from pitwall.ingest.manifest import DEFAULT_MANIFEST_PATH, load_race_manifest
 
 
 def main() -> int:
     args = parse_args()
-    session_ids = DEMO_SESSION_IDS if args.all_demo else ()
-    session_id = None if args.all_demo else args.session
+    if args.manifest:
+        session_ids = _session_ids_from_manifest(args.manifest)
+        session_id = None
+    else:
+        session_ids = DEMO_SESSION_IDS if args.all_demo else ()
+        session_id = None if args.all_demo else args.session
 
     engine = create_db_engine()
     with engine.begin() as connection:
@@ -57,6 +63,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Fit Bahrain, Monaco, and Hungary 2024 race sessions.",
     )
+    target.add_argument(
+        "--manifest",
+        nargs="?",
+        const=str(DEFAULT_MANIFEST_PATH),
+        help="Fit enabled sessions from a race manifest, defaulting to data/reference/ml_race_manifest.yaml.",
+    )
     parser.add_argument(
         "--no-refresh-clean-air",
         dest="refresh_clean_air",
@@ -65,6 +77,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.set_defaults(refresh_clean_air=True)
     return parser.parse_args()
+
+
+def _session_ids_from_manifest(path: str) -> tuple[str, ...]:
+    manifest = load_race_manifest(DEFAULT_MANIFEST_PATH if path is None else Path(path))
+    return tuple(entry.session_id for entry in manifest.enabled_entries())
 
 
 def print_eligibility_summary(rows: Iterable[dict[str, Any]]) -> None:

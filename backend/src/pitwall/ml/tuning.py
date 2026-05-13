@@ -29,12 +29,16 @@ class CandidateResult:
     num_boost_round: int
     aggregate_metrics: Mapping[str, Any]
     fold_metrics: Sequence[Mapping[str, Any]]
+    feature_columns: tuple[str, ...] | None = None
 
     def to_json_dict(self) -> dict[str, Any]:
         return {
             "candidate_id": self.candidate_id,
             "hyperparameters": self.hyperparameters,
             "num_boost_round": self.num_boost_round,
+            "feature_columns": (
+                list(self.feature_columns) if self.feature_columns is not None else None
+            ),
             "aggregate_metrics": dict(self.aggregate_metrics),
             "fold_metrics": [dict(row) for row in self.fold_metrics],
         }
@@ -111,10 +115,12 @@ def tune_xgb_hyperparameters(
     candidates: Sequence[Mapping[str, Any]] | None = None,
     num_boost_round: int = 200,
     trainer: ModelTrainer = train_booster,
+    feature_columns: Sequence[str] | None = None,
 ) -> TuningResult:
     """Evaluate candidate configs on dataset folds and select the best one."""
 
     candidate_rows: list[CandidateResult] = []
+    selected_features = tuple(feature_columns) if feature_columns is not None else None
     for index, params in enumerate(candidates or candidate_hyperparameters(), start=1):
         evaluation: FoldEvaluationResult = evaluate_folds(
             frame,
@@ -122,6 +128,7 @@ def tune_xgb_hyperparameters(
             hyperparameters=dict(params),
             num_boost_round=num_boost_round,
             trainer=trainer,
+            feature_columns=feature_columns,
         )
         candidate_rows.append(
             CandidateResult(
@@ -130,6 +137,7 @@ def tune_xgb_hyperparameters(
                 num_boost_round=num_boost_round,
                 aggregate_metrics=evaluation.aggregate_metrics,
                 fold_metrics=evaluation.fold_metrics,
+                feature_columns=selected_features,
             )
         )
     selected = select_best_candidate(candidate_rows)

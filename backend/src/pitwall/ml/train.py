@@ -155,13 +155,26 @@ def select_usable_rows(frame: pl.DataFrame) -> pl.DataFrame:
     return pl.DataFrame(rows) if rows else pl.DataFrame()
 
 
-def fit_feature_schema(frame: pl.DataFrame) -> FeatureSchema:
+def fit_feature_schema(
+    frame: pl.DataFrame,
+    *,
+    feature_columns: Sequence[str] | None = None,
+) -> FeatureSchema:
     """Fit a deterministic one-hot schema from a training frame."""
 
+    raw_features = tuple(feature_columns or FEATURE_COLUMNS)
     columns = set(frame.columns)
-    numeric_features = tuple(feature for feature in NUMERIC_FEATURES if feature in columns)
+    numeric_features = tuple(
+        feature
+        for feature in raw_features
+        if feature in columns
+        and feature not in CATEGORICAL_FEATURES
+        and feature not in IDENTIFIER_FEATURES
+    )
     categorical_features = tuple(
-        feature for feature in CATEGORICAL_FEATURES if feature in columns
+        feature
+        for feature in CATEGORICAL_FEATURES
+        if feature in columns and feature in raw_features
     )
     rows = frame.to_dicts()
     categorical_values: dict[str, tuple[str, ...]] = {}
@@ -306,6 +319,7 @@ def evaluate_folds(
     hyperparameters: dict[str, Any],
     num_boost_round: int,
     trainer: ModelTrainer = train_booster,
+    feature_columns: Sequence[str] | None = None,
 ) -> FoldEvaluationResult:
     """Train and evaluate one native Booster per dataset fold."""
 
@@ -330,7 +344,7 @@ def evaluate_folds(
         if train_frame.is_empty() or holdout_frame.is_empty():
             raise ValueError(f"fold {fold_id} has empty train or {evaluation_split} split")
 
-        schema = fit_feature_schema(train_frame)
+        schema = fit_feature_schema(train_frame, feature_columns=feature_columns)
         encoded_train = encode_features(train_frame, schema)
         encoded_holdout = encode_features(holdout_frame, schema)
         dtrain = make_dmatrix(encoded_train, include_target=True)
@@ -430,13 +444,14 @@ def train_final_model(
     hyperparameters: dict[str, Any],
     num_boost_round: int,
     trainer: ModelTrainer = train_booster,
+    feature_columns: Sequence[str] | None = None,
 ) -> FinalModelResult:
     """Train the final runtime/demo model on all usable rows."""
 
     usable_frame = select_usable_rows(frame)
     if usable_frame.is_empty():
         raise ValueError("XGBoost final model has zero usable rows")
-    schema = fit_feature_schema(usable_frame)
+    schema = fit_feature_schema(usable_frame, feature_columns=feature_columns)
     encoded = encode_features(usable_frame, schema)
     dtrain = make_dmatrix(encoded, include_target=True)
     model = trainer(dtrain, hyperparameters, num_boost_round)
@@ -459,6 +474,8 @@ def train_xgb_model(
     metadata_path: Path = DEFAULT_MODEL_METADATA_PATH,
     hyperparameters: dict[str, Any] | None = None,
     num_boost_round: int = 250,
+    feature_columns: Sequence[str] | None = None,
+    feature_set_name: str | None = None,
 ) -> TrainingRunResult:
     """Run the full Day 8 training flow and write model artifacts."""
 
@@ -470,11 +487,13 @@ def train_xgb_model(
         dataset_metadata,
         hyperparameters=params,
         num_boost_round=num_boost_round,
+        feature_columns=feature_columns,
     )
     final_result = train_final_model(
         frame,
         hyperparameters=params,
         num_boost_round=num_boost_round,
+        feature_columns=feature_columns,
     )
     metadata = build_training_metadata(
         dataset_metadata=dataset_metadata,
@@ -487,6 +506,9 @@ def train_xgb_model(
         hyperparameters=params,
         num_boost_round=num_boost_round,
         top_feature_importances=final_result.top_feature_importances,
+        raw_feature_columns=tuple(feature_columns or FEATURE_COLUMNS),
+        feature_set_name=feature_set_name
+        or ("custom" if feature_columns is not None else "full"),
     )
     save_training_outputs(
         model=final_result.model,
@@ -513,6 +535,8 @@ def build_training_metadata(
     hyperparameters: dict[str, Any],
     num_boost_round: int,
     top_feature_importances: Sequence[Mapping[str, Any]],
+    raw_feature_columns: Sequence[str] = FEATURE_COLUMNS,
+    feature_set_name: str = "full",
 ) -> dict[str, Any]:
     """Build the model sidecar metadata consumed by validation and reporting."""
 
@@ -526,12 +550,15 @@ def build_training_metadata(
         "dataset_metadata_path": str(dataset_metadata_path),
         "row_count": row_count,
         "usable_row_count": usable_row_count,
-        "raw_feature_columns": FEATURE_COLUMNS,
+        "feature_set": feature_set_name,
+        "raw_feature_columns": list(raw_feature_columns),
         "feature_list": list(final_schema.feature_names),
         "feature_schema": final_schema.to_json(),
         "categorical_features": list(final_schema.categorical_features),
         "numeric_features": list(final_schema.numeric_features),
         "target_column": TARGET_COLUMN,
+        "target_strategy": dataset_metadata.get("target_strategy", "lap_time_delta"),
+        "target_definition": dataset_metadata.get("target_definition"),
         "fold_metrics": fold_result.fold_metrics,
         "target_distribution_by_fold": [
             {
@@ -551,6 +578,7 @@ def build_training_metadata(
         "session_chronology": list(dataset_metadata.get("session_chronology", [])),
         "final_test_status": dataset_metadata.get("final_test_status", "not_configured"),
         "folds": list(dataset_metadata.get("folds", [])),
+        "baseline_reference_source": dataset_metadata.get("baseline_reference_source"),
         "reference_pace_method": dataset_metadata.get("reference_pace_method"),
         "driver_offset_method": dataset_metadata.get("driver_offset_method"),
         "leakage_policy": [
@@ -573,7 +601,7 @@ def build_training_metadata(
         "known_limitations": [
             "model quality depends on multi-season manifest coverage",
             "with three races, LORO is effectively leave-one-circuit-out",
-            "no hyperparameter tuning beyond conservative defaults",
+            "hyperparameter tuning is intentionally small and temporal-CV only",
             "traffic is represented by simple gap proxies",
             "Scipy baseline comparison is deferred to Day 9 backtest work",
         ],

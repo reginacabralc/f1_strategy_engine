@@ -22,6 +22,17 @@ def main() -> int:
         choices=("loro", "temporal_expanding", "temporal_year"),
         default=os.environ.get("SPLIT_STRATEGY", "temporal_expanding"),
     )
+    parser.add_argument(
+        "--target-strategy",
+        choices=(
+            "lap_time_delta",
+            "session_normalized_delta",
+            "stint_relative_delta",
+            "absolute_lap_time",
+            "season_circuit_compound_delta",
+        ),
+        default=os.environ.get("TARGET_STRATEGY", "lap_time_delta"),
+    )
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST_PATH)
     parser.add_argument("--dataset", type=Path, default=DATASET_PATH)
     parser.add_argument("--dataset-meta", type=Path, default=METADATA_PATH)
@@ -41,6 +52,7 @@ def main() -> int:
             train_years=_parse_years(args.train_years),
             validation_years=_parse_years(args.validation_years),
             test_years=_parse_years(args.test_years),
+            target_strategy=args.target_strategy,
         )
 
     write_dataset(result, dataset_path=args.dataset, metadata_path=args.dataset_meta)
@@ -50,6 +62,7 @@ def main() -> int:
     print(f"Rows: {result.metadata['row_count']}")
     print(f"Usable rows: {result.metadata['usable_row_count']}")
     print(f"Split strategy: {result.metadata['split_strategy']}")
+    print(f"Target strategy: {result.metadata['target_strategy']}")
     print(f"Sessions: {', '.join(result.metadata['sessions_included'])}")
     print("Folds:")
     for fold in result.metadata["folds"]:

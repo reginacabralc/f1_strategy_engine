@@ -95,6 +95,68 @@ def test_lap_time_delta_target_is_lap_time_minus_fold_safe_reference() -> None:
     assert holdout["row_usable"] is True
 
 
+def test_session_normalized_target_uses_only_past_session_laps() -> None:
+    rows = [
+        _lap("train_2024_R", "bahrain", "VER", "HARD", 90_000),
+        _lap(
+            "holdout_2024_R",
+            "bahrain",
+            "VER",
+            "HARD",
+            100_000,
+            lap_number=1,
+        ),
+        _lap(
+            "holdout_2024_R",
+            "bahrain",
+            "VER",
+            "HARD",
+            112_000,
+            lap_number=2,
+        ),
+    ]
+
+    result = build_loro_dataset(rows, target_strategy="session_normalized_delta")
+    first = _only_row(
+        result.rows,
+        fold_id="fold_holdout_2024_R",
+        session_id="holdout_2024_R",
+        lap_number=1,
+    )
+    second = _only_row(
+        result.rows,
+        fold_id="fold_holdout_2024_R",
+        session_id="holdout_2024_R",
+        lap_number=2,
+    )
+
+    assert result.metadata["target_strategy"] == "session_normalized_delta"
+    assert first["reference_source"] == "circuit_compound"
+    assert first[TARGET_COLUMN] == 10_000
+    assert second["reference_source"] == "past_session_compound"
+    assert second[TARGET_COLUMN] == 12_000
+
+
+def test_season_circuit_compound_target_prefers_train_year_reference() -> None:
+    rows = [
+        _lap("s1", "bahrain", "VER", "HARD", 90_000, season=2024, round_number=1),
+        _lap("s2", "bahrain", "LEC", "HARD", 92_000, season=2024, round_number=2),
+        _lap("s3", "bahrain", "VER", "HARD", 96_000, season=2024, round_number=3),
+        _lap("s4", "bahrain", "VER", "HARD", 100_000, season=2024, round_number=4),
+    ]
+
+    result = build_temporal_expanding_dataset(
+        rows,
+        block_size=2,
+        target_strategy="season_circuit_compound_delta",
+    )
+    holdout = _only_row(result.rows, fold_id="fold_001", session_id="s3")
+
+    assert holdout["reference_source"] == "season_circuit_compound"
+    assert holdout["reference_lap_time_ms"] == 91_000
+    assert holdout[TARGET_COLUMN] == 5_000
+
+
 def test_leave_one_race_out_folds_mark_train_and_holdout_sessions() -> None:
     folds = build_loro_folds(["bahrain_2024_R", "monaco_2024_R", "hungary_2024_R"])
 
@@ -314,11 +376,13 @@ def _only_row(
     *,
     fold_id: str,
     session_id: str,
+    lap_number: int | None = None,
 ) -> dict[str, object]:
     matches = [
         row
         for row in rows
         if row["fold_id"] == fold_id and row["session_id"] == session_id
+        and (lap_number is None or row["lap_number"] == lap_number)
     ]
     assert len(matches) == 1
     return matches[0]

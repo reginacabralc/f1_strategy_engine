@@ -248,7 +248,7 @@ docs/adr/0009-xgboost-vs-scipy-resultados.md
     sessions only.
 - [x] Training, tuning, and plots.
   - `train.py` evaluates generic folds, then trains the final runtime model.
-  - `scripts/tune_xgb.py` runs a curated 8-candidate XGBoost search.
+  - `scripts/tune_xgb.py` runs a curated 12-candidate XGBoost search.
   - `scripts/plot_xgb_diagnostics.py` writes matplotlib plots under
     `reports/figures/`.
   - XGBoost remains the only implemented model family; CatBoost/LightGBM are
@@ -257,6 +257,35 @@ docs/adr/0009-xgboost-vs-scipy-resultados.md
   - Added ADR 0010 and `docs/ml_temporal_modeling_plan.md`.
   - Added `notebooks/07_augmented_temporal_model.md`.
   - Updated architecture, quanta 06, training report, and progress.
+
+### Día 8.2 — Temporal model diagnostics before backtest
+- [x] Target/reference shift diagnostics.
+  - `backend/src/pitwall/ml/diagnostics.py`.
+  - `scripts/diagnose_xgb_dataset_shift.py` / `make diagnose-xgb-shift`.
+  - Reports fold/session target distributions, reference-source counts,
+    driver-offset source counts, failed ingestions, and zero-usable sessions.
+- [x] Leakage-safe baseline ladder.
+  - `backend/src/pitwall/ml/baselines.py`.
+  - `scripts/evaluate_xgb_baselines.py` / `make evaluate-xgb-baselines`.
+  - Baselines: zero, train mean, circuit+compound median,
+    circuit+compound+tyre-age curve, and driver/team-adjusted median.
+- [x] Feature ablations and target variants.
+  - `backend/src/pitwall/ml/ablation.py`.
+  - `scripts/run_xgb_ablation.py` / `make run-xgb-ablations`.
+  - `TARGET_STRATEGY` supports current delta, session-normalized,
+    stint-relative, absolute lap time, and season+circuit+compound delta.
+- [x] Data-quality cleanup.
+  - Dataset metadata records requested sessions that produce zero usable rows.
+  - Wet/mixed or missing-compound sessions are explicit instead of silently
+    absent.
+  - `scripts/fit_degradation.py --manifest` supports full manifest fitting.
+- [x] Day 8.2 quality gate.
+  - Selected `TARGET_STRATEGY=session_normalized_delta` and
+    `FEATURE_SET=no_reference_lap_time_ms`.
+  - Aggregate temporal CV: XGBoost MAE 1,561.9 ms vs zero-delta 1,762.7 ms
+    and train-mean 1,612.9 ms.
+  - Gate passed by 200.8 ms vs zero-delta (11.4%) and all five folds improved
+    over zero-delta.
 
 ### Día 9 — Backtest comparativo (E9 + E10) ⭐
 - [ ] `backend/src/pitwall/engine/backtest.py` con métricas precision/recall/MAE@k.

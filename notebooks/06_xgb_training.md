@@ -195,7 +195,7 @@ Implemented in the augmented modeling patch:
 - `scripts/build_xgb_dataset.py` defaults to `temporal_expanding`.
 - Dataset rows now include `season`, `round_number`, `event_order`,
   `split_strategy`, `fold_id`, and `split`.
-- `scripts/tune_xgb.py` runs a small 8-candidate search and writes
+- `scripts/tune_xgb.py` runs a small 12-candidate search and writes
   `data/ml/xgb_tuning_report.json`.
 - `scripts/plot_xgb_diagnostics.py` writes matplotlib diagnostics under
   `reports/figures/`.

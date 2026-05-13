@@ -294,13 +294,39 @@
   Reference pace and driver offsets remain fold-safe.
 - [x] **Stream A: training/tuning/diagnostics.**
   `train.py` evaluates generic folds, `scripts/tune_xgb.py` runs an
-  8-candidate XGBoost search, and `scripts/plot_xgb_diagnostics.py` writes 7
+  12-candidate XGBoost search, and `scripts/plot_xgb_diagnostics.py` writes 7
   matplotlib diagnostics under `reports/figures/`.
 - [x] **Stream A: docs pivot recorded.**
   Added ADR 0010, `docs/ml_temporal_modeling_plan.md`, and
   `notebooks/07_augmented_temporal_model.md`; updated architecture, quanta 06,
   and training report. Day 9 backtest remains out of scope until model quality
   is assessed on the full temporal dataset.
+
+### Día 8.2 — Temporal model diagnostics and baselines
+- [x] **Stream A: target/reference shift diagnostics.**
+  Added `make diagnose-xgb-shift`, which writes `reports/ml/` diagnostics for
+  fold/session target distributions, reference-source counts, driver-offset
+  source counts, failed ingestions, and zero-usable sessions.
+- [x] **Stream A: baseline ladder and ablations.**
+  Added leakage-safe baseline evaluation and controlled XGBoost feature
+  ablations. These reports define what the model must beat before Day 9.
+- [x] **Stream A: target strategy experiments.**
+  `make build-xgb-dataset` now accepts `TARGET_STRATEGY` for
+  `lap_time_delta`, `session_normalized_delta`, `stint_relative_delta`,
+  `absolute_lap_time`, and `season_circuit_compound_delta`.
+- [x] **Stream A: data-quality edge cases explicit.**
+  Dataset metadata records zero-usable requested sessions, so wet/mixed or
+  missing-data races are not silently dropped. Degradation fitting can now use
+  the ML manifest instead of only the 3 demo races.
+- [x] **Stream A: Day 8.2 quality gate passed for temporal modeling.**
+  Final run used `TARGET_STRATEGY=session_normalized_delta` and
+  `FEATURE_SET=no_reference_lap_time_ms`. Ingestion attempted 48 races,
+  succeeded 48, failed 0, and skipped six disabled 2026 races. Dataset has
+  151,363 usable rows across 47 usable sessions; 2024 Sao Paulo is explicit
+  zero-usable due unsupported/missing compound rows. Temporal CV aggregate:
+  XGBoost MAE/RMSE/R² = 1,561.9 ms / 4,614.4 ms / 0.007 vs zero-delta
+  1,762.7 ms and train-mean 1,612.9 ms. Improvement vs zero is 200.8 ms
+  (11.4%), and all five folds improve over zero-delta.
 
 ### Día 9
 - [ ] **Stream A+B: backtest comparativo scipy vs XGBoost completo.**

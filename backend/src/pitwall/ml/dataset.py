@@ -17,6 +17,15 @@ from pitwall.degradation.dataset import DEMO_SESSION_IDS, refresh_clean_air_lap_
 from pitwall.ingest.normalize import clean_nulls, to_bool, to_float, to_int
 
 VALID_XGB_COMPOUNDS = frozenset({"SOFT", "MEDIUM", "HARD"})
+VALID_TARGET_STRATEGIES = frozenset(
+    {
+        "lap_time_delta",
+        "session_normalized_delta",
+        "stint_relative_delta",
+        "absolute_lap_time",
+        "season_circuit_compound_delta",
+    }
+)
 TARGET_COLUMN = "lap_time_delta_ms"
 FEATURE_COLUMNS = [
     "session_id",
@@ -167,6 +176,7 @@ class SessionOrder:
 
 @dataclass(frozen=True, slots=True)
 class ReferencePace:
+    by_season_circuit_compound: dict[tuple[int, str, str], float]
     by_circuit_compound: dict[tuple[str, str], float]
     by_compound: dict[str, float]
 
@@ -202,10 +212,12 @@ def load_clean_pace_laps(
 def build_loro_dataset(
     rows: Iterable[Mapping[str, Any]],
     *,
+    target_strategy: str = "lap_time_delta",
     generated_at: datetime | None = None,
 ) -> DatasetBuildResult:
     """Build one train/holdout copy of every clean lap for each LORO fold."""
 
+    _validate_target_strategy(target_strategy)
     clean_rows = [_normalise_lap(row) for row in rows]
     eligible_rows = [row for row in clean_rows if _is_training_eligible(row)]
     session_ids = sorted({str(row["session_id"]) for row in eligible_rows})
@@ -216,6 +228,7 @@ def build_loro_dataset(
         folds,
         split_strategy="loro",
         session_orders=_infer_session_orders(eligible_rows),
+        target_strategy=target_strategy,
     )
 
     timestamp = generated_at or datetime.now(UTC)
@@ -227,6 +240,7 @@ def build_loro_dataset(
         split_strategy="loro",
         session_orders=_infer_session_orders(eligible_rows),
         final_test_status="not_configured",
+        target_strategy=target_strategy,
     )
     return DatasetBuildResult(rows=dataset_rows, metadata=metadata)
 
@@ -249,10 +263,12 @@ def build_temporal_expanding_dataset(
     rows: Iterable[Mapping[str, Any]],
     *,
     block_size: int | None = None,
+    target_strategy: str = "lap_time_delta",
     generated_at: datetime | None = None,
 ) -> DatasetBuildResult:
     """Build expanding-window folds ordered by season and round."""
 
+    _validate_target_strategy(target_strategy)
     clean_rows = [_normalise_lap(row) for row in rows]
     eligible_rows = [row for row in clean_rows if _is_training_eligible(row)]
     session_orders = _infer_session_orders(eligible_rows)
@@ -265,6 +281,7 @@ def build_temporal_expanding_dataset(
         folds,
         split_strategy="temporal_expanding",
         session_orders=session_orders,
+        target_strategy=target_strategy,
     )
     timestamp = generated_at or datetime.now(UTC)
     metadata = _build_metadata(
@@ -275,6 +292,7 @@ def build_temporal_expanding_dataset(
         split_strategy="temporal_expanding",
         session_orders=session_orders,
         final_test_status="not_configured",
+        target_strategy=target_strategy,
     )
     return DatasetBuildResult(rows=dataset_rows, metadata=metadata)
 
@@ -321,10 +339,12 @@ def build_temporal_year_dataset(
     train_years: tuple[int, ...],
     validation_years: tuple[int, ...],
     test_years: tuple[int, ...] = (),
+    target_strategy: str = "lap_time_delta",
     generated_at: datetime | None = None,
 ) -> DatasetBuildResult:
     """Build one explicit temporal-year split."""
 
+    _validate_target_strategy(target_strategy)
     clean_rows = [_normalise_lap(row) for row in rows]
     eligible_rows = [row for row in clean_rows if _is_training_eligible(row)]
     session_orders = _infer_session_orders(eligible_rows)
@@ -361,6 +381,7 @@ def build_temporal_year_dataset(
         [fold],
         split_strategy="temporal_year",
         session_orders=session_orders,
+        target_strategy=target_strategy,
     )
     timestamp = generated_at or datetime.now(UTC)
     included_years = {*train_years, *validation_years, *test_years}
@@ -372,6 +393,7 @@ def build_temporal_year_dataset(
         split_strategy="temporal_year",
         session_orders=session_orders,
         final_test_status="reserved" if test_sessions else "not_configured",
+        target_strategy=target_strategy,
     )
     metadata["train_years"] = list(train_years)
     metadata["validation_years"] = list(validation_years)
@@ -382,17 +404,26 @@ def build_temporal_year_dataset(
 def compute_reference_pace(rows: Iterable[Mapping[str, Any]]) -> ReferencePace:
     """Compute fold-local median reference pace maps."""
 
+    by_season_circuit_compound_values: dict[tuple[int, str, str], list[float]] = defaultdict(list)
     by_circuit_compound_values: dict[tuple[str, str], list[float]] = defaultdict(list)
     by_compound_values: dict[str, list[float]] = defaultdict(list)
     for row in rows:
+        season = to_int(row.get("season"))
         circuit_id = str(row.get("circuit_id") or "")
         compound = str(row.get("compound") or "").upper()
         lap_time_ms = to_float(row.get("lap_time_ms"))
         if not circuit_id or compound not in VALID_XGB_COMPOUNDS or lap_time_ms is None:
             continue
+        if season is not None:
+            by_season_circuit_compound_values[(season, circuit_id, compound)].append(lap_time_ms)
         by_circuit_compound_values[(circuit_id, compound)].append(lap_time_ms)
         by_compound_values[compound].append(lap_time_ms)
     return ReferencePace(
+        by_season_circuit_compound={
+            group: float(median(values))
+            for group, values in by_season_circuit_compound_values.items()
+            if values
+        },
         by_circuit_compound={
             group: float(median(values))
             for group, values in by_circuit_compound_values.items()
@@ -443,8 +474,10 @@ def _build_rows_for_folds(
     *,
     split_strategy: str,
     session_orders: Sequence[SessionOrder],
+    target_strategy: str,
 ) -> list[dict[str, Any]]:
     event_order_by_session = {row.session_id: row.event_order for row in session_orders}
+    past_refs = _compute_past_references(eligible_rows)
     dataset_rows: list[dict[str, Any]] = []
     for fold in folds:
         train_session_set = set(fold.train_session_ids)
@@ -480,6 +513,8 @@ def _build_rows_for_folds(
                     split=split,
                     split_strategy=split_strategy,
                     event_order=event_order_by_session.get(session_id),
+                    target_strategy=target_strategy,
+                    past_references=past_refs,
                 )
             )
     return dataset_rows
@@ -582,22 +617,30 @@ def build_dataset_from_db(
     train_years: tuple[int, ...] = (),
     validation_years: tuple[int, ...] = (),
     test_years: tuple[int, ...] = (),
+    target_strategy: str = "lap_time_delta",
 ) -> DatasetBuildResult:
     """Refresh clean-air diagnostics, load DB laps, and build the dataset."""
 
     refresh_clean_air_lap_times(connection)
     rows = load_clean_pace_laps(connection, session_ids=session_ids)
     if split_strategy == "loro":
-        return build_loro_dataset(rows)
+        result = build_loro_dataset(rows, target_strategy=target_strategy)
+        _attach_raw_session_quality(result.metadata, rows, session_ids)
+        return result
     if split_strategy == "temporal_expanding":
-        return build_temporal_expanding_dataset(rows)
+        result = build_temporal_expanding_dataset(rows, target_strategy=target_strategy)
+        _attach_raw_session_quality(result.metadata, rows, session_ids)
+        return result
     if split_strategy == "temporal_year":
-        return build_temporal_year_dataset(
+        result = build_temporal_year_dataset(
             rows,
             train_years=train_years,
             validation_years=validation_years,
             test_years=test_years,
+            target_strategy=target_strategy,
         )
+        _attach_raw_session_quality(result.metadata, rows, session_ids)
+        return result
     raise ValueError(f"unsupported split_strategy: {split_strategy}")
 
 
@@ -610,14 +653,17 @@ def _build_dataset_row(
     split: str,
     split_strategy: str,
     event_order: int | None,
+    target_strategy: str,
+    past_references: Mapping[tuple[int, str], float],
 ) -> dict[str, Any]:
-    reference, reference_source = _reference_for_row(row, references)
-    lap_time_ms = to_float(row.get("lap_time_ms"))
-    target = (
-        lap_time_ms - reference
-        if lap_time_ms is not None and reference is not None
-        else None
+    reference, reference_source = _target_reference_for_row(
+        row,
+        references,
+        target_strategy=target_strategy,
+        past_references=past_references,
     )
+    lap_time_ms = to_float(row.get("lap_time_ms"))
+    target = _target_for_row(lap_time_ms, reference, target_strategy=target_strategy)
     driver_offset, missing, driver_source = _driver_offset_for_row(row, driver_offsets)
 
     lap_number = to_int(row.get("lap_number"))
@@ -687,6 +733,123 @@ def _reference_for_row(
     return None, "missing_reference"
 
 
+def _target_reference_for_row(
+    row: Mapping[str, Any],
+    references: ReferencePace,
+    *,
+    target_strategy: str,
+    past_references: Mapping[tuple[int, str], float],
+) -> tuple[float | None, str]:
+    if target_strategy == "absolute_lap_time":
+        reference, source = _reference_for_row(row, references)
+        return reference, f"feature_{source}"
+    if target_strategy == "session_normalized_delta":
+        past_key = (id(row), "session")
+        if past_key in past_references:
+            return past_references[past_key], "past_session_compound"
+    if target_strategy == "stint_relative_delta":
+        past_key = (id(row), "stint")
+        if past_key in past_references:
+            return past_references[past_key], "past_stint"
+    if target_strategy == "season_circuit_compound_delta":
+        season = to_int(row.get("season"))
+        circuit_id = str(row.get("circuit_id") or "")
+        compound = str(row.get("compound") or "").upper()
+        key = (season, circuit_id, compound) if season is not None else None
+        if key in references.by_season_circuit_compound:
+            return references.by_season_circuit_compound[key], "season_circuit_compound"
+    return _reference_for_row(row, references)
+
+
+def _target_for_row(
+    lap_time_ms: float | None,
+    reference: float | None,
+    *,
+    target_strategy: str,
+) -> float | None:
+    if lap_time_ms is None:
+        return None
+    if target_strategy == "absolute_lap_time":
+        return lap_time_ms
+    if reference is None:
+        return None
+    return lap_time_ms - reference
+
+
+def _compute_past_references(
+    rows: Sequence[Mapping[str, Any]],
+) -> dict[tuple[int, str], float]:
+    """Precompute live-safe past references without reading future laps."""
+
+    refs: dict[tuple[int, str], float] = {}
+    session_values: dict[tuple[str, str], list[float]] = defaultdict(list)
+    stint_values: dict[tuple[str, str, int], list[float]] = defaultdict(list)
+    ordered_rows = sorted(
+        rows,
+        key=lambda row: (
+            str(row.get("session_id") or ""),
+            to_int(row.get("lap_number")) or 0,
+            str(row.get("driver_code") or ""),
+        ),
+    )
+    for row in ordered_rows:
+        session_id = str(row.get("session_id") or "")
+        compound = str(row.get("compound") or "").upper()
+        driver_code = str(row.get("driver_code") or "")
+        stint_number = to_int(row.get("stint_number")) or 0
+        lap_time_ms = to_float(row.get("lap_time_ms"))
+        session_key = (session_id, compound)
+        stint_key = (session_id, driver_code, stint_number)
+        if session_values[session_key]:
+            refs[(id(row), "session")] = float(median(session_values[session_key]))
+        if stint_values[stint_key]:
+            refs[(id(row), "stint")] = float(median(stint_values[stint_key]))
+        if lap_time_ms is not None:
+            session_values[session_key].append(lap_time_ms)
+            stint_values[stint_key].append(lap_time_ms)
+    return refs
+
+
+def _validate_target_strategy(target_strategy: str) -> None:
+    if target_strategy not in VALID_TARGET_STRATEGIES:
+        raise ValueError(f"unsupported target_strategy: {target_strategy}")
+
+
+def _attach_raw_session_quality(
+    metadata: dict[str, Any],
+    raw_rows: Sequence[Mapping[str, Any]],
+    requested_session_ids: Sequence[str],
+) -> None:
+    requested = [session_id for session_id in requested_session_ids if session_id]
+    included = set(str(session_id) for session_id in metadata.get("sessions_included", []))
+    raw_by_session: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
+    for row in raw_rows:
+        raw_by_session[str(row.get("session_id") or "")].append(row)
+    metadata["requested_session_count"] = len(requested)
+    metadata["zero_usable_sessions"] = [
+        {
+            "session_id": session_id,
+            "raw_rows": len(raw_by_session.get(session_id, [])),
+            "dominant_reason": _dominant_zero_usable_reason(raw_by_session.get(session_id, [])),
+        }
+        for session_id in requested
+        if session_id not in included
+    ]
+
+
+def _dominant_zero_usable_reason(rows: Sequence[Mapping[str, Any]]) -> str:
+    if not rows:
+        return "no_raw_rows_loaded"
+    compounds = {str(row.get("compound") or "").upper() for row in rows}
+    if compounds - VALID_XGB_COMPOUNDS:
+        return "unsupported_or_missing_compound"
+    if any(str(row.get("track_status") or "GREEN").upper() != "GREEN" for row in rows):
+        return "non_green_or_mixed_conditions"
+    if any(to_bool(row.get("is_pit_in_lap")) or to_bool(row.get("is_pit_out_lap")) for row in rows):
+        return "pit_laps_only"
+    return "filtered_by_clean_lap_rules"
+
+
 def _driver_offset_for_row(
     row: Mapping[str, Any],
     offsets: DriverOffsetLookup,
@@ -739,6 +902,7 @@ def _build_metadata(
     split_strategy: str,
     session_orders: Sequence[SessionOrder],
     final_test_status: str,
+    target_strategy: str,
 ) -> dict[str, Any]:
     usable_rows = [row for row in rows if row.get("row_usable") is True]
     return {
@@ -746,6 +910,9 @@ def _build_metadata(
         "usable_row_count": len(usable_rows),
         "feature_columns": FEATURE_COLUMNS,
         "target_column": TARGET_COLUMN,
+        "target_strategy": target_strategy,
+        "target_definition": _target_definition(target_strategy),
+        "baseline_reference_source": _baseline_reference_source(target_strategy),
         "sessions_included": session_ids,
         "split_strategy": split_strategy,
         "session_chronology": [
@@ -790,6 +957,7 @@ def _build_metadata(
             f"{split_strategy} by session chronology",
             "holdout reference pace uses training sessions only",
             "holdout driver offsets use training sessions only",
+            "live-style target strategies use only past in-session laps when applicable",
             "temporal validation/test sessions are never used to compute train references",
             "pit loss excluded from lap-level pace dataset",
         ],
@@ -801,6 +969,40 @@ def _build_metadata(
             "no pit-loss or pair-level undercut outcome features in this dataset",
         ],
     }
+
+
+def _target_definition(target_strategy: str) -> str:
+    definitions = {
+        "lap_time_delta": "lap_time_ms minus fold-training reference_lap_time_ms",
+        "session_normalized_delta": (
+            "lap_time_ms minus median prior clean dry laps in the same session+compound; "
+            "falls back to fold-training reference"
+        ),
+        "stint_relative_delta": (
+            "lap_time_ms minus median prior clean dry laps in the same driver stint; "
+            "falls back to fold-training reference"
+        ),
+        "absolute_lap_time": (
+            "raw clean lap_time_ms stored in lap_time_delta_ms "
+            "for experiment compatibility"
+        ),
+        "season_circuit_compound_delta": (
+            "lap_time_ms minus fold-training season+circuit+compound median; "
+            "falls back to circuit+compound and global compound"
+        ),
+    }
+    return definitions[target_strategy]
+
+
+def _baseline_reference_source(target_strategy: str) -> str:
+    sources = {
+        "lap_time_delta": "fold_train_circuit_compound_or_global_compound",
+        "session_normalized_delta": "past_session_compound_then_fold_train_reference",
+        "stint_relative_delta": "past_driver_stint_then_fold_train_reference",
+        "absolute_lap_time": "none_target_is_absolute_lap_time",
+        "season_circuit_compound_delta": "fold_train_season_circuit_compound",
+    }
+    return sources[target_strategy]
 
 
 def _infer_session_orders(rows: Sequence[Mapping[str, Any]]) -> list[SessionOrder]:

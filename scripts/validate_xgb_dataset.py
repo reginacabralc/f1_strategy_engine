@@ -164,6 +164,23 @@ def _validate_metadata(metadata: dict[str, Any]) -> list[str]:
             errors.append(f"metadata missing feature column {column}")
     if metadata.get("target_column") != TARGET_COLUMN:
         errors.append("metadata target column is not lap_time_delta_ms")
+    if metadata.get("target_strategy") not in {
+        "lap_time_delta",
+        "session_normalized_delta",
+        "stint_relative_delta",
+        "absolute_lap_time",
+        "season_circuit_compound_delta",
+    }:
+        errors.append("metadata target_strategy is missing or unsupported")
+    if not metadata.get("target_definition"):
+        errors.append("metadata target_definition is missing")
+    if not metadata.get("baseline_reference_source"):
+        errors.append("metadata baseline_reference_source is missing")
+    if "zero_usable_sessions" not in metadata:
+        errors.append("metadata zero_usable_sessions is missing")
+    for row in metadata.get("zero_usable_sessions", []):
+        if not row.get("dominant_reason"):
+            errors.append(f"zero-usable session lacks explanation: {row.get('session_id')}")
     if metadata.get("split_strategy") not in {"loro", "temporal_expanding", "temporal_year"}:
         errors.append("metadata split_strategy is missing or unsupported")
     leakage_text = " ".join(metadata.get("leakage_policy", [])).lower()
@@ -189,6 +206,7 @@ def _print_summary(frame: Any, metadata: dict[str, Any]) -> None:
     print(f"rows: {frame.height}")
     polars = __import__("polars")
     print(f"usable_rows: {frame.filter(polars.col('row_usable')).height}")
+    print(f"target_strategy: {metadata.get('target_strategy')}")
     print(f"sessions: {', '.join(metadata.get('sessions_included', []))}")
     print("folds:")
     for fold in metadata.get("folds", []):

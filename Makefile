@@ -7,7 +7,9 @@ PIP ?= $(PYTHON) -m pip
         fit-degradation validate-degradation report-degradation \
         fit-pit-loss validate-pit-loss \
         fit-driver-offsets validate-driver-offsets \
-        build-xgb-dataset validate-xgb-dataset tune-xgb train-xgb validate-xgb-model \
+        build-xgb-dataset validate-xgb-dataset diagnose-xgb-shift \
+        evaluate-xgb-baselines run-xgb-ablations \
+        tune-xgb train-xgb validate-xgb-model \
         plot-xgb-diagnostics \
         replay test test-backend lint demo serve-api
 
@@ -75,7 +77,7 @@ ingest-ml-races: install db-wait
 	$(PYTHON) scripts/ingest_race_manifest.py --continue-on-error
 
 fit-degradation: install db-wait
-	$(PYTHON) scripts/fit_degradation.py --all-demo
+	$(PYTHON) scripts/fit_degradation.py --manifest data/reference/ml_race_manifest.yaml
 
 validate-degradation: install db-wait
 	$(PYTHON) scripts/validate_degradation.py
@@ -95,19 +97,28 @@ validate-driver-offsets: install db-wait
 	$(PYTHON) scripts/validate_driver_offsets.py
 
 build-xgb-dataset: install db-wait
-	$(PYTHON) scripts/build_xgb_dataset.py --split-strategy $(or $(SPLIT_STRATEGY),temporal_expanding)
+	$(PYTHON) scripts/build_xgb_dataset.py --split-strategy $(or $(SPLIT_STRATEGY),temporal_expanding) --target-strategy $(or $(TARGET_STRATEGY),lap_time_delta)
 
 validate-xgb-dataset: install
 	$(PYTHON) scripts/validate_xgb_dataset.py
 
+diagnose-xgb-shift: install db-wait
+	$(PYTHON) scripts/diagnose_xgb_dataset_shift.py
+
+evaluate-xgb-baselines: install
+	$(PYTHON) scripts/evaluate_xgb_baselines.py
+
+run-xgb-ablations: install
+	$(PYTHON) scripts/run_xgb_ablation.py
+
 train-xgb: install
-	$(PYTHON) scripts/train_xgb.py
+	$(PYTHON) scripts/train_xgb.py --feature-set $(or $(FEATURE_SET),full)
 
 validate-xgb-model: install
 	$(PYTHON) scripts/validate_xgb_model.py
 
 tune-xgb: install
-	$(PYTHON) scripts/tune_xgb.py
+	$(PYTHON) scripts/tune_xgb.py --feature-set $(or $(FEATURE_SET),full)
 
 plot-xgb-diagnostics: install
 	$(PYTHON) scripts/plot_xgb_diagnostics.py
