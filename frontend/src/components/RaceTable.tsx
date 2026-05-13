@@ -1,68 +1,7 @@
 import type { DriverState } from "../api/types";
+import mockRaceOrder from "../data/mockRaceOrder.json";
 
-// Mock data — replaced in Day 4 when the WS snapshot feed is live
-const MOCK_DRIVERS: DriverState[] = [
-  {
-    driver_code: "VER",
-    team_code: "Red Bull",
-    position: 1,
-    gap_to_leader_ms: 0,
-    gap_to_ahead_ms: null,
-    last_lap_ms: 92_450,
-    compound: "MEDIUM",
-    tyre_age: 12,
-    is_in_pit: false,
-    is_lapped: false,
-    last_pit_lap: 15,
-    stint_number: 2,
-    undercut_score: 0.15,
-  },
-  {
-    driver_code: "LEC",
-    team_code: "Ferrari",
-    position: 2,
-    gap_to_leader_ms: 3_200,
-    gap_to_ahead_ms: 3_200,
-    last_lap_ms: 92_810,
-    compound: "MEDIUM",
-    tyre_age: 14,
-    is_in_pit: false,
-    is_lapped: false,
-    last_pit_lap: 13,
-    stint_number: 2,
-    undercut_score: 0.72,
-  },
-  {
-    driver_code: "SAI",
-    team_code: "Ferrari",
-    position: 3,
-    gap_to_leader_ms: 5_900,
-    gap_to_ahead_ms: 2_700,
-    last_lap_ms: 93_020,
-    compound: "HARD",
-    tyre_age: 8,
-    is_in_pit: false,
-    is_lapped: false,
-    last_pit_lap: 19,
-    stint_number: 2,
-    undercut_score: 0.38,
-  },
-  {
-    driver_code: "HAM",
-    team_code: "Mercedes",
-    position: 4,
-    gap_to_leader_ms: 9_100,
-    gap_to_ahead_ms: 3_200,
-    last_lap_ms: 93_400,
-    compound: "SOFT",
-    tyre_age: 6,
-    is_in_pit: false,
-    is_lapped: false,
-    last_pit_lap: 21,
-    stint_number: 3,
-    undercut_score: 0.51,
-  },
-];
+const MOCK_DRIVERS = mockRaceOrder as DriverState[];
 
 const COMPOUND_COLORS: Record<string, string> = {
   SOFT: "text-red-400",
@@ -105,8 +44,11 @@ interface Props {
 
 export function RaceTable({ drivers = MOCK_DRIVERS }: Props) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-pitwall-border">
-      <table className="w-full text-sm">
+    <div
+      className="overflow-x-auto rounded-lg border border-pitwall-border"
+      data-testid="race-table-scroll"
+    >
+      <table className="min-w-[760px] w-full text-sm">
         <thead>
           <tr className="bg-pitwall-surface text-pitwall-muted uppercase text-xs tracking-wider">
             <th className="px-4 py-3 text-left w-8">P</th>
