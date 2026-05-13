@@ -35,10 +35,11 @@ Por (circuito × compuesto). Parámetros ajustados con `scipy.optimize.curve_fit
 
 ### Modelo
 
-`xgboost.XGBRegressor` con:
+Native `xgboost.Booster` con:
 
-- `max_depth=5`, `n_estimators=400`, `learning_rate=0.05`, `early_stopping_rounds=20`
-- Sin tuning extenso (timebox).
+- hiperparámetros por defecto conservadores,
+- búsqueda pequeña opcional con `make tune-xgb`,
+- selección por MAE temporal de validación, después RMSE y gap train-validación.
 
 ### Features
 
@@ -66,7 +67,9 @@ Donde `p20` es el percentil 20 (vueltas más rápidas) de ese (compuesto, circui
 
 ### Split
 
-**Leave-one-race-out (LORO)**: para cada hold-out race, entrenamos con el resto. Esto evita leakage temporal y permite reportar honestamente cómo generalizaría a una carrera nueva.
+**Temporal expanding window** es ahora el split principal: ordenamos sesiones por
+`(season, round_number)`, entrenamos solo con sesiones pasadas y validamos con
+sesiones futuras. LORO se conserva como stress test, no como la métrica principal.
 
 ### Pros
 
@@ -95,7 +98,17 @@ Donde `p20` es el percentil 20 (vueltas más rápidas) de ese (compuesto, circui
 
 ## Resultado real (post-E10)
 
-_(Llenar al cerrar [ADR 0009](../adr/0009-xgboost-vs-scipy-resultados.md))_
+Day 8 mostró que el modelo de 3 carreras estaba bien armado pero no era una
+evidencia de calidad suficiente:
+
+- Train MAE/R²: 294.7 ms / 0.943.
+- Holdout MAE/R²: 7,396.0 ms / -0.080.
+- Mejora vs zero-delta: 36.6 ms.
+
+La causa principal fue cobertura insuficiente: LORO con tres carreras es casi
+leave-one-circuit-out. La decisión nueva está en
+[ADR 0010](../adr/0010-temporal-expanding-xgboost-validation.md): usar 2024/2025
+recientes, validación temporal y tuning pequeño antes de Day 9.
 
 | Métrica | scipy | XGBoost | Δ |
 |---------|-------|---------|---|
@@ -108,17 +121,20 @@ _(Llenar al cerrar [ADR 0009](../adr/0009-xgboost-vs-scipy-resultados.md))_
 
 Recomendaciones (post-experimento):
 
-- **Demo "al profesor"**: usa `xgb` para mostrar el componente de ML.
+- **Demo "al profesor"**: usa `xgb` para mostrar el componente de ML, pero
+  explica si el modelo fue entrenado solo con las tres demos o con el manifiesto completo.
 - **Debug de motor**: usa `scipy` (predicciones interpretables).
 - **Carreras con datos pobres**: scipy es más estable.
-- **Carreras con muchos datos**: XGBoost generalmente gana.
+- **Carreras con muchos datos recientes**: XGBoost es el candidato principal,
+  pero debe ganar en CV temporal antes de hacerlo default de calidad.
 
 ## Implementación
 
 - ScipyPredictor: [`backend/src/pitwall/degradation/`](../../backend/src/pitwall/degradation/)
 - XGBoostPredictor: [`backend/src/pitwall/ml/predictor.py`](../../backend/src/pitwall/ml/predictor.py)
-- Entrenamiento: [`backend/src/pitwall/ml/train_xgb.py`](../../backend/src/pitwall/ml/train_xgb.py)
-- Notebook: [`notebooks/05_xgboost_train_eval.ipynb`](../../notebooks/05_xgboost_train_eval.ipynb)
+- Dataset/training: [`backend/src/pitwall/ml/`](../../backend/src/pitwall/ml/)
+- Manifest: [`data/reference/ml_race_manifest.yaml`](../../data/reference/ml_race_manifest.yaml)
+- Reporte temporal: [`notebooks/07_augmented_temporal_model.md`](../../notebooks/07_augmented_temporal_model.md)
 
 ## Quanta relacionadas
 

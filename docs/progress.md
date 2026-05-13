@@ -16,6 +16,7 @@
 | Motor undercut V1 con `ScipyPredictor` | ⏳ | Día 5 | Stream B |
 | Pipeline end-to-end con datos reales | ⏳ | Día 7 | Todos |
 | **XGBoost entrenado y serializado** | ✅ | Día 8 | Stream A — native Booster trained, serialized, and validated; weak 3-race holdout metrics documented |
+| **XGBoost temporal multi-season preparado** | ✅ | Día 8.5 | Stream A — manifest 2024/2025, temporal CV, tuning, plots, ADR 0010; full ingestion run pending |
 | **Backtest comparativo scipy vs XGBoost** | ⏳ | Día 9 | Stream A+B |
 | Demo end-to-end probada en limpio | ⏳ | Día 10 | Todos |
 
@@ -275,6 +276,31 @@
   **234 tests, ruff clean, mypy clean (85 files).** 3 smoke tests pass.
 - [ ] Stream C: pulido visual mínimo, responsive.
 - [ ] Stream D: test suite verde, ADRs revisados.
+
+### Día 8.5 — Augmented temporal ML
+- [x] **Stream A: manifest multi-season agregado.**
+  `data/reference/ml_race_manifest.yaml` enables all 2024 and 2025 race
+  sessions, with 2026 candidates disabled by default. `make validate-ml-races`
+  validates the manifest and checks FastF1 schedule availability through the
+  repo cache.
+- [x] **Stream A: ingestion workflow by manifest.**
+  `scripts/ingest_race_manifest.py` reuses the existing one-race ingestion
+  path, supports `--continue-on-error`, remains idempotent through DB upserts,
+  and writes `data/ml/ingestion_report.json`.
+- [x] **Stream A: temporal dataset split support.**
+  `backend/src/pitwall/ml/dataset.py` now supports `loro`,
+  `temporal_expanding`, and `temporal_year`. Dataset rows include `season`,
+  `round_number`, `event_order`, `split_strategy`, `fold_id`, and `split`.
+  Reference pace and driver offsets remain fold-safe.
+- [x] **Stream A: training/tuning/diagnostics.**
+  `train.py` evaluates generic folds, `scripts/tune_xgb.py` runs an
+  8-candidate XGBoost search, and `scripts/plot_xgb_diagnostics.py` writes 7
+  matplotlib diagnostics under `reports/figures/`.
+- [x] **Stream A: docs pivot recorded.**
+  Added ADR 0010, `docs/ml_temporal_modeling_plan.md`, and
+  `notebooks/07_augmented_temporal_model.md`; updated architecture, quanta 06,
+  and training report. Day 9 backtest remains out of scope until model quality
+  is assessed on the full temporal dataset.
 
 ### Día 9
 - [ ] **Stream A+B: backtest comparativo scipy vs XGBoost completo.**

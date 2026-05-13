@@ -7,7 +7,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from pitwall.degradation.dataset import DEMO_SESSION_IDS
 from pitwall.ml.dataset import FEATURE_COLUMNS, TARGET_COLUMN, VALID_XGB_COMPOUNDS
 
 DATASET_PATH = Path("data/ml/xgb_pace_dataset.parquet")
@@ -47,6 +46,10 @@ def validate_dataset_files(dataset_path: Path, metadata_path: Path) -> list[str]
         TARGET_COLUMN,
         "fold_id",
         "split",
+        "split_strategy",
+        "season",
+        "round_number",
+        "event_order",
         "row_usable",
         "track_status",
         "is_pit_in_lap",
@@ -101,36 +104,55 @@ def _validate_targets(frame: Any) -> list[str]:
 
 def _validate_folds(frame: Any, metadata: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    expected_sessions = set(DEMO_SESSION_IDS)
+    expected_sessions = set(metadata.get("sessions_included", []))
     folds = metadata.get("folds", [])
-    holdouts = {fold.get("holdout_session_id") for fold in folds}
-    missing_holdouts = expected_sessions - holdouts
-    if missing_holdouts:
-        errors.append(f"missing LORO holdout fold(s): {sorted(missing_holdouts)}")
+    split_strategy = str(metadata.get("split_strategy") or "loro")
+    evaluation_sessions = _evaluation_sessions(folds)
+    if split_strategy == "loro":
+        missing_holdouts = expected_sessions - evaluation_sessions
+        if missing_holdouts:
+            errors.append(f"missing LORO holdout fold(s): {sorted(missing_holdouts)}")
 
     polars = __import__("polars")
     for fold in folds:
         fold_id = fold.get("fold_id")
         holdout = fold.get("holdout_session_id")
         train_sessions = set(fold.get("train_session_ids", []))
+        validation_sessions = set(fold.get("validation_session_ids", []))
+        test_sessions = set(fold.get("test_session_ids", []))
         if holdout in train_sessions:
             errors.append(f"holdout leaked into train sessions for {fold_id}")
+        if train_sessions & validation_sessions:
+            errors.append(f"validation leaked into train sessions for {fold_id}")
+        if train_sessions & test_sessions:
+            errors.append(f"test leaked into train sessions for {fold_id}")
         fold_rows = frame.filter(polars.col("fold_id") == fold_id)
-        holdout_rows = fold_rows.filter(polars.col("session_id") == holdout)
-        if holdout_rows.height == 0:
-            errors.append(f"fold {fold_id} has no holdout rows")
-        bad_holdout_split = holdout_rows.filter(polars.col("split") != "holdout")
-        if bad_holdout_split.height:
-            errors.append(f"fold {fold_id} holdout rows not marked holdout")
-        leaked_offset_rows = holdout_rows.filter(
-            polars.col("driver_offset_source_sessions").str.contains(str(holdout), literal=True)
-        )
-        if leaked_offset_rows.height:
-            errors.append(f"fold {fold_id} holdout driver offsets include holdout data")
+        eval_split = "validation" if validation_sessions else "holdout"
+        eval_sessions = validation_sessions or ({holdout} if holdout else set()) or test_sessions
+        eval_rows = fold_rows.filter(polars.col("session_id").is_in(list(eval_sessions)))
+        if eval_rows.height == 0:
+            errors.append(f"fold {fold_id} has no evaluation rows")
+        bad_eval_split = eval_rows.filter(polars.col("split") != eval_split)
+        if bad_eval_split.height:
+            errors.append(f"fold {fold_id} evaluation rows not marked {eval_split}")
+        for eval_session in eval_sessions:
+            leaked_offset_rows = eval_rows.filter(
+                polars.col("driver_offset_source_sessions").str.contains(
+                    str(eval_session),
+                    literal=True,
+                )
+            )
+            if leaked_offset_rows.height:
+                errors.append(f"fold {fold_id} driver offsets include {eval_session}")
         train_rows = fold_rows.filter(polars.col("session_id").is_in(list(train_sessions)))
         bad_train_split = train_rows.filter(polars.col("split") != "train")
         if bad_train_split.height:
             errors.append(f"fold {fold_id} train rows not marked train")
+        if split_strategy in {"temporal_expanding", "temporal_year"} and train_rows.height and eval_rows.height:
+            max_train_order = train_rows["event_order"].max()
+            min_eval_order = eval_rows["event_order"].min()
+            if max_train_order is not None and min_eval_order is not None and max_train_order >= min_eval_order:
+                errors.append(f"future session leaked into train rows for {fold_id}")
     return errors
 
 
@@ -142,12 +164,24 @@ def _validate_metadata(metadata: dict[str, Any]) -> list[str]:
             errors.append(f"metadata missing feature column {column}")
     if metadata.get("target_column") != TARGET_COLUMN:
         errors.append("metadata target column is not lap_time_delta_ms")
+    if metadata.get("split_strategy") not in {"loro", "temporal_expanding", "temporal_year"}:
+        errors.append("metadata split_strategy is missing or unsupported")
     leakage_text = " ".join(metadata.get("leakage_policy", [])).lower()
     if "pit loss excluded" not in leakage_text:
         errors.append("metadata does not document pit-loss exclusion")
     if "training sessions only" not in leakage_text:
         errors.append("metadata does not document fold-safe training-only leakage policy")
     return errors
+
+
+def _evaluation_sessions(folds: list[dict[str, Any]]) -> set[str]:
+    sessions: set[str] = set()
+    for fold in folds:
+        if fold.get("holdout_session_id"):
+            sessions.add(str(fold["holdout_session_id"]))
+        sessions.update(str(item) for item in fold.get("validation_session_ids", []))
+        sessions.update(str(item) for item in fold.get("test_session_ids", []))
+    return sessions
 
 
 def _print_summary(frame: Any, metadata: dict[str, Any]) -> None:
@@ -158,8 +192,11 @@ def _print_summary(frame: Any, metadata: dict[str, Any]) -> None:
     print(f"sessions: {', '.join(metadata.get('sessions_included', []))}")
     print("folds:")
     for fold in metadata.get("folds", []):
+        evaluation = fold.get("validation_session_ids") or fold.get("test_session_ids")
+        if not evaluation and fold.get("holdout_session_id"):
+            evaluation = [fold["holdout_session_id"]]
         print(
-            f"  {fold['fold_id']}: holdout={fold['holdout_session_id']} "
+            f"  {fold['fold_id']}: eval={','.join(str(item) for item in evaluation or [])} "
             f"train={','.join(fold['train_session_ids'])}"
         )
 

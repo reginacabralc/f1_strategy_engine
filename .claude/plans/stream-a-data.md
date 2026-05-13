@@ -229,6 +229,35 @@ docs/adr/0009-xgboost-vs-scipy-resultados.md
     filesystem; registrar el modelo en DB puede agregarse en Day 9/10 sin
     cambiar el artifact.
 
+### Día 8.5 — Augmented temporal XGBoost
+- [x] Manifest-based race coverage.
+  - `data/reference/ml_race_manifest.yaml` enables full 2024 and 2025 race
+    sessions.
+  - 2026 candidates are disabled by default and must be enabled only after
+    FastF1 availability is confirmed and `race_date <= as_of_date`.
+  - `scripts/validate_race_manifest.py` / `make validate-ml-races`.
+  - `scripts/ingest_race_manifest.py` / `make ingest-ml-races`.
+  - Ingestion reports write to `data/ml/ingestion_report.json`.
+- [x] Temporal dataset strategies.
+  - `loro` remains available as stress-test mode.
+  - `temporal_expanding` is now the default build strategy.
+  - `temporal_year` supports explicit train/validation/test year boundaries.
+  - Dataset rows include `season`, `round_number`, `event_order`,
+    `split_strategy`, `fold_id`, and `split`.
+  - Reference pace and driver offsets are still computed from fold training
+    sessions only.
+- [x] Training, tuning, and plots.
+  - `train.py` evaluates generic folds, then trains the final runtime model.
+  - `scripts/tune_xgb.py` runs a curated 8-candidate XGBoost search.
+  - `scripts/plot_xgb_diagnostics.py` writes matplotlib plots under
+    `reports/figures/`.
+  - XGBoost remains the only implemented model family; CatBoost/LightGBM are
+    deferred in code/docs.
+- [x] Documentation.
+  - Added ADR 0010 and `docs/ml_temporal_modeling_plan.md`.
+  - Added `notebooks/07_augmented_temporal_model.md`.
+  - Updated architecture, quanta 06, training report, and progress.
+
 ### Día 9 — Backtest comparativo (E9 + E10) ⭐
 - [ ] `backend/src/pitwall/engine/backtest.py` con métricas precision/recall/MAE@k.
 - [ ] Notebook `04_backtest_v1.ipynb` corriendo replay determinista para 5 sesiones hold-out.

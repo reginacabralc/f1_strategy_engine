@@ -290,6 +290,25 @@ def evaluate_loro_folds(
 ) -> FoldEvaluationResult:
     """Train and evaluate one native Booster per leave-one-race-out fold."""
 
+    return evaluate_folds(
+        frame,
+        dataset_metadata,
+        hyperparameters=hyperparameters,
+        num_boost_round=num_boost_round,
+        trainer=trainer,
+    )
+
+
+def evaluate_folds(
+    frame: pl.DataFrame,
+    dataset_metadata: Mapping[str, Any],
+    *,
+    hyperparameters: dict[str, Any],
+    num_boost_round: int,
+    trainer: ModelTrainer = train_booster,
+) -> FoldEvaluationResult:
+    """Train and evaluate one native Booster per dataset fold."""
+
     usable_frame = select_usable_rows(frame)
     if usable_frame.is_empty():
         raise ValueError("XGBoost training dataset has zero usable rows")
@@ -303,12 +322,13 @@ def evaluate_loro_folds(
 
     for fold in dataset_metadata.get("folds", []):
         fold_id = str(fold["fold_id"])
-        holdout_session = str(fold["holdout_session_id"])
+        evaluation_split, evaluation_sessions = _evaluation_split_for_fold(fold)
+        holdout_session = ",".join(evaluation_sessions)
         fold_frame = usable_frame.filter(pl.col("fold_id") == fold_id)
         train_frame = fold_frame.filter(pl.col("split") == "train")
-        holdout_frame = fold_frame.filter(pl.col("split") == "holdout")
+        holdout_frame = fold_frame.filter(pl.col("split") == evaluation_split)
         if train_frame.is_empty() or holdout_frame.is_empty():
-            raise ValueError(f"fold {fold_id} has empty train or holdout split")
+            raise ValueError(f"fold {fold_id} has empty train or {evaluation_split} split")
 
         schema = fit_feature_schema(train_frame)
         encoded_train = encode_features(train_frame, schema)
@@ -341,6 +361,8 @@ def evaluate_loro_folds(
             {
                 "fold_id": fold_id,
                 "holdout_session": holdout_session,
+                "evaluation_split": evaluation_split,
+                "evaluation_sessions": evaluation_sessions,
                 "train_rows": train_frame.height,
                 "holdout_rows": holdout_frame.height,
                 "train_mae_ms": train_metrics.mae_ms,
@@ -356,6 +378,10 @@ def evaluate_loro_folds(
                 "train_mean_holdout_rmse_ms": train_mean_metrics.rmse_ms,
                 "train_mean_holdout_r2": train_mean_metrics.r2,
                 "improvement_vs_zero_mae_ms": zero_metrics.mae_ms - holdout_metrics.mae_ms,
+                "train_validation_gap_mae_ms": holdout_metrics.mae_ms - train_metrics.mae_ms,
+                "validation_mae_ms": holdout_metrics.mae_ms,
+                "validation_rmse_ms": holdout_metrics.rmse_ms,
+                "validation_r2": holdout_metrics.r2,
                 "target_distribution": target_distribution(holdout_target),
                 "xgb_train_mae_ms": train_metrics.mae_ms,
                 "xgb_train_rmse_ms": train_metrics.rmse_ms,
@@ -439,7 +465,7 @@ def train_xgb_model(
     params = hyperparameters or default_hyperparameters()
     frame, dataset_metadata = load_dataset(dataset_path, dataset_metadata_path)
     usable_rows = select_usable_rows(frame).height
-    fold_result = evaluate_loro_folds(
+    fold_result = evaluate_folds(
         frame,
         dataset_metadata,
         hyperparameters=params,
@@ -491,6 +517,7 @@ def build_training_metadata(
     """Build the model sidecar metadata consumed by validation and reporting."""
 
     aggregate = dict(fold_result.aggregate_metrics)
+    split_strategy = str(dataset_metadata.get("split_strategy", "loro"))
     metadata = {
         "model_type": "xgboost_pace_v1",
         "model_format": "xgboost_native_json",
@@ -520,11 +547,14 @@ def build_training_metadata(
         "hyperparameters": hyperparameters,
         "num_boost_round": num_boost_round,
         "training_sessions": list(dataset_metadata.get("sessions_included", [])),
+        "split_strategy": split_strategy,
+        "session_chronology": list(dataset_metadata.get("session_chronology", [])),
+        "final_test_status": dataset_metadata.get("final_test_status", "not_configured"),
         "folds": list(dataset_metadata.get("folds", [])),
         "reference_pace_method": dataset_metadata.get("reference_pace_method"),
         "driver_offset_method": dataset_metadata.get("driver_offset_method"),
         "leakage_policy": [
-            "leave-one-race-out by session_id",
+            f"{split_strategy} split by session_id/event_order",
             "fold encoders are fit on training rows only",
             "holdout reference pace comes from Day 7 fold-safe references",
             "holdout driver offsets come from Day 7 fold-safe offsets",
@@ -537,11 +567,11 @@ def build_training_metadata(
         "scipy_baseline_status": "deferred_to_day_9",
         "overfitting_diagnosis": _diagnose_overfitting(aggregate),
         "diagnosis": (
-            "functional_training_pipeline_but_weak_holdout_generalization_on_3_race_"
-            "unseen_circuit_loro"
+            "functional_training_pipeline; model_quality_depends_on_manifest_coverage_"
+            f"and_{split_strategy}_validation"
         ),
         "known_limitations": [
-            "three demo races only",
+            "model quality depends on multi-season manifest coverage",
             "with three races, LORO is effectively leave-one-circuit-out",
             "no hyperparameter tuning beyond conservative defaults",
             "traffic is represented by simple gap proxies",
@@ -628,14 +658,17 @@ def validate_model_artifacts(
 
     frame, dataset_metadata = load_dataset(dataset_path, dataset_metadata_path)
     expected_sessions = set(dataset_metadata.get("sessions_included", []))
-    holdout_sessions = {
-        str(metric["holdout_session"])
+    split_strategy = str(dataset_metadata.get("split_strategy") or "loro")
+    evaluation_sessions = {
+        str(session)
         for metric in metadata["fold_metrics"]
-        if metric.get("holdout_session")
+        for session in metric.get("evaluation_sessions", [metric.get("holdout_session")])
+        if session
     }
-    missing_sessions = sorted(expected_sessions - holdout_sessions)
-    if missing_sessions:
-        raise ValueError(f"fold metrics missing holdout session(s): {missing_sessions}")
+    if split_strategy == "loro":
+        missing_sessions = sorted(expected_sessions - evaluation_sessions)
+        if missing_sessions:
+            raise ValueError(f"fold metrics missing holdout session(s): {missing_sessions}")
 
     xgb = import_module("xgboost")
     booster = xgb.Booster()
@@ -788,6 +821,7 @@ def _aggregate_metrics(
         "train_mean_holdout_rmse_ms": train_mean_metrics.rmse_ms,
         "train_mean_holdout_r2": train_mean_metrics.r2,
         "improvement_vs_zero_mae_ms": zero_metrics.mae_ms - holdout_metrics.mae_ms,
+        "train_validation_gap_mae_ms": holdout_metrics.mae_ms - train_metrics.mae_ms,
         "target_distribution": target_distribution(holdout_target),
         "xgb_train_mae_ms": train_metrics.mae_ms,
         "xgb_train_rmse_ms": train_metrics.rmse_ms,
@@ -800,6 +834,19 @@ def _aggregate_metrics(
         "zero_r2": zero_metrics.r2,
         "improvement_mae_ms": zero_metrics.mae_ms - holdout_metrics.mae_ms,
     }
+
+
+def _evaluation_split_for_fold(fold: Mapping[str, Any]) -> tuple[str, list[str]]:
+    validation_sessions = [str(value) for value in fold.get("validation_session_ids", [])]
+    if validation_sessions:
+        return "validation", validation_sessions
+    holdout_session = fold.get("holdout_session_id")
+    if holdout_session:
+        return "holdout", [str(holdout_session)]
+    test_sessions = [str(value) for value in fold.get("test_session_ids", [])]
+    if test_sessions:
+        return "test", test_sessions
+    raise ValueError(f"fold has no evaluation sessions: {fold}")
 
 
 def _diagnose_overfitting(aggregate: Mapping[str, Any]) -> str:

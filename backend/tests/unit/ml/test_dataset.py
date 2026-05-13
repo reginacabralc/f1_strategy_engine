@@ -1,14 +1,21 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from pitwall.ml.dataset import (
     FEATURE_COLUMNS,
     TARGET_COLUMN,
+    DatasetBuildResult,
     build_loro_dataset,
     build_loro_folds,
+    build_temporal_expanding_dataset,
+    build_temporal_expanding_folds,
+    build_temporal_year_dataset,
     compute_reference_pace,
     validate_dataset_rows,
+    write_dataset,
 )
 
 
@@ -19,6 +26,8 @@ def _lap(
     compound: str,
     lap_time_ms: int,
     *,
+    season: int = 2024,
+    round_number: int = 1,
     lap_number: int = 1,
     tyre_age: int = 3,
     gap_to_ahead_ms: int | None = 2500,
@@ -32,6 +41,8 @@ def _lap(
     return {
         "session_id": session_id,
         "circuit_id": circuit_id,
+        "season": season,
+        "round_number": round_number,
         "driver_code": driver_code,
         "team_code": "ferrari" if driver_code == "LEC" else "red_bull_racing",
         "compound": compound,
@@ -175,6 +186,127 @@ def test_validation_rejects_pit_loss_leakage() -> None:
 
     with pytest.raises(ValueError, match="pit_loss"):
         validate_dataset_rows(rows, metadata={"folds": []})
+
+
+def test_temporal_expanding_folds_use_only_past_sessions() -> None:
+    sessions = [
+        ("s1", 2024, 1),
+        ("s2", 2024, 2),
+        ("s3", 2024, 3),
+        ("s4", 2024, 4),
+        ("s5", 2025, 1),
+        ("s6", 2025, 2),
+    ]
+
+    folds = build_temporal_expanding_folds(sessions, block_size=2)
+
+    assert [(fold.train_session_ids, fold.validation_session_ids) for fold in folds] == [
+        (("s1", "s2"), ("s3", "s4")),
+        (("s1", "s2", "s3", "s4"), ("s5", "s6")),
+    ]
+    assert all(
+        max(fold.train_event_orders) < min(fold.validation_event_orders)
+        for fold in folds
+    )
+
+
+def test_temporal_dataset_marks_chronology_and_split_strategy() -> None:
+    rows = [
+        _lap("s1", "bahrain", "VER", "HARD", 90_000, season=2024, round_number=1),
+        _lap("s2", "jeddah", "LEC", "HARD", 91_000, season=2024, round_number=2),
+        _lap("s3", "melbourne", "VER", "HARD", 92_000, season=2024, round_number=3),
+        _lap("s4", "suzuka", "LEC", "HARD", 93_000, season=2024, round_number=4),
+    ]
+
+    result = build_temporal_expanding_dataset(rows, block_size=2)
+
+    assert result.metadata["split_strategy"] == "temporal_expanding"
+    assert [row["event_order"] for row in result.metadata["session_chronology"]] == [1, 2, 3, 4]
+    assert {row["split_strategy"] for row in result.rows} == {"temporal_expanding"}
+    fold_rows = [row for row in result.rows if row["fold_id"] == "fold_001"]
+    assert {row["split"] for row in fold_rows} == {"train", "validation"}
+    assert {row["session_id"] for row in fold_rows if row["split"] == "train"} == {"s1", "s2"}
+    assert {row["session_id"] for row in fold_rows if row["split"] == "validation"} == {"s3", "s4"}
+
+
+def test_temporal_year_dataset_supports_train_validation_and_test_years() -> None:
+    rows = [
+        _lap("s1", "bahrain", "VER", "HARD", 90_000, season=2024, round_number=1),
+        _lap("s2", "melbourne", "LEC", "HARD", 91_000, season=2025, round_number=1),
+        _lap("s3", "miami", "VER", "HARD", 92_000, season=2026, round_number=1),
+    ]
+
+    result = build_temporal_year_dataset(
+        rows,
+        train_years=(2024,),
+        validation_years=(2025,),
+        test_years=(2026,),
+    )
+
+    assert result.metadata["split_strategy"] == "temporal_year"
+    assert result.metadata["final_test_status"] == "reserved"
+    assert {row["split"] for row in result.rows} == {"train", "validation", "test"}
+
+
+def test_validation_rejects_temporal_future_leakage() -> None:
+    rows: list[dict[str, object]] = [
+        {
+            column: 0
+            for column in [
+                *FEATURE_COLUMNS,
+                TARGET_COLUMN,
+                "row_usable",
+                "compound",
+                "split",
+                "session_id",
+                "fold_id",
+                "season",
+                "round_number",
+                "event_order",
+                "split_strategy",
+            ]
+        }
+    ]
+    rows[0]["compound"] = "HARD"
+    rows[0]["split"] = "train"
+    rows[0]["event_order"] = 3
+    rows.append({**rows[0], "split": "validation", "event_order": 2})
+
+    with pytest.raises(ValueError, match="future session"):
+        validate_dataset_rows(
+            rows,
+            metadata={
+                "split_strategy": "temporal_expanding",
+                "folds": [
+                    {
+                        "fold_id": 0,
+                        "train_session_ids": ["future"],
+                        "validation_session_ids": ["past"],
+                    }
+                ],
+            },
+        )
+
+
+def test_write_dataset_handles_late_string_values_after_nulls(tmp_path: Path) -> None:
+    rows = [
+        _lap("s1", "bahrain", "VER", "HARD", 90_000, season=2024, round_number=1),
+        _lap("s2", "jeddah", "LEC", "SOFT", 91_000, season=2024, round_number=2),
+    ]
+    result = build_temporal_expanding_dataset(rows, block_size=1)
+    first_row = dict(result.rows[0])
+    second_row = dict(result.rows[1])
+    first_row["missing_reason"] = None
+    second_row["missing_reason"] = "missing_reference"
+    patched = DatasetBuildResult(rows=[*([first_row] * 101), second_row], metadata=result.metadata)
+
+    write_dataset(
+        patched,
+        dataset_path=tmp_path / "dataset.parquet",
+        metadata_path=tmp_path / "dataset.meta.json",
+    )
+
+    assert (tmp_path / "dataset.parquet").exists()
 
 
 def _only_row(

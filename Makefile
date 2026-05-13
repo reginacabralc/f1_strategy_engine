@@ -3,10 +3,12 @@ PIP ?= $(PYTHON) -m pip
 
 .PHONY: install db-up db-wait db-down up down down-v logs ps migrate \
         ingest ingest-monaco ingest-demo validate-demo seed \
+        ingest-ml-races validate-ml-races \
         fit-degradation validate-degradation report-degradation \
         fit-pit-loss validate-pit-loss \
         fit-driver-offsets validate-driver-offsets \
-        build-xgb-dataset validate-xgb-dataset train-xgb validate-xgb-model \
+        build-xgb-dataset validate-xgb-dataset tune-xgb train-xgb validate-xgb-model \
+        plot-xgb-diagnostics \
         replay test test-backend lint demo serve-api
 
 install: .venv/.installed
@@ -66,6 +68,12 @@ validate-demo: install db-wait
 
 seed: ingest-demo
 
+validate-ml-races: install
+	$(PYTHON) scripts/validate_race_manifest.py
+
+ingest-ml-races: install db-wait
+	$(PYTHON) scripts/ingest_race_manifest.py --continue-on-error
+
 fit-degradation: install db-wait
 	$(PYTHON) scripts/fit_degradation.py --all-demo
 
@@ -87,7 +95,7 @@ validate-driver-offsets: install db-wait
 	$(PYTHON) scripts/validate_driver_offsets.py
 
 build-xgb-dataset: install db-wait
-	$(PYTHON) scripts/build_xgb_dataset.py
+	$(PYTHON) scripts/build_xgb_dataset.py --split-strategy $(or $(SPLIT_STRATEGY),temporal_expanding)
 
 validate-xgb-dataset: install
 	$(PYTHON) scripts/validate_xgb_dataset.py
@@ -97,6 +105,12 @@ train-xgb: install
 
 validate-xgb-model: install
 	$(PYTHON) scripts/validate_xgb_model.py
+
+tune-xgb: install
+	$(PYTHON) scripts/tune_xgb.py
+
+plot-xgb-diagnostics: install
+	$(PYTHON) scripts/plot_xgb_diagnostics.py
 
 test: install
 	cd backend && ../$(PYTHON) -m pytest tests/unit -q

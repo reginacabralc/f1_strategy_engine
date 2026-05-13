@@ -16,6 +16,7 @@ from pitwall.ml.train import (
     format_target_distributions,
     train_xgb_model,
 )
+from pitwall.ml.tuning import DEFAULT_TUNING_REPORT_PATH, load_selected_tuning_config
 
 
 def main() -> int:
@@ -24,15 +25,22 @@ def main() -> int:
     parser.add_argument("--dataset-meta", type=Path, default=DEFAULT_DATASET_METADATA_PATH)
     parser.add_argument("--model", type=Path, default=DEFAULT_MODEL_PATH)
     parser.add_argument("--model-meta", type=Path, default=DEFAULT_MODEL_METADATA_PATH)
-    parser.add_argument("--rounds", type=int, default=250)
+    parser.add_argument("--tuning-report", type=Path, default=DEFAULT_TUNING_REPORT_PATH)
+    parser.add_argument("--ignore-tuning-report", action="store_true")
+    parser.add_argument("--rounds", type=int, default=None)
     args = parser.parse_args()
+    selected_config = None if args.ignore_tuning_report else load_selected_tuning_config(args.tuning_report)
+    selected_params = selected_config[0] if selected_config else None
+    selected_rounds = selected_config[1] if selected_config else None
+    num_boost_round = args.rounds or selected_rounds or 250
 
     result = train_xgb_model(
         dataset_path=args.dataset,
         dataset_metadata_path=args.dataset_meta,
         model_path=args.model,
         metadata_path=args.model_meta,
-        num_boost_round=args.rounds,
+        hyperparameters=selected_params,
+        num_boost_round=num_boost_round,
     )
 
     metadata = result.metadata
@@ -59,6 +67,8 @@ def main() -> int:
     print(f"  improvement_vs_zero_mae_ms: {aggregate['improvement_vs_zero_mae_ms']:.1f}")
     print(f"  overfitting_diagnosis: {metadata['overfitting_diagnosis']}")
     print(f"  diagnosis: {metadata['diagnosis']}")
+    if selected_params:
+        print(f"  hyperparameters_source: {args.tuning_report}")
     print()
     print(f"Wrote {result.model_path}")
     print(f"Wrote {result.metadata_path}")

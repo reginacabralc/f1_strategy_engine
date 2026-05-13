@@ -40,6 +40,7 @@ dev = [
     # Test client for FastAPI + tooling for the OpenAPI contract test
     "httpx>=0.27.0",
     "pyyaml>=6.0",
+    "matplotlib>=3.8",
     "types-PyYAML>=6.0",
     "openapi-spec-validator>=0.7",
 ]
