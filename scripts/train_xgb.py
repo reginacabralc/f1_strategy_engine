@@ -1,0 +1,69 @@
+#!/usr/bin/env python
+"""Train the Day 8 native XGBoost pace model."""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+from pitwall.ml.train import (
+    DEFAULT_DATASET_METADATA_PATH,
+    DEFAULT_DATASET_PATH,
+    DEFAULT_MODEL_METADATA_PATH,
+    DEFAULT_MODEL_PATH,
+    format_feature_importances,
+    format_fold_metrics,
+    format_target_distributions,
+    train_xgb_model,
+)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dataset", type=Path, default=DEFAULT_DATASET_PATH)
+    parser.add_argument("--dataset-meta", type=Path, default=DEFAULT_DATASET_METADATA_PATH)
+    parser.add_argument("--model", type=Path, default=DEFAULT_MODEL_PATH)
+    parser.add_argument("--model-meta", type=Path, default=DEFAULT_MODEL_METADATA_PATH)
+    parser.add_argument("--rounds", type=int, default=250)
+    args = parser.parse_args()
+
+    result = train_xgb_model(
+        dataset_path=args.dataset,
+        dataset_metadata_path=args.dataset_meta,
+        model_path=args.model,
+        metadata_path=args.model_meta,
+        num_boost_round=args.rounds,
+    )
+
+    metadata = result.metadata
+    print("fold diagnostics:")
+    print(format_fold_metrics(metadata["fold_metrics"]))
+    print()
+    print("holdout target distributions:")
+    print(format_target_distributions(metadata["fold_metrics"]))
+    print()
+    print("top feature importances by gain:")
+    print(format_feature_importances(metadata["top_feature_importances"]))
+    aggregate = metadata["aggregate_metrics"]
+    print()
+    print("aggregate:")
+    print(f"  rows: {aggregate['holdout_rows']}")
+    print(f"  train_mae_ms: {aggregate['train_mae_ms']:.1f}")
+    print(f"  train_rmse_ms: {aggregate['train_rmse_ms']:.1f}")
+    print(f"  train_r2: {aggregate['train_r2']:.3f}")
+    print(f"  holdout_mae_ms: {aggregate['holdout_mae_ms']:.1f}")
+    print(f"  holdout_rmse_ms: {aggregate['holdout_rmse_ms']:.1f}")
+    print(f"  holdout_r2: {aggregate['holdout_r2']:.3f}")
+    print(f"  zero_holdout_mae_ms: {aggregate['zero_holdout_mae_ms']:.1f}")
+    print(f"  train_mean_holdout_mae_ms: {aggregate['train_mean_holdout_mae_ms']:.1f}")
+    print(f"  improvement_vs_zero_mae_ms: {aggregate['improvement_vs_zero_mae_ms']:.1f}")
+    print(f"  overfitting_diagnosis: {metadata['overfitting_diagnosis']}")
+    print(f"  diagnosis: {metadata['diagnosis']}")
+    print()
+    print(f"Wrote {result.model_path}")
+    print(f"Wrote {result.metadata_path}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

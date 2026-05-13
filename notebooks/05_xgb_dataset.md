@@ -151,6 +151,12 @@ V1 includes only:
 - no pit-loss columns exist,
 - dry compounds and clean-lap filters are respected.
 
+## Day 8 Training Handoff
+
+The Day 8 training report is `notebooks/06_xgb_training.md`. It uses this
+dataset unchanged, trains native `xgboost.Booster` fold models plus one final
+all-data model, and reports the real zero-delta baseline comparison.
+
 ## V2 Improvements
 
 - ingest more races and seasons,

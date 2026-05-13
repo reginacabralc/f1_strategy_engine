@@ -64,7 +64,7 @@ PitWall es un sistema event-driven con un único proceso backend (FastAPI + asyn
 |---|------------|----------|-------|-------|
 | 1 | Ingestor histórico | Python (Polars + FastF1) | Stream A | CLI scripts; carga 2024 a TimescaleDB |
 | 2 | Degradation fit (scipy) | Python | Stream A | Cuadrática por (circuito × compuesto) |
-| 3 | XGBoost trainer | Python | Stream A | Dataset LORO con target `lap_time_delta_ms`; serializa a JSON; metadata en DB |
+| 3 | XGBoost trainer | Python | Stream A | Dataset LORO con target `lap_time_delta_ms`; serializa Booster JSON + sidecar metadata |
 | 4 | RaceFeed interface | Python (abstract) | Stream B | Contrato común para replay y futuro live |
 | 5 | ReplayFeed | Python (asyncio) | Stream B | Lee DB, emite eventos al ritmo del factor |
 | 6 | OpenF1Feed (stub V1) | Python | Stream B | Implementación dummy; real en V2 |
@@ -177,6 +177,32 @@ Reglas:
 - `api/` **no importa** de `feeds/` directamente. Lee del estado in-memory del engine.
 
 ## 7. Tamaños esperados
+
+### XGBoost training baseline
+
+Stream A Day 8 trains two kinds of models from the Day 7 pace dataset:
+
+- Fold models: one native `xgboost.Booster` per leave-one-race-out fold, used
+  only for evaluation.
+- Final model: one native `xgboost.Booster` trained on all usable rows and
+  written to `models/xgb_pace_v1.json` with metadata in
+  `models/xgb_pace_v1.meta.json`.
+
+The model target is `lap_time_delta_ms`, not raw lap time. Categorical
+features (`circuit_id`, `compound`, `driver_code`, `team_code`) are one-hot
+encoded with `UNKNOWN` for missing/unseen values. Numeric missing values are
+left as `NaN` for XGBoost. `session_id` remains a fold/split identifier and is
+not a training feature. Pit loss is intentionally excluded from this lap-level
+pace model; it belongs to Day 9 undercut/backtest decision features.
+
+Current 3-race metrics are functional but weak. Day 8.1 diagnostics show
+sub-second training error (MAE 294.7 ms, R² 0.943) but poor holdout error
+(MAE 7,396.0 ms, R² -0.080). With only Bahrain, Monaco, and Hungary, LORO is
+effectively leave-one-circuit-out, so target/reference shift dominates. The
+model barely improves over the zero-delta baseline and is documented as a
+serialized engineering baseline, not as an accurate pace model. V2 needs 8-10+
+races, ideally repeated circuits across seasons or richer circuit/reference
+descriptors.
 
 | Recurso | Tamaño | Dónde |
 |---------|--------|-------|
