@@ -15,7 +15,7 @@
 | Curva de degradación scipy ajustada | ✅ | Día 5 | Stream A — functional baseline persisted and reported; R² remains below target |
 | Motor undercut V1 con `ScipyPredictor` | ⏳ | Día 5 | Stream B |
 | Pipeline end-to-end con datos reales | ⏳ | Día 7 | Todos |
-| **XGBoost entrenado y serializado** | ⏳ | Día 8 | Stream A |
+| **XGBoost entrenado y serializado** | ✅ | Día 8 | Stream A — native Booster trained, serialized, and validated; weak 3-race holdout metrics documented |
 | **Backtest comparativo scipy vs XGBoost** | ⏳ | Día 9 | Stream A+B |
 | Demo end-to-end probada en limpio | ⏳ | Día 10 | Todos |
 
@@ -244,7 +244,25 @@
 - [ ] Stream D: Dockerfile frontend + nginx prod.
 
 ### Día 8
-- [ ] **Stream A: XGBoost entrenado, serializado, métricas reportadas.**
+- [x] **Stream A: XGBoost entrenado, serializado, métricas reportadas.**
+  Added `backend/src/pitwall/ml/train.py`, `scripts/train_xgb.py`,
+  `scripts/validate_xgb_model.py`, `make train-xgb`, and
+  `make validate-xgb-model`. The trainer uses native `xgboost.Booster`,
+  one-hot encoding for categorical features, explicit UNKNOWN handling,
+  leave-one-race-out fold models for evaluation, and one final all-data
+  runtime/demo model. Artifacts are gitignored:
+  `models/xgb_pace_v1.json` and `models/xgb_pace_v1.meta.json`.
+  Day 8.1 diagnostic refinement adds train-vs-holdout metrics, holdout target
+  distributions, train-mean baseline, feature-gain importances, and explicit
+  metadata diagnosis. Latest run on the 3 demo races: 10,509 dataset rows,
+  3,503 unique holdout rows across folds, 57 encoded features. Aggregate train
+  MAE/R²: 294.7 ms / 0.943. Aggregate holdout MAE/R²: 7,396.0 ms / -0.080.
+  Zero-delta holdout MAE: 7,432.5 ms; train-mean holdout MAE: 7,423.2 ms.
+  The model only improves aggregate MAE by 36.6 ms and Monaco remains worse
+  than zero. Diagnosis: engineering-complete training pipeline, but weak
+  holdout generalization on a 3-race split that is effectively
+  leave-one-circuit-out. No evidence of a training/serialization bug; the
+  limitation is data/reference coverage. Scipy comparison is deferred to Day 9.
 - [x] **Stream B**: edge cases (SC/VSC/rain), `XGBoostPredictor` cargable.
   SC/VSC: `_on_lap_complete()` checks `track_status` — SC/VSC broadcasts
   `SUSPENDED_SC`/`SUSPENDED_VSC` and skips pair evaluation; GREEN evaluates normally.

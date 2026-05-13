@@ -6,7 +6,7 @@ PIP ?= $(PYTHON) -m pip
         fit-degradation validate-degradation report-degradation \
         fit-pit-loss validate-pit-loss \
         fit-driver-offsets validate-driver-offsets \
-        build-xgb-dataset validate-xgb-dataset \
+        build-xgb-dataset validate-xgb-dataset train-xgb validate-xgb-model \
         replay test test-backend lint demo serve-api
 
 install: .venv/.installed
@@ -91,6 +91,12 @@ build-xgb-dataset: install db-wait
 
 validate-xgb-dataset: install
 	$(PYTHON) scripts/validate_xgb_dataset.py
+
+train-xgb: install
+	$(PYTHON) scripts/train_xgb.py
+
+validate-xgb-model: install
+	$(PYTHON) scripts/validate_xgb_model.py
 
 test: install
 	cd backend && ../$(PYTHON) -m pytest tests/unit -q

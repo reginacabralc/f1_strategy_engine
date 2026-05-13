@@ -198,12 +198,36 @@ docs/adr/0009-xgboost-vs-scipy-resultados.md
   - Pit loss queda fuera del dataset de pace; se reserva para Day 9.
 
 ### Día 8 — Entrenamiento XGBoost (E10) ⭐
-- [ ] `backend/src/pitwall/ml/train_xgb.py`.
-- [ ] Hiperparámetros fijos: `max_depth=5, n_estimators=400, lr=0.05, early_stopping=20`.
-- [ ] Persistir modelo a `models/xgb_pace_v1.json`.
+- [x] `backend/src/pitwall/ml/train.py`.
+  - Usa `xgboost.Booster` nativo, no `XGBRegressor`, para mantener
+    compatibilidad con `XGBoostPredictor.from_file()`.
+  - Entrena modelos fold leave-one-race-out para evaluación y un modelo final
+    entrenado con todas las filas usables.
+- [x] Hiperparámetros conservadores iniciales.
+  - `objective=reg:squarederror`, `max_depth=4`, `eta=0.08`,
+    `subsample=0.9`, `colsample_bytree=0.9`, `num_boost_round=250`.
+  - No hay tuning agresivo todavía.
+- [x] Persistir modelo a `models/xgb_pace_v1.json`.
+  - Metadata sidecar: `models/xgb_pace_v1.meta.json`.
+  - Ambos artifacts quedan fuera de git.
+- [x] Validación reproducible.
+  - `scripts/train_xgb.py` / `make train-xgb`.
+  - `scripts/validate_xgb_model.py` / `make validate-xgb-model`.
+  - La validación carga el Booster, carga `XGBoostPredictor.from_file()`,
+    predice valores finitos sobre una muestra y rechaza features de pit loss.
+- [x] Reporte `notebooks/06_xgb_training.md`.
+  - Última métrica real con 3 demos: XGB MAE 7,396.0 ms, RMSE 9,209.6 ms,
+    R² -0.080 vs zero-delta MAE 7,432.5 ms.
+  - Day 8.1 agrega diagnóstico train-vs-holdout, distribución del target,
+    baseline de media del training fold, importancias por gain y campo
+    `diagnosis` en metadata. Resultado: pipeline de entrenamiento funcional,
+    pero señal débil por generalización a circuito no visto con solo 3
+    carreras. No hay evidencia de bug de training/serialization; hace falta
+    más cobertura de datos antes de tunear. Comparación scipy queda para Day 9.
 - [ ] Insertar metadata en `model_registry`.
-- [ ] `XGBoostPredictor` que carga modelo al boot.
-- [ ] Notebook `05_xgboost_train_eval.ipynb`.
+  - Diferido: Day 8 usa sidecar JSON porque el runtime actual carga desde
+    filesystem; registrar el modelo en DB puede agregarse en Day 9/10 sin
+    cambiar el artifact.
 
 ### Día 9 — Backtest comparativo (E9 + E10) ⭐
 - [ ] `backend/src/pitwall/engine/backtest.py` con métricas precision/recall/MAE@k.
