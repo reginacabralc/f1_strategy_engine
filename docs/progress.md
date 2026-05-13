@@ -43,6 +43,9 @@
 - [x] **Stream B**: WebSocket message spec finalised in
       `docs/interfaces/websocket_messages.md` (8 server→client types,
       reconnect / heartbeat / backpressure semantics).
+- [x] **Stream C**: dashboard wireframe captured in
+      `docs/frontend_dashboard_wireframe.md`; Day 1 frontend contract checked
+      against Stream B OpenAPI + WebSocket specs.
 - [x] **Stream B**: Replay event format finalised in
       `docs/interfaces/replay_event_format.md` (8 event types,
       ordering guarantees, pacing algorithm).

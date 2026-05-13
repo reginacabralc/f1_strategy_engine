@@ -39,20 +39,23 @@ frontend/
 ## Tareas
 
 ### Día 1 — Kickoff
-- [ ] Esquema visual del dashboard en pizarra/figjam (no necesita ser bonito).
-- [ ] Acordar con B: shape de OpenAPI y WebSocket.
+- [x] Esquema visual del dashboard en pizarra/figjam (no necesita ser bonito).
+      Repo artifact: [`docs/frontend_dashboard_wireframe.md`](../../docs/frontend_dashboard_wireframe.md).
+- [x] Acordar con B: shape de OpenAPI y WebSocket.
+      Confirmed against [`docs/interfaces/openapi_v1.yaml`](../../docs/interfaces/openapi_v1.yaml)
+      and [`docs/interfaces/websocket_messages.md`](../../docs/interfaces/websocket_messages.md).
 
 ### Día 2 — Bootstrap (E8 esqueleto)
-- [ ] `frontend/package.json` con Vite + React + TS + TanStack Query + Tailwind + Recharts.
-- [ ] `vite.config.ts` con proxy a backend en dev.
-- [ ] App esqueleto: layout con header + main.
-- [ ] Hook `useSessions` que llama a `/api/v1/sessions`.
-- [ ] Component `<SessionPicker>` con dropdown.
+- [x] `frontend/package.json` con Vite + React + TS + TanStack Query + Tailwind + Recharts.
+- [x] `vite.config.ts` con proxy a backend en dev.
+- [x] App esqueleto: layout con header + main.
+- [x] Hook `useSessions` que llama a `/api/v1/sessions`.
+- [x] Component `<SessionPicker>` con dropdown.
 
 ### Día 3 — Tabla mock (E8)
-- [ ] Component `<RaceTable>` con datos mock estáticos en JSON.
+- [x] Component `<RaceTable>` con datos mock estáticos en JSON.
   - Columnas: Pos, Driver, Team, Gap, Compound, Tyre Age, Score (barra de color).
-- [ ] Layout responsive básico (móvil OK pero no prioritario).
+- [x] Layout responsive básico (móvil OK pero no prioritario).
 
 ### Día 4 — Cliente API + WS skeleton (E8)
 - [ ] `api/client.ts` con `fetch` tipado.

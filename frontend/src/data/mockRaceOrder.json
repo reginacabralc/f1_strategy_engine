@@ -1,0 +1,62 @@
+[
+  {
+    "driver_code": "VER",
+    "team_code": "Red Bull",
+    "position": 1,
+    "gap_to_leader_ms": 0,
+    "gap_to_ahead_ms": null,
+    "last_lap_ms": 92450,
+    "compound": "MEDIUM",
+    "tyre_age": 12,
+    "is_in_pit": false,
+    "is_lapped": false,
+    "last_pit_lap": 15,
+    "stint_number": 2,
+    "undercut_score": 0.15
+  },
+  {
+    "driver_code": "LEC",
+    "team_code": "Ferrari",
+    "position": 2,
+    "gap_to_leader_ms": 3200,
+    "gap_to_ahead_ms": 3200,
+    "last_lap_ms": 92810,
+    "compound": "MEDIUM",
+    "tyre_age": 14,
+    "is_in_pit": false,
+    "is_lapped": false,
+    "last_pit_lap": 13,
+    "stint_number": 2,
+    "undercut_score": 0.72
+  },
+  {
+    "driver_code": "SAI",
+    "team_code": "Ferrari",
+    "position": 3,
+    "gap_to_leader_ms": 5900,
+    "gap_to_ahead_ms": 2700,
+    "last_lap_ms": 93020,
+    "compound": "HARD",
+    "tyre_age": 8,
+    "is_in_pit": false,
+    "is_lapped": false,
+    "last_pit_lap": 19,
+    "stint_number": 2,
+    "undercut_score": 0.38
+  },
+  {
+    "driver_code": "HAM",
+    "team_code": "Mercedes",
+    "position": 4,
+    "gap_to_leader_ms": 9100,
+    "gap_to_ahead_ms": 3200,
+    "last_lap_ms": 93400,
+    "compound": "SOFT",
+    "tyre_age": 6,
+    "is_in_pit": false,
+    "is_lapped": false,
+    "last_pit_lap": 21,
+    "stint_number": 3,
+    "undercut_score": 0.51
+  }
+]
