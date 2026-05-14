@@ -16,6 +16,8 @@
 5. Motor de undercut: pares relevantes, scoring, alertas.
 6. FastAPI app: routers REST + WebSocket.
 7. Edge cases: SC, VSC, lluvia, pit reciente, datos faltantes.
+8. Módulo causal explicable de viabilidad de undercut, como capa adicional
+   sobre el motor existente y sin reemplazar `PacePredictor`/XGBoost.
 
 ## Archivos owned
 
@@ -34,6 +36,19 @@ docs/interfaces/replay_event_format.md
 ```
 
 ## Tareas
+
+### Línea nueva — Causal undercut viability module
+
+- [ ] **Stream B implementará el causal undercut viability module** como una
+  capa adicional explicable para responder `undercut_viable = sí/no` por
+  observación `(driver, rival, lap)`, sin reemplazar XGBoost ni el motor
+  heurístico existente.
+- [ ] Plan detallado: [`stream-b-causal-undercut.md`](stream-b-causal-undercut.md).
+- [ ] Gate conceptual antes de código: validar inventario de variables reales,
+  definición operacional de labels históricos, DAG inicial, tratamientos,
+  outcomes, confounders y límites de DoWhy.
+- [ ] Si se agrega `dowhy` como dependencia, escribir ADR mínimo antes de tocar
+  `backend/pyproject.toml`.
 
 ### Day 1 — Kickoff ✅
 

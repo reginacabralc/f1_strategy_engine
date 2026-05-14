@@ -1,0 +1,483 @@
+# Stream B — Causal undercut viability module
+
+> Owner: Stream B. Inputs: Stream A data/ML artifacts. Consumers: engine/API/WS and later Stream C explanations.
+> Status: conceptual plan. No implementation until labels and data assumptions are validated.
+
+## Goal
+
+Add an explainable causal layer for:
+
+```text
+undercut_viable = yes/no
+```
+
+The unit of observation is `(session_id, attacker_driver, rival_driver, lap_number)`.
+This module does not replace `ScipyPredictor`, `XGBoostPredictor`, or
+`evaluate_undercut()`. It sits beside the existing undercut engine to explain
+why a live pair looks viable or not, and to run offline causal analyses with
+DoWhy.
+
+## Decision Locked
+
+We will implement the causal graph module as an **independent alternative**
+to compare against the current XGBoost path.
+
+Explicit decisions:
+
+- XGBoost is **not required** to build the causal graph.
+- XGBoost must **not define** the DAG edges, treatments, outcomes, or
+  confounders.
+- The DAG is built from motorsport/domain assumptions and variables available
+  in PitWall data.
+- The first causal MVP should use transparent, auditable inputs:
+  `ScipyPredictor`, degradation coefficients, pit-loss estimates, reconstructed
+  gaps, tyre deltas, race phase, weather, and traffic proxies.
+- XGBoost may later be used only as an optional pace-estimation variant inside
+  a node such as `expected_pace`, never as the source of causal structure.
+- The comparison target is:
+
+```text
+Scipy undercut engine   vs   XGBoost undercut engine   vs   Causal graph module
+```
+
+The reason for this separation is important: current XGBoost holdout metrics are
+weak on the three-race demo set, so the causal graph module should not inherit
+XGBoost errors. The causal module should provide a second, explainable decision
+path for `undercut_viable`, not a wrapper around the current ML model.
+
+## Why This Belongs To Stream B
+
+Stream B owns the replay loop, `RaceState`, relevant-pair selection, undercut
+scoring, alerts, FastAPI, and WebSocket. The causal module is a decision/explainability
+layer over a live driver-rival-lap observation, so Stream B owns implementation.
+Stream A remains the provider of historical lap data, degradation coefficients,
+pit-loss estimates, and XGBoost pace artifacts.
+
+## Non-Goals
+
+- Do not replace XGBoost or `PacePredictor`.
+- Do not use XGBoost to construct the causal graph.
+- Do not make XGBoost a mandatory dependency of the causal MVP.
+- Do not use DoWhy as a classifier.
+- Do not treat feature importance as causal evidence.
+- Do not add new endpoints, WebSocket fields, DB schema, or dependencies until
+  the data/label design is accepted.
+- Do not use variables that are only known after the decision as live features.
+
+## Current Data Audit
+
+Available in schema / runtime:
+
+- `laps`: lap time, sectors, compound, tyre age, pit-in/out flags, validity,
+  track status, position, optional gaps, timestamp.
+- `stints`: reconstructed stint number, compound, lap range, tyre age at start.
+- `weather`: track temp, air temp, humidity, rainfall.
+- `pit_stops`: pit lap, duration when available, new compound, optional pit loss.
+- `degradation_coefficients`: quadratic degradation by `(circuit_id, compound)`.
+- `pit_loss_estimates`: pit loss by circuit/team plus circuit/global fallback.
+- `driver_skill_offsets`: persisted driver pace offsets.
+- `RaceState`: live position, smoothed gap-to-ahead, last lap, compound, tyre
+  age, stint number, laps in stint, pit status, track status, weather.
+- `evaluate_undercut()`: projected gain, score, confidence, pit loss, current gap.
+
+Important gaps:
+
+- FastF1 lap cache has lap/sector/compound/tyre/track-status/position/weather
+  columns, but not direct `gap_to_leader_ms` or `gap_to_ahead_ms`.
+- The schema and engine support gaps, but current ingestion does not derive
+  them. A causal MVP must either derive cumulative gaps from timing data or
+  limit itself to sessions where gaps are populated.
+- `OpenF1Feed` is a V2 stub. Live in V1 means replayed historical FastF1.
+- `known_undercuts` exists in schema, but curated rows and backtest runner are
+  not implemented yet.
+- DoWhy is not currently a backend dependency; adding it requires an ADR.
+
+## Variable Inventory
+
+### Available Now
+
+- `session_id`, `season`, `circuit_id`, `lap_number`, `total_laps`
+- `position`, `lap_time_ms`, `sector_1_ms`, `sector_2_ms`, `sector_3_ms`
+- `compound`, `tyre_age`, `stint_number`, `laps_in_stint`
+- `is_pit_in`, `is_pit_out`, `is_valid`, `track_status`
+- `track_temp_c`, `air_temp_c`, `humidity_pct`, `rainfall`
+- `pit_loss_ms` from `pit_loss_estimates` fallback lookup
+- `degradation_estimate` through `PacePredictor` / degradation coefficients
+- `driver_pace_offset_ms` from `driver_skill_offsets` when fitted
+- `undercut_score`, `estimated_gain_ms`, `confidence` from `evaluate_undercut()`
+
+### Derivable Now
+
+- `laps_remaining = total_laps - lap_number`
+- `race_phase` / `race_progress`
+- `fuel_proxy = 1 - lap_number / total_laps`
+- `current_gap_to_car_ahead` and `gap_to_rival`, if cumulative elapsed times are
+  reconstructed from lap timing data
+- `current_gap_to_car_behind`, if field order and cumulative gaps are reconstructed
+- `tyre_age_delta = defender.tyre_age - attacker.tyre_age`
+- `fresh_tyre_advantage` from projected defender worn pace minus attacker fresh pace
+- `projected_gain_if_pit_now`, `projected_gap_after_pit`,
+  `required_gain_to_clear_rival`
+- `undercut_window_open` from break-even within `K_MAX`
+- `traffic_after_pit` / `clean_air_potential` as coarse proxies from projected
+  pit-exit position against reconstructed field gaps
+- `field_spread` from reconstructed gaps
+- `number_of_pit_stops_already` from `stint_number - 1`
+- `safety_car_status`, `virtual_safety_car_status`, `yellow_flag` from
+  `track_status`
+
+### Ideal Future
+
+- True live OpenF1 intervals/gaps and pit-out traffic at sub-lap resolution
+- Overtake difficulty by circuit/DRS/train context
+- Teammate and team strategy context
+- Remaining tyre sets / compound availability
+- Mandatory compound rule status beyond simple dry-compound inference
+- Rival likely pit window learned from strategy history
+- Real dirty-air / DRS / ERS / car-damage telemetry
+- Robust multi-season known-undercut labels
+
+### Not Recommended As Live Causal Inputs
+
+- `pit_now` as a feature for `undercut_viable` because it is downstream of the
+  viability assessment and team choice.
+- `pit_decision` as a feature because it is the system recommendation.
+- `undercut_success` as a feature because it is future outcome.
+- Final classification, final gaps, post-race positions, or future pit laps.
+- XGBoost feature importance as a substitute for causal effect.
+
+## Causal Problem Definition
+
+- Unit: `driver-rival-lap`.
+- Main decision target: `undercut_viable`.
+- Operational definition: undercut is viable on lap `t` if the attacker, by
+  pitting now against the relevant rival, has a documented and model-supported
+  opportunity to gain the pit cycle before the rival stops or within a short
+  window `N` laps, after pit loss, current gap, cold-tyre penalty, traffic proxy,
+  track status, and confidence gates.
+- Recommendation output: `pit_decision`, derived after viability and other
+  strategy constraints; never the causal target.
+
+Treatment candidates:
+
+- `fresh_tyre_advantage`
+- `gap_to_rival`
+- `traffic_after_pit`
+- `tyre_age_delta`
+- `pit_now`, only for observed historical effect on `undercut_success`
+
+Outcome candidates:
+
+- `undercut_viable` for explaining modeled viability.
+- `undercut_success_within_n_laps` for executed stops.
+- `position_gain_after_pit_window`.
+- `gap_delta_to_rival_after_pit_window`.
+
+Confounders:
+
+- `circuit_id`, `race_phase`, `lap_number`, `laps_remaining`
+- `track_temp_c`, `air_temp_c`, `rainfall`, `track_status`
+- attacker/rival tyre compound and age
+- attacker/rival pace/degradation estimates
+- current position, gap, field spread, traffic proxy
+- pit loss estimate
+
+## Initial DAG
+
+```text
+circuit_id -> pit_loss_estimate
+circuit_id -> overtake_difficulty_proxy
+circuit_id -> degradation_estimate
+
+track_temp_c -> degradation_estimate
+air_temp_c -> degradation_estimate
+rainfall -> track_status
+track_status -> undercut_viable
+
+tyre_compound -> degradation_estimate
+tyre_age -> degradation_estimate
+degradation_estimate -> current_pace
+
+rival_tyre_compound -> rival_degradation_estimate
+rival_tyre_age -> rival_degradation_estimate
+rival_degradation_estimate -> rival_expected_pace
+
+current_pace -> fresh_tyre_advantage
+rival_expected_pace -> fresh_tyre_advantage
+tyre_age_delta -> fresh_tyre_advantage
+
+gap_to_rival -> projected_gap_after_pit
+pit_loss_estimate -> projected_gap_after_pit
+traffic_after_pit -> projected_gain_if_pit_now
+fresh_tyre_advantage -> projected_gain_if_pit_now
+
+projected_gap_after_pit -> undercut_viable
+projected_gain_if_pit_now -> undercut_viable
+required_gain_to_clear_rival -> undercut_viable
+laps_until_rival_expected_pit -> undercut_viable
+laps_remaining -> undercut_viable
+race_phase -> undercut_viable
+
+undercut_viable -> pit_decision
+pit_decision -> pit_now
+pit_now -> undercut_success
+```
+
+Modeling caveat: when `undercut_viable` is a proxy produced by the existing
+projector, causal estimates into that label explain the projectors assumptions,
+not objective F1 truth. For observed causal effect of actually pitting, use
+`pit_now -> undercut_success` with confounder adjustment.
+
+## Historical Label Design
+
+For each eligible `driver-rival-lap`:
+
+1. Build attacker/rival pair from current race order. MVP uses consecutive
+   ahead/behind pairs; later allow strategic rivals within a configurable gap.
+2. Reconstruct or load current gap and field gaps.
+3. Lookup pit loss for attacker circuit/team.
+4. Project attacker fresh-tyre pace and rival worn-tyre pace for `N = 3..5`.
+5. Estimate pit-exit position and traffic proxy.
+6. Define `undercut_viable_label = 1` if projected gain clears:
+
+```text
+projected_gain_if_pit_now >= pit_loss + gap_to_rival + safety_margin
+```
+
+   within the window, with green-track, dry-compound, non-stale data, and
+   confidence gates.
+7. Mark this label as `proxy_modeled`, not observed causal truth.
+
+For laps where the attacker actually pitted:
+
+1. `pit_now = 1`.
+2. Observe `undercut_success` over the next `N` laps or until both cars complete
+   the pit cycle.
+3. Success if the attacker exits ahead of the rival, gains net position versus
+   the rival after the exchange, or improves gap by a documented threshold.
+
+For laps where the attacker did not pit:
+
+- `pit_now = 0`.
+- `undercut_success` is unobserved/censored.
+- `undercut_viable_label` can still be computed as a proxy with the projector,
+  but must not be treated as observed causal success.
+
+## DoWhy Use
+
+DoWhy should be used offline to formalize assumptions and estimate selected
+effects, not to make the primary live classification.
+
+MVP analyses:
+
+- `treatment='fresh_tyre_advantage'`, `outcome='undercut_viable'`
+- `treatment='gap_to_rival'`, `outcome='undercut_viable'`
+- `treatment='traffic_after_pit'`, `outcome='undercut_viable'`
+- `treatment='pit_now'`, `outcome='undercut_success'` only on executed/censored
+  historical pit opportunities
+
+Methods:
+
+- `backdoor.linear_regression` for continuous treatment prototypes.
+- Propensity score matching/stratification for binary `pit_now`.
+- For binary outcomes, document the limitation of linear probability estimates
+  or use compatible logistic/statistical estimators where supported.
+
+Refuters:
+
+- random common cause
+- placebo treatment
+- data subset refuter
+
+## Predictor Independence And Comparison
+
+The causal module should support predictor/source variants, but the MVP default
+is the independent transparent path:
+
+```text
+causal_scipy:
+  expected_pace_source = ScipyPredictor / degradation_coefficients
+  undercut_viable = DAG-informed rule + documented thresholds
+  explanation = causal factors from the graph
+
+causal_xgb_later:
+  expected_pace_source = XGBoostPredictor
+  undercut_viable = same DAG-informed rule
+  status = optional comparison only after XGBoost runtime prediction is reliable
+```
+
+The first comparison should report:
+
+- `scipy_engine`: existing `evaluate_undercut()` with `ScipyPredictor`.
+- `xgb_engine`: existing `evaluate_undercut()` with `XGBoostPredictor`, only
+  once runtime prediction is implemented.
+- `causal_scipy`: causal graph module using transparent pace/degradation inputs.
+
+Metrics:
+
+- precision, recall, F1 against curated historical undercuts when available,
+- lead time in laps,
+- false positives/false negatives by circuit and race phase,
+- agreement/disagreement table between `scipy_engine`, `xgb_engine`, and
+  `causal_scipy`,
+- explanation sanity checks for top causal factors.
+
+If curated undercuts are still missing, compare first against proxy
+`undercut_viable_label` and label the result explicitly as proxy evaluation, not
+ground truth.
+
+## Live Use
+
+On each `lap_complete`, build a `driver-rival-lap` observation for every relevant
+pair. The live module may produce:
+
+```text
+undercut_viable: bool
+causal_explanation: list[str]
+support_level: "strong" | "weak" | "insufficient"
+top_factors: gap_to_rival, fresh_tyre_advantage, traffic_after_pit, tyre_age_delta
+```
+
+Example explanation:
+
+```text
+Undercut viable because gap_to_rival is inside the pit-loss-adjusted window,
+fresh_tyre_advantage is high, rival tyre age is high, and projected pit-exit
+traffic is low.
+```
+
+Live language must be careful: say "consistent with the causal model" or
+"model-supported" unless the historical refutation tests support stronger claims.
+
+## Proposed Future Files
+
+```text
+backend/src/pitwall/causal/
+  __init__.py
+  graph.py
+  dataset_builder.py
+  labels.py
+  estimators.py
+  live_inference.py
+  explain.py
+
+backend/tests/unit/causal/
+  test_causal_dataset.py
+  test_causal_graph.py
+  test_undercut_labels.py
+
+docs/CAUSAL_MODEL.md
+```
+
+Do not add these files until the conceptual gate is accepted.
+
+## Phased Plan
+
+### Phase 1 — Repo/Data Audit
+
+- [x] Read current plans, docs, schema, replay, engine, XGBoost, degradation,
+  pit-loss, frontend surface, and generated data locations.
+- [ ] Verify in a running DB whether demo sessions have non-null gap fields.
+- [ ] If gaps are null, define the gap reconstruction task before causal labels.
+
+### Phase 2 — Variable Inventory And Assumptions
+
+- [ ] Freeze a table of variables with status: `available_now`,
+  `derivable_now`, `ideal_future`, `not_recommended`.
+- [ ] Explicitly document historical vs live availability.
+- [ ] Document leakage rules for pair-level causal data.
+
+### Phase 3 — Historical Driver-Rival-Lap Dataset
+
+- [ ] Build offline dataset rows from `laps`, `stints`, `weather`,
+  `pit_loss_estimates`, `degradation_coefficients`, and `driver_skill_offsets`.
+- [ ] Start with consecutive race-order rivals only.
+- [ ] Include source/confidence flags for derived gaps and proxy labels.
+
+### Phase 4 — Label Construction
+
+- [ ] Implement and test `undercut_viable_label` as a documented proxy.
+- [ ] Implement and test `undercut_success` only for executed pit cycles.
+- [ ] Keep censored/unobserved outcomes explicit.
+
+### Phase 5 — DAG Documentation
+
+- [ ] Encode the initial DAG in DOT/GML/string.
+- [ ] Document every edge and confounder in `docs/CAUSAL_MODEL.md`.
+- [ ] Mark speculative/future variables as unavailable.
+
+### Phase 6 — DoWhy Prototype
+
+- [ ] Add ADR for `dowhy` dependency.
+- [ ] Create a small reproducible notebook/script over the driver-rival-lap
+  dataset.
+- [ ] Estimate simple effects first; no complex causal ML.
+- [ ] Use the `causal_scipy` path first so results are independent from XGBoost.
+
+### Phase 7 — Refutation Tests
+
+- [ ] Add random common cause refuter.
+- [ ] Add placebo treatment refuter.
+- [ ] Add data subset refuter.
+- [ ] Report when estimates are unstable or unsupported.
+
+### Phase 8 — Live Lap-by-Lap Integration
+
+- [ ] Convert current `RaceState` pair into causal observation.
+- [ ] Reuse `evaluate_undercut()` projections rather than duplicating math.
+- [ ] Keep causal live inference behind a separate module/output so it can be
+  compared against XGBoost instead of depending on it.
+- [ ] Return explainability metadata without changing alert semantics first.
+
+### Phase 9 — Explainability Output
+
+- [ ] Produce compact human-readable explanations.
+- [ ] Add confidence/support wording.
+- [ ] Later coordinate with Stream C before adding UI/WS fields.
+
+### Phase 10 — Tests And Documentation
+
+- [ ] Unit-test dataset construction, graph shape, label logic, and live
+  observation conversion.
+- [ ] Update `docs/CAUSAL_MODEL.md`.
+- [ ] If API/WS shape changes, update `docs/interfaces/` in the same PR.
+
+## MVP In 2 Days
+
+1. Finish gap audit and reconstruction decision.
+2. Document final variable inventory and DAG.
+3. Build a minimal offline driver-rival-lap dataset for the three demo races.
+4. Generate proxy `undercut_viable_label` using the existing undercut projector.
+5. Run one DoWhy estimand/refuter pair on a small stable treatment, preferably
+   `fresh_tyre_advantage -> undercut_viable`.
+6. Produce the independent `causal_scipy` baseline for comparison against the
+   existing XGBoost path.
+7. Add `docs/CAUSAL_MODEL.md` explaining limitations.
+8. Do not wire live API/WS until the offline labels pass sanity checks.
+
+## Acceptance Criteria
+
+- Clear inventory of available, derivable, future, and rejected variables.
+- Documented DAG.
+- Historical `driver-rival-lap` dataset exists.
+- Explicit definition of decision target, treatment candidates, outcomes, and
+  confounders.
+- DoWhy prototype runs on the dataset.
+- At least one refutation test exists.
+- XGBoost remains in place and is not replaced.
+- XGBoost is not used to construct the DAG.
+- The first causal MVP can run without XGBoost runtime predictions.
+- Results can be compared as `scipy_engine` vs `xgb_engine` vs `causal_scipy`.
+- Live loop can eventually emit a lap-by-lap explanation for `undercut_viable`.
+- Stream B remains the explicit owner in `.claude/plans/stream-b-engine.md`.
+
+## Critical Risks
+
+- If gaps are not populated or reconstructed, `undercut_viable` cannot be
+  labeled honestly.
+- If `undercut_viable` is generated by the same heuristic used in live scoring,
+  causal analysis explains the heuristic, not necessarily real race outcomes.
+- `pit_now` is confounded by team strategy, position, tyres, traffic, and safety
+  car context; naive estimates will be biased.
+- Small data volume (three demo races) makes DoWhy estimates unstable. The MVP
+  should emphasize assumptions, labels, and refuters over numeric certainty.
