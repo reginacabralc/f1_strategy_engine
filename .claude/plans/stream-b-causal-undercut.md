@@ -326,6 +326,85 @@ If curated undercuts are still missing, compare first against proxy
 `undercut_viable_label` and label the result explicitly as proxy evaluation, not
 ground truth.
 
+## Simulation, Prediction, And Explanation
+
+The causal graph module must support three related but distinct capabilities:
+
+### 1. Predict Current Viability
+
+Given the current live/replay observation:
+
+```text
+RaceState + attacker + rival + lap_number
+```
+
+compute:
+
+```text
+undercut_viable = yes/no
+required_gain_ms = pit_loss + gap_to_rival + safety_margin
+projected_gain_ms = projected fresh-tyre advantage minus traffic penalty
+support_level = strong | weak | insufficient
+```
+
+This prediction is not produced by training the graph. It is produced by the
+DAG-informed structural equations and transparent parameters.
+
+### 2. Simulate Counterfactual Scenarios
+
+The module should be able to run "what-if" scenarios by intervening on selected
+variables while holding the rest of the observation fixed. Examples:
+
+```text
+do(pit_now = true)
+do(pit_lap = current_lap + 1)
+do(traffic_after_pit = low)
+do(pit_loss_estimate = pit_loss_estimate + 1000)
+do(fresh_tyre_advantage = fresh_tyre_advantage + 500)
+```
+
+MVP scenarios:
+
+- base case: evaluate current lap as observed,
+- pit now,
+- pit next lap,
+- pit now with high pit-exit traffic,
+- pit now with low pit-exit traffic,
+- pit loss sensitivity `±1000 ms`.
+
+Expected output shape:
+
+```text
+scenario_name
+undercut_viable
+required_gain_ms
+projected_gain_ms
+projected_gap_after_pit
+main_limiting_factor
+```
+
+This is the main strategic value of the causal graph: it can answer "what would
+happen if we changed one condition?", not only "what pattern did a predictor
+learn historically?"
+
+### 3. Explain The Decision
+
+For each prediction or simulation, emit a compact explanation based on the DAG
+nodes that most constrained or enabled viability:
+
+```text
+Undercut viable because gap_to_rival is inside the pit-loss-adjusted window,
+fresh_tyre_advantage is high, rival tyre age is high, and projected pit-exit
+traffic is low.
+```
+
+When data support is weak, say so explicitly:
+
+```text
+Undercut not supported: gap_to_rival is large and projected traffic_after_pit is
+high. Support is weak because gap_to_rival was reconstructed, not observed.
+```
+
 ## Live Use
 
 On each `lap_complete`, build a `driver-rival-lap` observation for every relevant
@@ -334,6 +413,7 @@ pair. The live module may produce:
 ```text
 undercut_viable: bool
 causal_explanation: list[str]
+counterfactuals: list[scenario_result]
 support_level: "strong" | "weak" | "insufficient"
 top_factors: gap_to_rival, fresh_tyre_advantage, traffic_after_pit, tyre_age_delta
 ```
@@ -377,15 +457,28 @@ Do not add these files until the conceptual gate is accepted.
 
 - [x] Read current plans, docs, schema, replay, engine, XGBoost, degradation,
   pit-loss, frontend surface, and generated data locations.
-- [ ] Verify in a running DB whether demo sessions have non-null gap fields.
-- [ ] If gaps are null, define the gap reconstruction task before causal labels.
+- [x] Add reproducible audit command:
+  `make audit-causal-inputs` / `scripts/audit_causal_inputs.py`.
+- [x] Verify in a running DB whether demo sessions have non-null gap fields.
+  Audit result: all three demo sessions have `0` populated `gap_to_leader_ms`
+  rows and `0` populated `gap_to_ahead_ms` rows.
+- [x] Define the gap reconstruction gate before causal labels. If the audit
+  reports `GAP_RECONSTRUCTION_REQUIRED`, Phase 3 must reconstruct cumulative
+  gaps or load another trusted gap source before labels are built.
+- [x] Record current DB artifact readiness. Audit result: raw ingest exists
+  (`3,721` lap rows), but `degradation_coefficients`, `pit_loss_estimates`,
+  `driver_skill_offsets`, and `known_undercuts` are empty in the audited DB
+  volume.
 
 ### Phase 2 — Variable Inventory And Assumptions
 
-- [ ] Freeze a table of variables with status: `available_now`,
-  `derivable_now`, `ideal_future`, `not_recommended`.
-- [ ] Explicitly document historical vs live availability.
-- [ ] Document leakage rules for pair-level causal data.
+- [x] Freeze a table of variables with status: `available_now`,
+  `derivable_now`, `ideal_future`, `not_recommended` in
+  `docs/CAUSAL_MODEL.md`.
+- [x] Explicitly document historical vs live availability in
+  `docs/CAUSAL_MODEL.md`.
+- [x] Document leakage rules for pair-level causal data in
+  `docs/CAUSAL_MODEL.md`.
 
 ### Phase 3 — Historical Driver-Rival-Lap Dataset
 
@@ -427,12 +520,16 @@ Do not add these files until the conceptual gate is accepted.
 - [ ] Reuse `evaluate_undercut()` projections rather than duplicating math.
 - [ ] Keep causal live inference behind a separate module/output so it can be
   compared against XGBoost instead of depending on it.
+- [ ] Produce current-lap `undercut_viable` prediction from structural equations.
+- [ ] Produce counterfactual scenario results for pit-now, pit-next-lap,
+  traffic-high/low, and pit-loss sensitivity.
 - [ ] Return explainability metadata without changing alert semantics first.
 
 ### Phase 9 — Explainability Output
 
 - [ ] Produce compact human-readable explanations.
 - [ ] Add confidence/support wording.
+- [ ] Explain both the base-case prediction and each counterfactual scenario.
 - [ ] Later coordinate with Stream C before adding UI/WS fields.
 
 ### Phase 10 — Tests And Documentation
@@ -452,8 +549,11 @@ Do not add these files until the conceptual gate is accepted.
    `fresh_tyre_advantage -> undercut_viable`.
 6. Produce the independent `causal_scipy` baseline for comparison against the
    existing XGBoost path.
-7. Add `docs/CAUSAL_MODEL.md` explaining limitations.
-8. Do not wire live API/WS until the offline labels pass sanity checks.
+7. Add deterministic simulation outputs for base case, pit-now,
+   pit-next-lap, traffic-high/low, and pit-loss sensitivity.
+8. Add explanations for prediction and simulations.
+9. Add `docs/CAUSAL_MODEL.md` explaining limitations.
+10. Do not wire live API/WS until the offline labels pass sanity checks.
 
 ## Acceptance Criteria
 
@@ -468,6 +568,9 @@ Do not add these files until the conceptual gate is accepted.
 - XGBoost is not used to construct the DAG.
 - The first causal MVP can run without XGBoost runtime predictions.
 - Results can be compared as `scipy_engine` vs `xgb_engine` vs `causal_scipy`.
+- The module can predict current-lap `undercut_viable`.
+- The module can simulate documented counterfactual scenarios.
+- The module explains why each base-case or simulated result is viable/not viable.
 - Live loop can eventually emit a lap-by-lap explanation for `undercut_viable`.
 - Stream B remains the explicit owner in `.claude/plans/stream-b-engine.md`.
 
