@@ -6,7 +6,8 @@ PIP ?= $(PYTHON) -m pip
         fit-degradation validate-degradation report-degradation \
         fit-pit-loss validate-pit-loss \
         fit-driver-offsets validate-driver-offsets \
-        audit-causal-inputs \
+        audit-causal-inputs reconstruct-race-gaps derive-known-undercuts \
+        build-causal-dataset \
         build-xgb-dataset validate-xgb-dataset train-xgb validate-xgb-model \
         replay test test-backend lint demo serve-api
 
@@ -89,6 +90,15 @@ validate-driver-offsets: install db-wait
 
 audit-causal-inputs: install
 	PYTHONPATH=backend/src $(PYTHON) scripts/audit_causal_inputs.py
+
+reconstruct-race-gaps: install
+	PYTHONPATH=backend/src $(PYTHON) scripts/reconstruct_race_gaps.py
+
+derive-known-undercuts: install
+	PYTHONPATH=backend/src $(PYTHON) scripts/derive_known_undercuts.py
+
+build-causal-dataset: install
+	PYTHONPATH=backend/src $(PYTHON) scripts/build_causal_dataset.py
 
 build-xgb-dataset: install db-wait
 	$(PYTHON) scripts/build_xgb_dataset.py

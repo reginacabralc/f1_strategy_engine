@@ -85,12 +85,27 @@ Important gaps:
 - FastF1 lap cache has lap/sector/compound/tyre/track-status/position/weather
   columns, but not direct `gap_to_leader_ms` or `gap_to_ahead_ms`.
 - The schema and engine support gaps, but current ingestion does not derive
-  them. A causal MVP must either derive cumulative gaps from timing data or
-  limit itself to sessions where gaps are populated.
+  them. Stream B added a repeatable FastF1 lap-end timestamp reconstruction
+  command: `make reconstruct-race-gaps`.
 - `OpenF1Feed` is a V2 stub. Live in V1 means replayed historical FastF1.
 - `known_undercuts` exists in schema, but curated rows and backtest runner are
   not implemented yet.
 - DoWhy is not currently a backend dependency; adding it requires an ADR.
+
+Current pre-Phase 3 DB prep status on the local DB volume:
+
+- `gap_to_leader_ms`: populated for 3,717 / 3,721 lap rows.
+- `gap_to_ahead_ms`: populated for 3,512 / 3,721 lap rows.
+- Global `gap_to_ahead_ms` coverage is 94.4%, above the Phase 3 threshold.
+- `degradation_coefficients`: 8 rows fitted.
+- `pit_loss_estimates`: 28 rows fitted.
+- `driver_skill_offsets`: 103 rows fitted and validated.
+- `known_undercuts`: 35 rows auto-derived from observed pit-cycle exchanges
+  (`13` successful, `22` unsuccessful). Human curation can still refine later.
+
+Phase 3 may start from this volume. Every dataset row must still carry gap
+source/confidence flags because the gap source is reconstructed, not direct
+interval telemetry.
 
 ## Variable Inventory
 
@@ -111,9 +126,9 @@ Important gaps:
 - `laps_remaining = total_laps - lap_number`
 - `race_phase` / `race_progress`
 - `fuel_proxy = 1 - lap_number / total_laps`
-- `current_gap_to_car_ahead` and `gap_to_rival`, if cumulative elapsed times are
-  reconstructed from lap timing data
-- `current_gap_to_car_behind`, if field order and cumulative gaps are reconstructed
+- `current_gap_to_car_ahead` and `gap_to_rival`, from reconstructed FastF1
+  lap-end timestamp gaps
+- `current_gap_to_car_behind`, from adjacent field order and reconstructed gaps
 - `tyre_age_delta = defender.tyre_age - attacker.tyre_age`
 - `fresh_tyre_advantage` from projected defender worn pace minus attacker fresh pace
 - `projected_gain_if_pit_now`, `projected_gap_after_pit`,
@@ -463,12 +478,21 @@ Do not add these files until the conceptual gate is accepted.
   Audit result: all three demo sessions have `0` populated `gap_to_leader_ms`
   rows and `0` populated `gap_to_ahead_ms` rows.
 - [x] Define the gap reconstruction gate before causal labels. If the audit
-  reports `GAP_RECONSTRUCTION_REQUIRED`, Phase 3 must reconstruct cumulative
-  gaps or load another trusted gap source before labels are built.
+  reports `GAP_RECONSTRUCTION_REQUIRED`, Phase 3 must reconstruct lap-end
+  timestamp gaps or load another trusted gap source before labels are built.
 - [x] Record current DB artifact readiness. Audit result: raw ingest exists
   (`3,721` lap rows), but `degradation_coefficients`, `pit_loss_estimates`,
   `driver_skill_offsets`, and `known_undercuts` are empty in the audited DB
   volume.
+- [x] Add and run lap-end timestamp gap reconstruction:
+  `make reconstruct-race-gaps`. Final audited coverage:
+  `gap_to_leader_ms=99.9%`, `gap_to_ahead_ms=94.4%`.
+- [x] Fit required pre-Phase 3 artifacts on the same DB volume:
+  `degradation_coefficients=8`, `pit_loss_estimates=28`,
+  `driver_skill_offsets=103`.
+- [x] Add and run observed pit-cycle known-undercut derivation:
+  `make derive-known-undercuts`. Final audited result:
+  `known_undercuts=35` (`13` successful, `22` unsuccessful).
 
 ### Phase 2 — Variable Inventory And Assumptions
 
@@ -482,16 +506,26 @@ Do not add these files until the conceptual gate is accepted.
 
 ### Phase 3 — Historical Driver-Rival-Lap Dataset
 
-- [ ] Build offline dataset rows from `laps`, `stints`, `weather`,
+- [x] Use valid reconstructed `gap_to_ahead_ms` / `gap_to_leader_ms`; keep the
+  small number of missing-position rows explicitly marked as insufficient support.
+- [x] Include `gap_source='reconstructed_fastf1_time'` for lap-line timestamp gaps.
+- [x] Join auto-derived `known_undercuts` only as evaluation/outcome data, never
+  as live input features.
+- [x] Build offline dataset rows from `laps`, `stints`, `weather`,
   `pit_loss_estimates`, `degradation_coefficients`, and `driver_skill_offsets`.
-- [ ] Start with consecutive race-order rivals only.
-- [ ] Include source/confidence flags for derived gaps and proxy labels.
+- [x] Start with consecutive race-order rivals only.
+- [x] Include source/confidence flags for derived gaps and proxy labels.
+- [x] Add repeatable build command: `make build-causal-dataset`.
+  Latest result: `3,512` rows, `3,512` usable rows, `1,026`
+  `undercut_viable=true` rows, and `14` observed success rows.
 
 ### Phase 4 — Label Construction
 
-- [ ] Implement and test `undercut_viable_label` as a documented proxy.
-- [ ] Implement and test `undercut_success` only for executed pit cycles.
-- [ ] Keep censored/unobserved outcomes explicit.
+- [x] Implement and test `undercut_viable_label` as a documented proxy.
+- [x] Implement and test `undercut_success` only for executed pit cycles.
+- [x] Keep censored/unobserved outcomes explicit.
+- [x] Keep XGBoost completely out of causal labels: no XGBoost features,
+  predictions, or feature importances are used.
 
 ### Phase 5 — DAG Documentation
 

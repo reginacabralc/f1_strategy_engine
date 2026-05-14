@@ -183,6 +183,8 @@ def print_label_readiness(artifact_rows: list[dict[str, Any]]) -> None:
         print("- BLOCKED: pit_loss_estimates is empty; run make fit-pit-loss.")
     if counts.get("known_undercuts", 0) == 0:
         print("- NOTE: known_undercuts is empty; success evaluation will be proxy-only.")
+    else:
+        print("- Known undercuts are present; observed pit-cycle success evaluation is available.")
 
 
 def print_table(rows: Iterable[dict[str, Any]], columns: list[str]) -> None:
