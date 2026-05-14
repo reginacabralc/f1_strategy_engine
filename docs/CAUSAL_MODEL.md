@@ -236,6 +236,131 @@ Phase 4 creates:
 The metadata leakage policy explicitly states that XGBoost features,
 predictions, and importances are not used.
 
+## Phase 5 DAG
+
+The initial DAG is encoded in:
+
+```text
+backend/src/pitwall/causal/graph.py
+```
+
+Exports:
+
+- `dag_dot()` for documentation/visualization.
+- `dag_gml()` for DoWhy.
+- `validate_dag()` for acyclic graph validation.
+
+Available treatment candidates:
+
+- `fresh_tyre_advantage_ms`
+- `gap_to_rival_ms`
+- `traffic_after_pit`
+- `tyre_age_delta`
+- `pit_now`
+
+Available outcome candidates:
+
+- `undercut_viable`
+- `undercut_success`
+- `projected_gap_after_pit_ms`
+
+Key confounders:
+
+- `circuit_id`, `lap_number`, `laps_remaining`, `race_phase`
+- `track_status`, `track_temp_c`, `air_temp_c`, `rainfall`
+- `current_position`, `rival_position`, `gap_to_rival_ms`
+- attacker/defender compounds and tyre ages
+- `tyre_age_delta`, `pit_loss_estimate_ms`, `traffic_after_pit`
+
+Initial DOT graph:
+
+```dot
+digraph causal_undercut_viability {
+  "circuit_id" -> "pit_loss_estimate_ms";
+  "circuit_id" -> "attacker_degradation_estimate";
+  "circuit_id" -> "defender_degradation_estimate";
+  "track_temp_c" -> "attacker_degradation_estimate";
+  "track_temp_c" -> "defender_degradation_estimate";
+  "air_temp_c" -> "attacker_degradation_estimate";
+  "air_temp_c" -> "defender_degradation_estimate";
+  "rainfall" -> "track_status";
+  "track_status" -> "undercut_viable";
+  "attacker_compound" -> "attacker_degradation_estimate";
+  "defender_compound" -> "defender_degradation_estimate";
+  "attacker_tyre_age" -> "attacker_degradation_estimate";
+  "defender_tyre_age" -> "defender_degradation_estimate";
+  "tyre_age_delta" -> "fresh_tyre_advantage_ms";
+  "attacker_degradation_estimate" -> "attacker_expected_pace";
+  "defender_degradation_estimate" -> "defender_expected_pace";
+  "attacker_expected_pace" -> "fresh_tyre_advantage_ms";
+  "defender_expected_pace" -> "fresh_tyre_advantage_ms";
+  "fresh_tyre_advantage_ms" -> "projected_gain_if_pit_now_ms";
+  "traffic_after_pit" -> "projected_gain_if_pit_now_ms";
+  "clean_air_potential" -> "projected_gain_if_pit_now_ms";
+  "gap_to_rival_ms" -> "required_gain_to_clear_rival_ms";
+  "pit_loss_estimate_ms" -> "required_gain_to_clear_rival_ms";
+  "required_gain_to_clear_rival_ms" -> "projected_gap_after_pit_ms";
+  "projected_gain_if_pit_now_ms" -> "projected_gap_after_pit_ms";
+  "projected_gap_after_pit_ms" -> "undercut_viable";
+  "required_gain_to_clear_rival_ms" -> "undercut_viable";
+  "projected_gain_if_pit_now_ms" -> "undercut_viable";
+  "laps_remaining" -> "undercut_viable";
+  "race_phase" -> "undercut_viable";
+  "current_position" -> "traffic_after_pit";
+  "rival_position" -> "traffic_after_pit";
+  "gap_to_rival_ms" -> "traffic_after_pit";
+  "undercut_viable" -> "pit_decision";
+  "pit_decision" -> "pit_now";
+  "pit_now" -> "undercut_success";
+}
+```
+
+Speculative/future nodes remain out of the MVP graph and are documented as
+future-only: overtake difficulty, remaining tyre sets, team strategy context,
+real DRS/train context, dirty-air telemetry, and learned rival pit windows.
+
+## Phase 6 DoWhy Prototype
+
+DoWhy is now a declared backend dependency via ADR 0010:
+
+```text
+dowhy>=0.12,<0.14
+```
+
+Repeatable command:
+
+```bash
+make run-causal-dowhy
+```
+
+The prototype reads the Phase 3/4 causal dataset and estimates simple effects
+first:
+
+- treatment `fresh_tyre_advantage_ms`, outcome `undercut_viable`
+- treatment `gap_to_rival_ms`, outcome `undercut_viable`
+- treatment `tyre_age_delta`, outcome `undercut_viable`
+
+Method:
+
+```text
+backdoor.linear_regression
+```
+
+For binary outcomes this is treated as a linear probability estimate. It is a
+diagnostic causal prototype, not the primary classifier and not a replacement
+for XGBoost. Refuters are intentionally left for Phase 7.
+
+Latest local run:
+
+| Treatment | Outcome | Method | Rows | Estimate |
+|-----------|---------|--------|------|----------|
+| `fresh_tyre_advantage_ms` | `undercut_viable` | `backdoor.linear_regression` | 3,512 | 0.000070 |
+| `gap_to_rival_ms` | `undercut_viable` | `backdoor.linear_regression` | 3,512 | -0.000005 |
+| `tyre_age_delta` | `undercut_viable` | `backdoor.linear_regression` | 3,512 | -0.002264 |
+
+Interpretation must stay cautious until Phase 7 refuters run. These are linear
+probability estimates over the three demo races, not classifier metrics.
+
 ## Phase 2 Variable Inventory
 
 ### Available Now
@@ -345,3 +470,5 @@ predictions, and importances are not used.
   Labels must include gap source/confidence flags, and initial observed-success
   evaluation can use auto-derived `known_undercuts`.
 - Phase 3/4 dataset exists and is reproducible with `make build-causal-dataset`.
+- Phase 5 DAG exists in code and is exported as DOT/GML.
+- Phase 6 DoWhy prototype exists and is reproducible with `make run-causal-dowhy`.

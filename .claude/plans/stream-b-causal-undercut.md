@@ -529,17 +529,20 @@ Do not add these files until the conceptual gate is accepted.
 
 ### Phase 5 — DAG Documentation
 
-- [ ] Encode the initial DAG in DOT/GML/string.
-- [ ] Document every edge and confounder in `docs/CAUSAL_MODEL.md`.
-- [ ] Mark speculative/future variables as unavailable.
+- [x] Encode the initial DAG in DOT/GML/string.
+- [x] Document every edge and confounder in `docs/CAUSAL_MODEL.md`.
+- [x] Mark speculative/future variables as unavailable.
+- [x] Add DAG unit tests for export and acyclic validation.
 
 ### Phase 6 — DoWhy Prototype
 
-- [ ] Add ADR for `dowhy` dependency.
-- [ ] Create a small reproducible notebook/script over the driver-rival-lap
+- [x] Add ADR for `dowhy` dependency.
+- [x] Create a small reproducible notebook/script over the driver-rival-lap
   dataset.
-- [ ] Estimate simple effects first; no complex causal ML.
-- [ ] Use the `causal_scipy` path first so results are independent from XGBoost.
+- [x] Estimate simple effects first; no complex causal ML.
+- [x] Use the `causal_scipy` path first so results are independent from XGBoost.
+- [x] Add repeatable command: `make run-causal-dowhy`.
+- [x] Keep binary outcome limitation documented as linear probability estimate.
 
 ### Phase 7 — Refutation Tests
 

@@ -329,6 +329,12 @@
   3,512 usable rows, 1,026 `undercut_viable=true` rows, and 14 observed
   `undercut_success` labels. Metadata records `pace_source=causal_scipy` and states
   XGBoost features/predictions/importances are not used.
+- [x] **Stream B**: causal undercut Phase 5-6 implemented.
+  Added `pitwall.causal.graph` with the domain-authored DAG, DOT/GML exports,
+  treatment/outcome/confounder lists, and acyclic validation tests. Added ADR 0010
+  and persisted `dowhy>=0.12,<0.14` in `backend/pyproject.toml`. Added
+  `pitwall.causal.estimators` and `make run-causal-dowhy` for the first DoWhy
+  prototype over the causal driver-rival-lap dataset. XGBoost remains untouched.
 - [ ] Stream C: copy y branding mínimo, demo polish.
 - [x] **Stream D**: quickstart/runbook corrected to match current implementation.
   README, walkthrough, infra README, runbook, and docker-compose architecture now state
