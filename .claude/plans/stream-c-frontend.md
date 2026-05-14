@@ -58,9 +58,9 @@ frontend/
 - [x] Layout responsive básico (móvil OK pero no prioritario).
 
 ### Día 4 — Cliente API + WS skeleton (E8)
-- [ ] `api/client.ts` con `fetch` tipado.
-- [ ] `api/types.ts` generado de `docs/interfaces/openapi_v1.yaml` con `openapi-typescript`.
-- [ ] `hooks/useRaceFeed.ts` esqueleto con WebSocket reconectable (backoff exponencial).
+- [x] `api/client.ts` con `fetch` tipado.
+- [x] `api/types.ts` generado de `docs/interfaces/openapi_v1.yaml` con `openapi-typescript`.
+- [x] `hooks/useRaceFeed.ts` esqueleto con WebSocket reconectable (backoff exponencial).
 
 ### Día 5 — Chart de degradación (E8)
 - [ ] Component `<DegradationChart>` con Recharts.

@@ -34,8 +34,8 @@ const COMPOUND_STYLES: Record<
   },
 };
 
-function ScoreBar({ score }: { score: number | null }) {
-  if (score === null)
+function ScoreBar({ score }: { score: number | null | undefined }) {
+  if (score == null)
     return <span className="text-pitwall-muted font-mono">—</span>;
   const pct = Math.round(score * 100);
   const color =
@@ -65,8 +65,8 @@ function ScoreBar({ score }: { score: number | null }) {
   );
 }
 
-function msToGap(ms: number | null): string {
-  if (ms === null || ms === 0) return "—";
+function msToGap(ms: number | null | undefined): string {
+  if (ms == null || ms === 0) return "—";
   return `+${(ms / 1000).toFixed(3)}s`;
 }
 

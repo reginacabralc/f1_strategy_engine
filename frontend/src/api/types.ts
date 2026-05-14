@@ -1,51 +1,33 @@
-// Hand-written from docs/interfaces/openapi_v1.yaml
-// TODO: replace with `openapi-typescript` codegen once spec stabilises
+// Generated types live in ./openapi.ts — run `pnpm generate:api` to refresh.
+// This file is the single import target for the rest of the codebase:
+// named re-exports so components don't need to know the openapi.ts structure.
+//
+// Rule: do NOT hand-write types here. If a type is missing, update
+// docs/interfaces/openapi_v1.yaml and regenerate.
 
-export type PredictorName = "scipy" | "xgboost";
+export type { components, paths, operations } from "./openapi";
 
-export type Compound = "SOFT" | "MEDIUM" | "HARD" | "INTER" | "WET";
+import type { components } from "./openapi";
 
-export type TrackStatus =
-  | "GREEN"
-  | "YELLOW"
-  | "SC"
-  | "VSC"
-  | "RED"
-  | "UNKNOWN";
+// --- Scalar enums ---
 
-export interface SessionSummary {
-  session_id: string;
-  circuit_id: string;
-  season: number;
-  round_number: number;
-  date: string;
-  total_laps: number | null;
-}
+export type Compound = components["schemas"]["Compound"];
+export type PredictorName = components["schemas"]["PredictorName"];
+export type TrackStatus = components["schemas"]["TrackStatus"];
+export type AlertType = components["schemas"]["AlertType"];
 
-export interface DriverState {
-  driver_code: string;
-  team_code: string | null;
-  position: number;
-  gap_to_leader_ms: number | null;
-  gap_to_ahead_ms: number | null;
-  last_lap_ms: number | null;
-  compound: Compound;
-  tyre_age: number;
-  is_in_pit: boolean;
-  is_lapped: boolean;
-  last_pit_lap: number | null;
-  stint_number: number;
-  undercut_score: number | null;
-}
+// --- Response/request bodies ---
 
-export interface RaceSnapshot {
-  session_id: string;
-  current_lap: number;
-  track_status: TrackStatus;
-  track_temp_c: number | null;
-  air_temp_c: number | null;
-  humidity_pct: number | null;
-  drivers: DriverState[];
-  active_predictor: PredictorName;
-  last_event_ts: string;
-}
+export type Health = components["schemas"]["Health"];
+export type Problem = components["schemas"]["Problem"];
+export type SessionSummary = components["schemas"]["SessionSummary"];
+export type DriverState = components["schemas"]["DriverState"];
+export type RaceSnapshot = components["schemas"]["RaceSnapshot"];
+export type DegradationCurve = components["schemas"]["DegradationCurve"];
+export type ReplayStartRequest = components["schemas"]["ReplayStartRequest"];
+export type ReplayRun = components["schemas"]["ReplayRun"];
+export type ReplayStopResponse = components["schemas"]["ReplayStopResponse"];
+export type SetPredictorRequest = components["schemas"]["SetPredictorRequest"];
+export type SetPredictorResponse = components["schemas"]["SetPredictorResponse"];
+export type UndercutMatch = components["schemas"]["UndercutMatch"];
+export type BacktestResult = components["schemas"]["BacktestResult"];
