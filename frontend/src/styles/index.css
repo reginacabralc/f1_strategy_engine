@@ -3,7 +3,40 @@
 @tailwind utilities;
 
 @layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    overflow: hidden;
+  }
+
   body {
     @apply bg-pitwall-bg text-pitwall-text;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Thin dark scrollbars throughout */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-pitwall-border-strong rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-pitwall-muted;
+  }
+}
+
+@layer utilities {
+  .panel {
+    @apply bg-pitwall-surface border border-pitwall-border rounded-lg;
+  }
+
+  .label-caps {
+    @apply text-[10px] font-semibold uppercase tracking-[0.12em] text-pitwall-muted;
   }
 }
