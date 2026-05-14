@@ -57,6 +57,7 @@ data/cache/
 data/raw/
 data/processed/
 data/ml/
+data/causal/
 
 # Modelos serializados grandes (regenerables)
 models/*.json

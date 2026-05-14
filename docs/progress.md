@@ -302,6 +302,23 @@
   ScipyPredictor, predictor switching, XGBoostPredictor stub graceful handling, alert
   payload shape, replay_state integration (HTTP + WS). 2 new WS reconnect tests.
   **280 tests (246 unit + 34 contract), ruff clean, mypy clean (90 files).**
+- [x] **Stream B**: causal undercut Phase 1-2 verificada y pre-Phase 3 prep ejecutada.
+  Added `make reconstruct-race-gaps` and `scripts/reconstruct_race_gaps.py` to populate
+  `laps.gap_to_leader_ms` / `gap_to_ahead_ms` from FastF1 lap-end timestamps without a
+  schema change. Local DB volume prep result: gaps populated at 99.9% leader / 94.4% ahead
+  coverage, degradation coefficients=8, pit-loss estimates=28, driver offsets=103.
+  Added `make derive-known-undercuts` to populate observed pit-cycle outcomes without
+  waiting for manual curation. Final local DB volume prep result: `known_undercuts=35`
+  (`13` successful, `22` unsuccessful). Phase 3 is unblocked for `undercut_viable`
+  label construction and initial success/backtest evaluation; labels must still carry
+  source/confidence flags.
+- [x] **Stream B**: causal undercut Phase 3-4 implemented independently from XGBoost.
+  Added `pitwall.causal.dataset_builder`, `pitwall.causal.labels`, and
+  `make build-causal-dataset`. Latest local output:
+  `data/causal/undercut_driver_rival_lap.parquet` with 3,512 driver-rival-lap rows,
+  3,512 usable rows, 1,026 `undercut_viable=true` rows, and 14 observed
+  `undercut_success` labels. Metadata records `pace_source=causal_scipy` and states
+  XGBoost features/predictions/importances are not used.
 - [ ] Stream C: copy y branding mínimo, demo polish.
 - [x] **Stream D**: quickstart/runbook corrected to match current implementation.
   README, walkthrough, infra README, runbook, and docker-compose architecture now state

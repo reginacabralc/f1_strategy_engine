@@ -1,8 +1,8 @@
 # Causal Undercut Viability Model
 
-> Status: Phase 1-2 complete. This document freezes the initial repo/data
-> audit, variable inventory, live/historical availability, leakage rules, and
-> running-DB causal input audit result.
+> Status: Phase 1-4 complete for the independent `causal_scipy` path. This
+> document freezes the repo/data audit, variable inventory, leakage rules,
+> running-DB audit result, and the Phase 3/4 causal dataset and labels.
 
 ## Decision
 
@@ -15,6 +15,11 @@ undercut_viable = yes/no
 It is designed to compare against the existing XGBoost path, not to wrap it.
 XGBoost is not required to build the causal graph, does not define causal edges,
 and is not a dependency of the first causal MVP.
+
+No XGBoost files, model artifacts, feature importances, or predictions are used
+by the causal dataset or labels. The causal path is intentionally implemented
+under `pitwall.causal` so it can be compared against XGBoost without affecting
+the existing ML pipeline.
 
 The first implementation target is:
 
@@ -65,7 +70,7 @@ traffic proxies.
 | OpenF1Feed | Stub only | Future live | Not usable in V1. |
 | Local model files | XGBoost artifacts when trained | Historical/runtime | `models/` currently only has `.gitkeep` in this workspace. |
 
-### Running-DB Audit Result
+### Initial Running-DB Audit Result
 
 The audit was run against the existing project DB volume through a temporary
 Timescale container on `localhost:55432`, because host port `5432` was occupied
@@ -115,7 +120,7 @@ honestly create `undercut_viable` labels until one of these is true:
 
 1. DB audit confirms `gap_to_ahead_ms` is already populated by some existing
    local data path, or
-2. gap reconstruction is implemented from cumulative timing data, or
+2. gap reconstruction is implemented from FastF1 lap-end timing data, or
 3. another trusted gap source is loaded.
 
 The repeatable audit command is:
@@ -127,10 +132,109 @@ make audit-causal-inputs
 It reads whichever database `DATABASE_URL` points to; start the compose DB first
 only when local port `5432` is free, or pass an alternate `DATABASE_URL`.
 
-This report currently says `GAP_RECONSTRUCTION_REQUIRED`, so gap reconstruction
-is a hard prerequisite for Phase 3. The same DB volume also needs
-`make fit-degradation`, `make fit-pit-loss`, and `make fit-driver-offsets` before
-the causal dataset can use pace, pit-loss, and driver-offset inputs.
+This initial report said `GAP_RECONSTRUCTION_REQUIRED`, so gap reconstruction
+was a hard prerequisite for Phase 3. The same DB volume also needed
+`fit_degradation.py --all-demo`, `fit_pit_loss.py`, and
+`fit_driver_offsets.py` before the causal dataset could use pace, pit-loss, and
+driver-offset inputs.
+
+### Pre-Phase 3 DB Prep Result
+
+Stream B added a repeatable reconstruction command:
+
+```bash
+make reconstruct-race-gaps
+```
+
+It updates the existing `laps.gap_to_leader_ms` and `laps.gap_to_ahead_ms`
+columns from FastF1 lap-end timestamps (`laps.ts`, derived from FastF1 `Time`).
+No schema change is required.
+Downstream causal rows must still carry
+`gap_source = "reconstructed_fastf1_time"` because these are not directly
+observed FastF1 interval gaps.
+
+The command was run against the existing project DB volume through the temporary
+Timescale container on `localhost:55432`.
+
+Reconstruction coverage:
+
+| Session | Lap rows | `gap_to_leader_ms` rows | `gap_to_ahead_ms` rows |
+|---------|----------|-------------------------|-----------------------|
+| `bahrain_2024_R` | 1,129 | 1,129 | 1,072 |
+| `hungary_2024_R` | 1,355 | 1,355 | 1,285 |
+| `monaco_2024_R` | 1,237 | 1,233 | 1,155 |
+
+The method uses the lap end timestamp rather than cumulative `lap_time_ms`, so
+missing `LapTime` rows no longer poison later gaps. Rows without race position
+remain `NULL` because the adjacent rival cannot be identified honestly.
+
+The required model artifacts were then fitted on the same DB volume:
+
+| Artifact | Rows after prep | Notes |
+|----------|-----------------|-------|
+| `degradation_coefficients` | 8 | All groups fit with warnings; low R² remains documented. |
+| `pit_loss_estimates` | 28 | Functional median estimates; quality remains weak/noisy on demo data. |
+| `driver_skill_offsets` | 103 | Existing validation reports all persisted offsets as `ok`. |
+| `known_undercuts` | 35 | Auto-derived from observed pit-cycle exchanges; human curation can still refine later. |
+
+Final causal audit decision:
+
+```text
+gap_to_ahead_ms coverage = 94.4%
+gap_to_leader_ms coverage = 99.9%
+```
+
+Therefore Phase 3 is no longer blocked by gap coverage, missing model artifacts,
+or an empty observed pit-cycle table. It must still carry
+`gap_source = "reconstructed_fastf1_time"` because the gaps are derived from
+FastF1 timing rather than direct interval telemetry. `undercut_viable_label`
+remains a proxy-modeled viability label by design, while `known_undercuts`
+provides an auto-derived observed pit-cycle outcome set for initial
+success/backtest evaluation.
+
+## Phase 3-4 Dataset And Labels
+
+The Phase 3/4 builder is independent from `pitwall.ml` and writes regenerable
+artifacts under:
+
+```text
+data/causal/undercut_driver_rival_lap.parquet
+data/causal/undercut_driver_rival_lap.meta.json
+```
+
+Repeatable command:
+
+```bash
+make build-causal-dataset
+```
+
+Latest local DB-volume result:
+
+| Metric | Value |
+|--------|-------|
+| dataset version | `causal_driver_rival_lap_v1` |
+| rows | 3,512 |
+| usable rows | 3,512 |
+| `undercut_viable = true` rows | 1,026 |
+| observed `undercut_success` rows | 14 |
+| gap source | `reconstructed_fastf1_time` |
+| pace source | `causal_scipy` |
+
+Phase 3 builds one row per consecutive race-order `driver-rival-lap` pair using
+only lap-`t` features: current/rival position, reconstructed gap, tyre state,
+stint state, weather, race phase, pit-loss estimate, and transparent
+degradation curves.
+
+Phase 4 creates:
+
+- `undercut_viable`: proxy-modeled with `causal_scipy` structural equations,
+  overridden by observed auto-derived pit-cycle success when an observed label
+  exists for the same `(session, attacker, defender, lap)`.
+- `undercut_success`: observed only when `known_undercuts` has a matching
+  pit-cycle label; otherwise left censored/`NULL`.
+
+The metadata leakage policy explicitly states that XGBoost features,
+predictions, and importances are not used.
 
 ## Phase 2 Variable Inventory
 
@@ -163,7 +267,7 @@ the causal dataset can use pace, pit-loss, and driver-offset inputs.
 | `laps_remaining` | `total_laps - lap_number` | yes | yes | Safe. |
 | `race_phase` | bucketed `lap_number / total_laps` | yes | yes | Confounder. |
 | `fuel_proxy` | `1 - lap_number / total_laps` | yes | yes | Proxy only. |
-| `gap_to_rival` | `gap_to_ahead_ms` or reconstructed cumulative time | conditional | conditional | Hard prerequisite. |
+| `gap_to_rival` | `gap_to_ahead_ms` or reconstructed lap-end timestamp gap | yes | yes | Sufficient coverage after reconstruction; carry source flag. |
 | `current_gap_to_car_ahead` | same as above | conditional | conditional | Must carry source flag. |
 | `current_gap_to_car_behind` | reconstruct from adjacent order | conditional | conditional | Useful for traffic risk. |
 | `tyre_age_delta` | `rival_tyre_age - attacker_tyre_age` | yes | yes | Good treatment candidate. |
@@ -181,7 +285,7 @@ the causal dataset can use pace, pit-loss, and driver-offset inputs.
 
 | Variable | Why useful | Suggested proxy now |
 |----------|------------|---------------------|
-| Live OpenF1 intervals/gaps | Real gap timing without reconstruction | cumulative lap-time reconstruction |
+| Live OpenF1 intervals/gaps | Real gap timing without reconstruction | FastF1 lap-end timestamp reconstruction |
 | Overtake difficulty | Circuit and DRS/train context affects success | `circuit_id` fixed effects |
 | Remaining tyre sets | Strategy feasibility | none reliable in current data |
 | Mandatory compound rule status | Avoid illegal recommendations | dry-compound/stint history heuristic |
@@ -228,11 +332,16 @@ the causal dataset can use pace, pit-loss, and driver-offset inputs.
 
 - Reproducible audit command exists: `make audit-causal-inputs`.
 - Critical gap issue is documented.
+- Gap reconstruction command exists: `make reconstruct-race-gaps`.
 - Variable inventory is frozen with `available_now`, `derivable_now`,
   `ideal_future`, and `not_recommended`.
 - Historical vs replay-live availability is documented.
 - Leakage rules are documented.
-- Running-DB gap coverage has been checked and is zero for all three demo
+- Initial running-DB gap coverage was checked and was zero for all three demo
   sessions.
-- Next implementation phase is blocked on gap reconstruction and model artifact
-  fitting before labels are built.
+- Pre-Phase 3 prep populated reconstructed gaps and fitted degradation,
+  pit-loss, and driver-offset artifacts in the local DB volume.
+- Phase 3 is unblocked for driver-rival-lap `undercut_viable` label construction.
+  Labels must include gap source/confidence flags, and initial observed-success
+  evaluation can use auto-derived `known_undercuts`.
+- Phase 3/4 dataset exists and is reproducible with `make build-causal-dataset`.
