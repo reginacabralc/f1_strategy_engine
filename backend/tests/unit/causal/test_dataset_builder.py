@@ -46,6 +46,10 @@ def _pair_row(**overrides: object) -> dict[str, object]:
         "rainfall": False,
         "pit_now": True,
         "pit_loss_estimate_ms": 10_000,
+        "projected_pit_exit_gap_to_leader_ms": 12_000,
+        "projected_pit_exit_position": 5,
+        "traffic_after_pit_cars": 0,
+        "nearest_traffic_gap_ms": 4_000,
     }
     row.update(overrides)
     return row
@@ -94,6 +98,11 @@ def test_build_causal_dataset_creates_viability_and_success_labels() -> None:
     assert row["gap_source"] == GAP_SOURCE
     assert row["pace_source"] == PACE_SOURCE
     assert row["label_version"] == DATASET_VERSION
+    assert row["projected_pit_exit_position"] == 5
+    assert row["traffic_after_pit_cars"] == 0
+    assert row["traffic_after_pit"] == "low"
+    assert row["clean_air_potential"] == "high"
+    assert row["pace_confidence"] == 0.7
     assert row["undercut_viable"] is True
     assert row["undercut_viable_label_source"] == "observed_auto_derived_pit_cycle_v1"
     assert row["undercut_success"] is True
@@ -112,3 +121,19 @@ def test_build_causal_dataset_marks_unusable_rows_with_reason() -> None:
     assert result.rows[0]["row_usable"] is False
     assert result.rows[0]["undercut_viable"] is None
     assert result.rows[0]["missing_reason"] == "missing_gap_to_rival"
+
+
+def test_build_causal_dataset_marks_high_pit_exit_traffic() -> None:
+    result = build_causal_dataset(
+        [
+            _pair_row(
+                traffic_after_pit_cars=2,
+                nearest_traffic_gap_ms=1_000,
+            )
+        ],
+        _degradation_rows(),
+        [],
+    )
+
+    assert result.rows[0]["traffic_after_pit"] == "high"
+    assert result.rows[0]["clean_air_potential"] == "low"

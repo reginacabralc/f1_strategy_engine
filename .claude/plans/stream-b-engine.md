@@ -39,15 +39,15 @@ docs/interfaces/replay_event_format.md
 
 ### Línea nueva — Causal undercut viability module
 
-- [ ] **Stream B implementará el causal undercut viability module** como una
+- [x] **Stream B implementará el causal undercut viability module** como una
   capa adicional explicable para responder `undercut_viable = sí/no` por
   observación `(driver, rival, lap)`, sin reemplazar XGBoost ni el motor
   heurístico existente.
-- [ ] Plan detallado: [`stream-b-causal-undercut.md`](stream-b-causal-undercut.md).
-- [ ] Gate conceptual antes de código: validar inventario de variables reales,
+- [x] Plan detallado: [`stream-b-causal-undercut.md`](stream-b-causal-undercut.md).
+- [x] Gate conceptual antes de código: validar inventario de variables reales,
   definición operacional de labels históricos, DAG inicial, tratamientos,
   outcomes, confounders y límites de DoWhy.
-- [ ] Si se agrega `dowhy` como dependencia, escribir ADR mínimo antes de tocar
+- [x] Si se agrega `dowhy` como dependencia, escribir ADR mínimo antes de tocar
   `backend/pyproject.toml`.
 
 ### Day 1 — Kickoff ✅

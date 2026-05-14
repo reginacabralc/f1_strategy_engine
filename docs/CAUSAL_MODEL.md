@@ -1,8 +1,9 @@
 # Causal Undercut Viability Model
 
-> Status: Phase 1-4 complete for the independent `causal_scipy` path. This
+> Status: Phase 1-10 complete for the independent `causal_scipy` MVP. This
 > document freezes the repo/data audit, variable inventory, leakage rules,
-> running-DB audit result, and the Phase 3/4 causal dataset and labels.
+> causal dataset, labels, DAG, DoWhy/refuter prototype, live inference,
+> counterfactual simulation, and explanation behavior.
 
 ## Decision
 
@@ -213,10 +214,11 @@ Latest local DB-volume result:
 | Metric | Value |
 |--------|-------|
 | dataset version | `causal_driver_rival_lap_v1` |
-| rows | 3,512 |
-| usable rows | 3,512 |
-| `undercut_viable = true` rows | 1,026 |
-| observed `undercut_success` rows | 14 |
+| sessions | Bahrain, Monaco, Hungary, Mexico City 2024 races |
+| rows | 4,654 |
+| usable rows | 4,586 |
+| `undercut_viable = true` rows | 1,022 |
+| observed `undercut_success` rows | 19 |
 | gap source | `reconstructed_fastf1_time` |
 | pace source | `causal_scipy` |
 
@@ -235,6 +237,25 @@ Phase 4 creates:
 
 The metadata leakage policy explicitly states that XGBoost features,
 predictions, and importances are not used.
+
+The dataset now includes a stronger pit-exit traffic reconstruction:
+
+- `projected_pit_exit_gap_to_leader_ms`: attacker gap to leader after applying
+  current pit-loss estimate.
+- `projected_pit_exit_position`: estimated field position if the attacker pits
+  now.
+- `traffic_after_pit_cars`: cars within +/- 3,000 ms of projected pit exit.
+- `nearest_traffic_gap_ms`: nearest car to the projected pit-exit point.
+- `traffic_after_pit`: low/medium/high bucket derived from the field around
+  projected pit exit, not only from the attacker-rival gap.
+
+Latest traffic distribution:
+
+| traffic_after_pit | Rows |
+|-------------------|------|
+| low | 2,942 |
+| medium | 462 |
+| high | 1,250 |
 
 ## Phase 5 DAG
 
@@ -348,18 +369,210 @@ backdoor.linear_regression
 
 For binary outcomes this is treated as a linear probability estimate. It is a
 diagnostic causal prototype, not the primary classifier and not a replacement
-for XGBoost. Refuters are intentionally left for Phase 7.
+for XGBoost.
 
 Latest local run:
 
 | Treatment | Outcome | Method | Rows | Estimate |
 |-----------|---------|--------|------|----------|
-| `fresh_tyre_advantage_ms` | `undercut_viable` | `backdoor.linear_regression` | 3,512 | 0.000070 |
-| `gap_to_rival_ms` | `undercut_viable` | `backdoor.linear_regression` | 3,512 | -0.000005 |
-| `tyre_age_delta` | `undercut_viable` | `backdoor.linear_regression` | 3,512 | -0.002264 |
+| `fresh_tyre_advantage_ms` | `undercut_viable` | `backdoor.linear_regression` | 4,586 | 0.000028 |
+| `gap_to_rival_ms` | `undercut_viable` | `backdoor.linear_regression` | 4,586 | -0.000004 |
+| `tyre_age_delta` | `undercut_viable` | `backdoor.linear_regression` | 4,586 | -0.000576 |
 
-Interpretation must stay cautious until Phase 7 refuters run. These are linear
-probability estimates over the three demo races, not classifier metrics.
+These are linear probability estimates over the four-race local causal dataset,
+not classifier metrics.
+
+## Phase 7 Refutation Tests
+
+`make run-causal-dowhy` now runs the Phase 6 effects plus three DoWhy refuters:
+
+- `random_common_cause`
+- `placebo_treatment_refuter`
+- `data_subset_refuter`
+
+Latest local refuter result:
+
+| Treatment | Refuter | Refuted estimate | Delta | Stability |
+|-----------|---------|------------------|-------|-----------|
+| `fresh_tyre_advantage_ms` | `random_common_cause` | 0.000028 | 0.000000 | stable |
+| `fresh_tyre_advantage_ms` | `placebo_treatment_refuter` | 0.000000 | 0.000028 | stable |
+| `fresh_tyre_advantage_ms` | `data_subset_refuter` | 0.000028 | 0.000000 | stable |
+| `gap_to_rival_ms` | `random_common_cause` | -0.000004 | 0.000000 | stable |
+| `gap_to_rival_ms` | `placebo_treatment_refuter` | -0.000000 | 0.000004 | stable |
+| `gap_to_rival_ms` | `data_subset_refuter` | -0.000004 | 0.000000 | stable |
+| `tyre_age_delta` | `random_common_cause` | -0.000575 | 0.000001 | stable |
+| `tyre_age_delta` | `placebo_treatment_refuter` | -0.000102 | 0.000474 | stable |
+| `tyre_age_delta` | `data_subset_refuter` | -0.000548 | 0.000028 | stable |
+
+Interpretation:
+
+- The implementation is working: all three refuters execute and report
+  stability labels.
+- After adding Mexico City 2024, all three default treatment estimates survive
+  the current refuters. This is better than the three-race run, where
+  `tyre_age_delta` failed placebo.
+- The numeric effects are still tiny because the outcome is a binary proxy
+  label and several treatments are measured in milliseconds.
+- None of these refuters prove true causality. They only check whether the
+  chosen estimate survives simple sensitivity probes under the authored DAG and
+  available demo data.
+
+## Phase 8-9 Live Inference, Simulation, And Explanation
+
+The live causal MVP is implemented in:
+
+```text
+backend/src/pitwall/causal/live_inference.py
+backend/src/pitwall/causal/explain.py
+```
+
+It does not add API or WebSocket fields yet, so no shared interface files were
+changed. Stream C/API wiring can happen later after the output shape is accepted.
+
+Current live flow:
+
+1. Convert the current `RaceState + attacker + defender` pair into
+   `CausalLiveObservation`.
+2. Reuse `evaluate_undercut()` with the injected `PacePredictor` and pit-loss
+   value. This avoids duplicating the undercut projection math.
+3. Derive DAG-facing metrics:
+   `required_gain_ms`, `projected_gain_ms`, `projected_gap_after_pit_ms`,
+   `traffic_after_pit`, `support_level`, and `top_factors`.
+4. Produce counterfactual scenarios:
+   `base_case`, `pit_now`, `pit_next_lap`, `pit_now_high_traffic`,
+   `pit_now_low_traffic`, `pit_loss_minus_1000_ms`, and
+   `pit_loss_plus_1000_ms`.
+5. Emit compact explanations for the base result and each scenario.
+
+Live output shape:
+
+```text
+CausalLiveResult(
+  observation=CausalLiveObservation(...),
+  undercut_viable=bool,
+  support_level="strong" | "weak" | "insufficient",
+  confidence=float,
+  required_gain_ms=int | None,
+  projected_gain_ms=int | None,
+  projected_gap_after_pit_ms=int | None,
+  traffic_after_pit="low" | "medium" | "high" | "unknown",
+  top_factors=(...),
+  explanations=(...),
+  counterfactuals=(CausalScenarioResult(...), ...)
+)
+```
+
+Important modeling boundary:
+
+- The graph itself is not trained as a predictor. Live prediction uses
+  structural equations and the existing transparent undercut projector.
+- DoWhy remains offline analysis/refutation tooling.
+- XGBoost remains independent and is not used by the causal graph, labels,
+  simulation, or explanation path.
+
+## Phase 10 Verification
+
+New unit coverage:
+
+- `test_estimators.py`: default effect specs, frame prep, GML generation, and
+  refuter stability helper behavior.
+- `test_graph.py`: DAG export and acyclic validation.
+- `test_live_inference.py`: live observation conversion, current-lap
+  prediction, counterfactual scenario generation, explanation text, and
+  insufficient-support handling.
+- Existing Phase 3/4 dataset and label tests remain in place.
+
+Verification commands run locally:
+
+```bash
+cd backend && ../.venv/bin/python -m pytest tests/unit/causal -q
+make run-causal-dowhy
+```
+
+Full-suite verification is recorded in `docs/progress.md`.
+
+## Post-MVP Corrections
+
+### Extended Race Data
+
+Implemented:
+
+```bash
+make prepare-causal-extended-data
+```
+
+and the underlying script:
+
+```text
+scripts/prepare_causal_extended_data.py
+```
+
+Default race list:
+
+```text
+2023:1, 2023:6, 2023:12, 2023:19,
+2024:1, 2024:8, 2024:13, 2024:20
+```
+
+The local verified run added `mexico_city_2024_R`, then rebuilt gaps,
+degradation coefficients with `--all-sessions`, pit-loss estimates, driver
+offsets, auto-derived undercuts, the causal dataset, DoWhy refuters, and the
+engine-disagreement table.
+
+### Manual Known-Undercut Curation
+
+Implemented:
+
+```bash
+make import-curated-known-undercuts
+```
+
+Input file:
+
+```text
+data/curation/known_undercuts_curated.csv
+```
+
+Rows inserted through this path use:
+
+```text
+notes LIKE 'curated_manual_v1%'
+```
+
+Auto-derived rows are preserved. The current repository CSV is intentionally
+empty except for the header; no human-reviewed truth labels were invented.
+
+### Engine Disagreement Table
+
+Implemented:
+
+```bash
+make compare-causal-engines
+```
+
+Output:
+
+```text
+data/causal/engine_disagreements.csv
+```
+
+Latest local result:
+
+| Metric | Value |
+|--------|-------|
+| rows | 4,654 |
+| causal vs scipy comparable rows | 4,586 |
+| causal vs scipy disagreements | 1,022 |
+| xgb status | `unavailable_feature_pipeline` |
+| causal vs xgb comparable rows | 0 |
+
+Interpretation: `causal_scipy` currently labels break-even viability, while
+`scipy_engine` represents stricter alert semantics (`score > 0.4` and
+`confidence > 0.5`). The 1,022 disagreements are therefore expected and useful:
+they identify opportunities that clear the causal break-even definition but do
+not meet the live alert threshold. XGBoost is reported as unavailable because
+`XGBoostPredictor.predict()` still raises `UnsupportedContextError` until Stream
+A wires runtime feature construction.
 
 ## Phase 2 Variable Inventory
 
@@ -472,3 +685,8 @@ probability estimates over the three demo races, not classifier metrics.
 - Phase 3/4 dataset exists and is reproducible with `make build-causal-dataset`.
 - Phase 5 DAG exists in code and is exported as DOT/GML.
 - Phase 6 DoWhy prototype exists and is reproducible with `make run-causal-dowhy`.
+- Phase 7 refuters run through the same command and report stability labels.
+- Phase 8/9 live inference can predict, simulate, and explain one current
+  `RaceState` driver-rival pair without touching XGBoost.
+- Phase 10 unit coverage exists for dataset, labels, graph, DoWhy helpers, live
+  observation conversion, simulation, and explanations.
