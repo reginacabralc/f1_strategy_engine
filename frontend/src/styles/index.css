@@ -31,6 +31,11 @@
   }
 }
 
+@keyframes alert-flash {
+  0% { background-color: rgba(225, 6, 0, 0.18); }
+  100% { background-color: transparent; }
+}
+
 @layer utilities {
   .panel {
     @apply bg-pitwall-surface border border-pitwall-border rounded-lg;
@@ -38,5 +43,9 @@
 
   .label-caps {
     @apply text-[10px] font-semibold uppercase tracking-[0.12em] text-pitwall-muted;
+  }
+
+  .alert-flash {
+    animation: alert-flash 1.4s ease-out forwards;
   }
 }

@@ -239,7 +239,17 @@
   `SessionRepository`). `scripts/ws_demo_client.py` WebSocket demo client added.
   Contract test extended to 7 implemented paths — all `operationId`s match static spec.
   **198 tests, ruff clean, mypy clean.**
-- [ ] Stream C: tabla y feed conectados a WS real.
+- [x] Stream C: tabla y feed conectados a WS real.
+      `useRaceFeed` upgraded with `applyLapUpdate` / `applyPitStop` / `applyTrackStatus`
+      pure helpers (exported for unit tests) and three new WS message handlers.
+      `MAX_ALERTS` reduced 50 → 20. `AlertPanel` rewritten to accept real `AlertPayload[]`,
+      shows attacker→defender, estimated gain, score/confidence, empty state, and CSS-only
+      flash animation on newest alert entry. `RaceTable` gains `isLive?` / `connectionStatus?`
+      props and an empty-state row. `TopBar` drives StatusDot colour from `ConnectionStatus`
+      (green/yellow/red/white). `App.tsx` calls `useRaceFeed()` and threads `snapshot.drivers`,
+      `alerts`, and `status` to all three components. 6 new Vitest tests (pure helpers) + 8
+      AlertPanel tests + 2 new RaceTable tests; total 24 tests passing.
+      `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm test` 24/24 ✅ · `pnpm build` ✅.
 - [ ] Stream D: pre-commit, badges, README mejorado.
 
 ### Día 7
