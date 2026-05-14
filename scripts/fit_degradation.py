@@ -22,7 +22,7 @@ from pitwall.degradation.writer import write_fit_results
 def main() -> int:
     args = parse_args()
     session_ids = DEMO_SESSION_IDS if args.all_demo else ()
-    session_id = None if args.all_demo else args.session
+    session_id = None if args.all_demo or args.all_sessions else args.session
 
     engine = create_db_engine()
     with engine.begin() as connection:
@@ -56,6 +56,11 @@ def parse_args() -> argparse.Namespace:
         "--all-demo",
         action="store_true",
         help="Fit Bahrain, Monaco, and Hungary 2024 race sessions.",
+    )
+    target.add_argument(
+        "--all-sessions",
+        action="store_true",
+        help="Fit every ingested session in clean_air_lap_times.",
     )
     parser.add_argument(
         "--no-refresh-clean-air",

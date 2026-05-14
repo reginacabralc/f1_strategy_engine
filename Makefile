@@ -7,7 +7,8 @@ PIP ?= $(PYTHON) -m pip
         fit-pit-loss validate-pit-loss \
         fit-driver-offsets validate-driver-offsets \
         audit-causal-inputs reconstruct-race-gaps derive-known-undercuts \
-        build-causal-dataset run-causal-dowhy \
+        import-curated-known-undercuts build-causal-dataset run-causal-dowhy \
+        compare-causal-engines prepare-causal-extended-data \
         build-xgb-dataset validate-xgb-dataset train-xgb validate-xgb-model \
         replay test test-backend lint demo serve-api
 
@@ -97,11 +98,20 @@ reconstruct-race-gaps: install
 derive-known-undercuts: install
 	PYTHONPATH=backend/src $(PYTHON) scripts/derive_known_undercuts.py
 
+import-curated-known-undercuts: install
+	PYTHONPATH=backend/src $(PYTHON) scripts/import_curated_known_undercuts.py
+
 build-causal-dataset: install
 	PYTHONPATH=backend/src $(PYTHON) scripts/build_causal_dataset.py
 
 run-causal-dowhy: install
 	MPLCONFIGDIR=/tmp/pitwall-matplotlib PYTHONPATH=backend/src $(PYTHON) scripts/run_causal_dowhy.py
+
+compare-causal-engines: install
+	PYTHONPATH=backend/src $(PYTHON) scripts/compare_causal_engines.py
+
+prepare-causal-extended-data: install
+	PYTHONPATH=backend/src $(PYTHON) scripts/prepare_causal_extended_data.py
 
 build-xgb-dataset: install db-wait
 	$(PYTHON) scripts/build_xgb_dataset.py

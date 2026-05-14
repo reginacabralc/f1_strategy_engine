@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import csv
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Protocol
 
 from sqlalchemy import text
@@ -13,6 +15,7 @@ from sqlalchemy import text
 from pitwall.ingest.normalize import to_bool, to_int
 
 AUTO_DERIVED_NOTES_PREFIX = "auto_derived_pit_cycle_v1"
+CURATED_NOTES_PREFIX = "curated_manual_v1"
 DEFAULT_MAX_PRE_PIT_GAP_MS = 30_000
 DEFAULT_MAX_DEFENDER_RESPONSE_LAPS = 8
 DEFAULT_EVAL_SETTLE_LAPS = 1
@@ -106,6 +109,13 @@ INSERT_KNOWN_UNDERCUT_SQL = text(
     """
 )
 
+DELETE_CURATED_SQL = text(
+    """
+    DELETE FROM known_undercuts
+    WHERE notes LIKE :notes_prefix
+    """
+)
+
 
 def load_lap_cycle_inputs(
     connection: QueryConnection,
@@ -152,6 +162,52 @@ def write_known_undercuts(
         return 0
     connection.execute(INSERT_KNOWN_UNDERCUT_SQL, payload)
     return len(payload)
+
+
+def write_curated_known_undercuts(
+    connection: QueryConnection,
+    rows: Iterable[KnownUndercut],
+    *,
+    replace_curated: bool = True,
+) -> int:
+    """Persist manually curated undercuts without touching auto-derived rows."""
+
+    payload = [
+        {
+            "session_id": row.session_id,
+            "attacker_code": row.attacker_code,
+            "defender_code": row.defender_code,
+            "lap_of_attempt": row.lap_of_attempt,
+            "was_successful": row.was_successful,
+            "notes": row.notes,
+        }
+        for row in rows
+    ]
+    if replace_curated:
+        connection.execute(
+            DELETE_CURATED_SQL,
+            {"notes_prefix": f"{CURATED_NOTES_PREFIX}%"},
+        )
+    if not payload:
+        return 0
+    connection.execute(INSERT_KNOWN_UNDERCUT_SQL, payload)
+    return len(payload)
+
+
+def load_curated_known_undercuts_csv(path: Path) -> list[KnownUndercut]:
+    """Load human-reviewed known undercuts from a CSV file."""
+
+    rows: list[KnownUndercut] = []
+    with path.open(newline="") as handle:
+        reader = csv.DictReader(handle)
+        missing = _missing_curated_columns(reader.fieldnames or [])
+        if missing:
+            raise ValueError(f"curated undercut CSV missing column(s): {missing}")
+        for index, row in enumerate(reader, start=2):
+            if _blank_csv_row(row):
+                continue
+            rows.append(_curated_row_from_csv(row, line_number=index))
+    return rows
 
 
 def derive_known_undercuts(
@@ -268,6 +324,61 @@ def lap_cycle_input_from_mapping(row: Mapping[str, Any]) -> LapCycleInput:
         is_pit_out=to_bool(row.get("is_pit_out")),
         ts=ts,
     )
+
+
+def _curated_row_from_csv(row: Mapping[str, str], *, line_number: int) -> KnownUndercut:
+    lap = to_int(row.get("lap_of_attempt"))
+    if lap is None:
+        raise ValueError(f"lap_of_attempt is required on curated CSV line {line_number}")
+    was_successful = _parse_bool(row.get("was_successful"), line_number=line_number)
+    reviewer = (row.get("reviewer") or "unknown").strip() or "unknown"
+    evidence = (row.get("evidence") or "manual_review").strip() or "manual_review"
+    note = (row.get("notes") or "").strip()
+    notes = f"{CURATED_NOTES_PREFIX};reviewer={reviewer};evidence={evidence}"
+    if note:
+        notes = f"{notes};notes={note}"
+    return KnownUndercut(
+        session_id=_required_csv_text(row, "session_id", line_number=line_number),
+        attacker_code=_required_csv_text(row, "attacker_code", line_number=line_number),
+        defender_code=_required_csv_text(row, "defender_code", line_number=line_number),
+        lap_of_attempt=lap,
+        was_successful=was_successful,
+        notes=notes,
+    )
+
+
+def _missing_curated_columns(fieldnames: Iterable[str]) -> list[str]:
+    required = {
+        "session_id",
+        "attacker_code",
+        "defender_code",
+        "lap_of_attempt",
+        "was_successful",
+        "reviewer",
+        "evidence",
+        "notes",
+    }
+    return sorted(required - set(fieldnames))
+
+
+def _blank_csv_row(row: Mapping[str, str]) -> bool:
+    return not any((value or "").strip() for value in row.values())
+
+
+def _required_csv_text(row: Mapping[str, str], column: str, *, line_number: int) -> str:
+    value = (row.get(column) or "").strip()
+    if not value:
+        raise ValueError(f"{column} is required on curated CSV line {line_number}")
+    return value
+
+
+def _parse_bool(value: str | None, *, line_number: int) -> bool:
+    normalized = (value or "").strip().lower()
+    if normalized in {"1", "true", "yes", "y"}:
+        return True
+    if normalized in {"0", "false", "no", "n"}:
+        return False
+    raise ValueError(f"was_successful must be boolean on curated CSV line {line_number}")
 
 
 def _eligible_pre_pit_attacker(

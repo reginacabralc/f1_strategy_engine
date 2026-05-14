@@ -344,6 +344,31 @@
   and persisted `dowhy>=0.12,<0.14` in `backend/pyproject.toml`. Added
   `pitwall.causal.estimators` and `make run-causal-dowhy` for the first DoWhy
   prototype over the causal driver-rival-lap dataset. XGBoost remains untouched.
+- [x] **Stream B**: causal undercut Phase 7-10 implemented.
+  Added DoWhy refuters (`random_common_cause`, `placebo_treatment_refuter`,
+  `data_subset_refuter`) to `make run-causal-dowhy`, plus stability reporting for
+  unsupported effects. Added `pitwall.causal.live_inference` and
+  `pitwall.causal.explain` for current-lap `undercut_viable`, support level,
+  counterfactual scenarios (`base_case`, `pit_now`, `pit_next_lap`,
+  traffic high/low, pit-loss ±1000 ms), top factors, and human-readable
+  explanations. No API/WS shape changed; interface docs do not need updates yet.
+  Latest refuter read on the original demo dataset: `fresh_tyre_advantage_ms`
+  and `gap_to_rival_ms` are stable; `tyre_age_delta` is unstable under placebo
+  and should not be treated as robust causal evidence yet.
+- [x] **Stream B**: causal undercut corrections implemented after Phase 10.
+  Added `make prepare-causal-extended-data` for multi-race ingestion and causal
+  artifact rebuilds, plus `fit_degradation.py --all-sessions` so new races
+  actually contribute degradation coefficients. Added `make
+  import-curated-known-undercuts` and `data/curation/known_undercuts_curated.csv`
+  for human-reviewed labels without overwriting auto-derived rows. Improved
+  `traffic_after_pit` with projected pit-exit gap/position, nearby-car count,
+  and nearest-traffic gap. Added `make compare-causal-engines` producing
+  `data/causal/engine_disagreements.csv`. Local verified run added
+  `mexico_city_2024_R`: causal dataset now has 4,654 rows, 4,586 usable rows,
+  1,022 viable rows, and 19 observed success rows. DoWhy refuters are stable for
+  all three default treatments on this four-race dataset. XGBoost comparison is
+  reported as `unavailable_feature_pipeline` until Stream A wires runtime XGB
+  prediction.
 - [ ] Stream C: copy y branding mínimo, demo polish.
 - [x] **Stream D**: quickstart/runbook corrected to match current implementation.
   README, walkthrough, infra README, runbook, and docker-compose architecture now state
@@ -370,3 +395,4 @@ _(ninguno por ahora)_
 | 2026-05-09 | asyncio in-process, sin broker | 0007 |
 | 2026-05-09 | OpenAPI auto-generado como fuente de verdad | 0008 |
 | 2026-05-?? | Resultado XGBoost vs scipy | 0009 (post-E10) |
+| 2026-05-14 | DoWhy para causal undercut offline/refuters | 0010 |

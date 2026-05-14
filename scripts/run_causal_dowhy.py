@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pitwall.causal.estimators import (
     DEFAULT_DATASET_PATH,
-    estimate_default_effects,
+    estimate_default_effects_with_refuters,
     load_causal_dataset,
 )
 
@@ -16,21 +16,35 @@ from pitwall.causal.estimators import (
 def main() -> int:
     args = parse_args()
     data = load_causal_dataset(args.dataset_path)
-    estimates = estimate_default_effects(data)
-    print("DoWhy causal undercut prototype")
+    results = estimate_default_effects_with_refuters(data)
+    print("DoWhy causal undercut prototype + refuters")
     print(f"dataset={args.dataset_path}")
     print()
     print("treatment | outcome | method | n_rows | estimate")
     print("----------+---------+--------+--------+---------")
-    for estimate in estimates:
+    for result in results:
+        estimate = result.estimate
         print(
             f"{estimate.treatment} | {estimate.outcome} | {estimate.method_name} | "
             f"{estimate.n_rows} | {estimate.estimate_value:.6f}"
         )
+        for refutation in result.refutations:
+            refuted = (
+                "n/a"
+                if refutation.refuted_estimate is None
+                else f"{refutation.refuted_estimate:.6f}"
+            )
+            delta = "n/a" if refutation.delta is None else f"{refutation.delta:.6f}"
+            print(
+                f"  refuter={refutation.refuter_name} | "
+                f"refuted={refuted} | delta={delta} | "
+                f"stability={refutation.stability}"
+            )
     print()
     print("Notes")
     print("- Binary outcomes are linear probability estimates in this MVP.")
-    print("- Demo-race linear models may be ill-conditioned; Phase 7 adds refuters.")
+    print("- Refuters are sensitivity checks, not proof of true causal validity.")
+    print("- Demo-race linear models may be ill-conditioned; unstable effects need more data.")
     print("- XGBoost predictions/features/importances are not used.")
     return 0
 

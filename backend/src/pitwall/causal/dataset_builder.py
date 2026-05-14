@@ -59,10 +59,15 @@ CAUSAL_DATASET_COLUMNS = [
     "air_temp_c",
     "rainfall",
     "pit_loss_estimate_ms",
+    "projected_pit_exit_gap_to_leader_ms",
+    "projected_pit_exit_position",
+    "traffic_after_pit_cars",
+    "nearest_traffic_gap_ms",
     "fresh_tyre_advantage_ms",
     "projected_gain_if_pit_now_ms",
     "required_gain_to_clear_rival_ms",
     "projected_gap_after_pit_ms",
+    "pace_confidence",
     "traffic_after_pit",
     "clean_air_potential",
     "undercut_window_open",
@@ -128,7 +133,76 @@ PAIR_LAP_QUERY = text(
         w.rainfall,
         a.is_pit_in AS pit_now,
         COALESCE(ple_team.pit_loss_ms, ple_circuit.pit_loss_ms, ple_global.pit_loss_ms)
-            AS pit_loss_estimate_ms
+            AS pit_loss_estimate_ms,
+        CASE
+            WHEN a.gap_to_leader_ms IS NULL THEN NULL
+            ELSE a.gap_to_leader_ms + COALESCE(
+                ple_team.pit_loss_ms,
+                ple_circuit.pit_loss_ms,
+                ple_global.pit_loss_ms,
+                :default_pit_loss_ms
+            )
+        END AS projected_pit_exit_gap_to_leader_ms,
+        CASE
+            WHEN a.gap_to_leader_ms IS NULL THEN NULL
+            ELSE 1 + (
+                SELECT COUNT(*)
+                FROM laps f
+                WHERE f.session_id = a.session_id
+                  AND f.lap_number = a.lap_number
+                  AND f.driver_code <> a.driver_code
+                  AND f.gap_to_leader_ms IS NOT NULL
+                  AND f.gap_to_leader_ms < (
+                    a.gap_to_leader_ms + COALESCE(
+                        ple_team.pit_loss_ms,
+                        ple_circuit.pit_loss_ms,
+                        ple_global.pit_loss_ms,
+                        :default_pit_loss_ms
+                    )
+                  )
+            )
+        END AS projected_pit_exit_position,
+        CASE
+            WHEN a.gap_to_leader_ms IS NULL THEN NULL
+            ELSE (
+                SELECT COUNT(*)
+                FROM laps f
+                WHERE f.session_id = a.session_id
+                  AND f.lap_number = a.lap_number
+                  AND f.driver_code <> a.driver_code
+                  AND f.gap_to_leader_ms IS NOT NULL
+                  AND ABS(
+                    f.gap_to_leader_ms - (
+                        a.gap_to_leader_ms + COALESCE(
+                            ple_team.pit_loss_ms,
+                            ple_circuit.pit_loss_ms,
+                            ple_global.pit_loss_ms,
+                            :default_pit_loss_ms
+                        )
+                    )
+                  ) <= 3000
+            )
+        END AS traffic_after_pit_cars,
+        CASE
+            WHEN a.gap_to_leader_ms IS NULL THEN NULL
+            ELSE (
+                SELECT MIN(ABS(
+                    f.gap_to_leader_ms - (
+                        a.gap_to_leader_ms + COALESCE(
+                            ple_team.pit_loss_ms,
+                            ple_circuit.pit_loss_ms,
+                            ple_global.pit_loss_ms,
+                            :default_pit_loss_ms
+                        )
+                    )
+                ))
+                FROM laps f
+                WHERE f.session_id = a.session_id
+                  AND f.lap_number = a.lap_number
+                  AND f.driver_code <> a.driver_code
+                  AND f.gap_to_leader_ms IS NOT NULL
+            )
+        END AS nearest_traffic_gap_ms
     FROM laps a
     JOIN laps d
       ON d.session_id = a.session_id
@@ -203,6 +277,7 @@ def load_pair_lap_rows(
         "session_ids": list(session_ids),
         "session_ids_is_null": not session_ids,
         "global_fallback_circuit_id": GLOBAL_FALLBACK_CIRCUIT_ID,
+        "default_pit_loss_ms": DEFAULT_PIT_LOSS_MS,
     }
     rows = connection.execute(PAIR_LAP_QUERY, params)
     return [dict(row._mapping) for row in rows]
@@ -368,6 +443,8 @@ def _build_dataset_row(
         row_usable = True
         missing_reason = None
     projected_gap = label.projected_gap_after_pit_ms
+    traffic_cars = to_int(row.get("traffic_after_pit_cars"))
+    nearest_traffic_gap_ms = to_int(row.get("nearest_traffic_gap_ms"))
 
     return {
         "session_id": row.get("session_id"),
@@ -408,12 +485,19 @@ def _build_dataset_row(
         "air_temp_c": to_float(row.get("air_temp_c")),
         "rainfall": to_bool(row.get("rainfall")),
         "pit_loss_estimate_ms": pit_loss_estimate_ms,
+        "projected_pit_exit_gap_to_leader_ms": to_int(
+            row.get("projected_pit_exit_gap_to_leader_ms")
+        ),
+        "projected_pit_exit_position": to_int(row.get("projected_pit_exit_position")),
+        "traffic_after_pit_cars": traffic_cars,
+        "nearest_traffic_gap_ms": nearest_traffic_gap_ms,
         "fresh_tyre_advantage_ms": label.fresh_tyre_advantage_ms,
         "projected_gain_if_pit_now_ms": label.projected_gain_if_pit_now_ms,
         "required_gain_to_clear_rival_ms": label.required_gain_to_clear_rival_ms,
         "projected_gap_after_pit_ms": projected_gap,
-        "traffic_after_pit": _traffic_bucket(projected_gap),
-        "clean_air_potential": _clean_air_potential(projected_gap),
+        "pace_confidence": label.pace_confidence,
+        "traffic_after_pit": _traffic_bucket(traffic_cars, nearest_traffic_gap_ms),
+        "clean_air_potential": _clean_air_potential(traffic_cars, nearest_traffic_gap_ms),
         "undercut_window_open": undercut_window_open,
         "undercut_viable": undercut_viable,
         "undercut_viable_label_source": undercut_viable_source,
@@ -484,22 +568,33 @@ def _race_phase(lap_number: int | None, total_laps: int | None) -> str | None:
     return "late"
 
 
-def _traffic_bucket(projected_gap_after_pit_ms: int | None) -> str:
-    if projected_gap_after_pit_ms is None:
+def _traffic_bucket(
+    traffic_after_pit_cars: int | None,
+    nearest_traffic_gap_ms: int | None,
+) -> str:
+    if traffic_after_pit_cars is None and nearest_traffic_gap_ms is None:
         return "unknown"
-    if projected_gap_after_pit_ms <= 0:
-        return "low"
-    if projected_gap_after_pit_ms <= 3_000:
-        return "medium"
-    return "high"
-
-
-def _clean_air_potential(projected_gap_after_pit_ms: int | None) -> str:
-    if projected_gap_after_pit_ms is None:
-        return "unknown"
-    if projected_gap_after_pit_ms <= 0:
+    if traffic_after_pit_cars is not None and traffic_after_pit_cars >= 2:
         return "high"
-    if projected_gap_after_pit_ms <= 3_000:
+    if nearest_traffic_gap_ms is not None and nearest_traffic_gap_ms <= 1_500:
+        return "high"
+    if traffic_after_pit_cars == 1:
+        return "medium"
+    if nearest_traffic_gap_ms is not None and nearest_traffic_gap_ms <= 3_000:
+        return "medium"
+    return "low"
+
+
+def _clean_air_potential(
+    traffic_after_pit_cars: int | None,
+    nearest_traffic_gap_ms: int | None,
+) -> str:
+    traffic = _traffic_bucket(traffic_after_pit_cars, nearest_traffic_gap_ms)
+    if traffic == "unknown":
+        return "unknown"
+    if traffic == "low":
+        return "high"
+    if traffic == "medium":
         return "medium"
     return "low"
 

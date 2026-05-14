@@ -1,7 +1,8 @@
 # Stream B — Causal undercut viability module
 
 > Owner: Stream B. Inputs: Stream A data/ML artifacts. Consumers: engine/API/WS and later Stream C explanations.
-> Status: conceptual plan. No implementation until labels and data assumptions are validated.
+> Status: Phase 1-10 implemented for the independent `causal_scipy` MVP.
+> API/WS wiring remains intentionally deferred until the output shape is accepted.
 
 ## Goal
 
@@ -546,35 +547,59 @@ Do not add these files until the conceptual gate is accepted.
 
 ### Phase 7 — Refutation Tests
 
-- [ ] Add random common cause refuter.
-- [ ] Add placebo treatment refuter.
-- [ ] Add data subset refuter.
-- [ ] Report when estimates are unstable or unsupported.
+- [x] Add random common cause refuter.
+- [x] Add placebo treatment refuter.
+- [x] Add data subset refuter.
+- [x] Report when estimates are unstable or unsupported.
 
 ### Phase 8 — Live Lap-by-Lap Integration
 
-- [ ] Convert current `RaceState` pair into causal observation.
-- [ ] Reuse `evaluate_undercut()` projections rather than duplicating math.
-- [ ] Keep causal live inference behind a separate module/output so it can be
+- [x] Convert current `RaceState` pair into causal observation.
+- [x] Reuse `evaluate_undercut()` projections rather than duplicating math.
+- [x] Keep causal live inference behind a separate module/output so it can be
   compared against XGBoost instead of depending on it.
-- [ ] Produce current-lap `undercut_viable` prediction from structural equations.
-- [ ] Produce counterfactual scenario results for pit-now, pit-next-lap,
+- [x] Produce current-lap `undercut_viable` prediction from structural equations.
+- [x] Produce counterfactual scenario results for pit-now, pit-next-lap,
   traffic-high/low, and pit-loss sensitivity.
-- [ ] Return explainability metadata without changing alert semantics first.
+- [x] Return explainability metadata without changing alert semantics first.
 
 ### Phase 9 — Explainability Output
 
-- [ ] Produce compact human-readable explanations.
-- [ ] Add confidence/support wording.
-- [ ] Explain both the base-case prediction and each counterfactual scenario.
-- [ ] Later coordinate with Stream C before adding UI/WS fields.
+- [x] Produce compact human-readable explanations.
+- [x] Add confidence/support wording.
+- [x] Explain both the base-case prediction and each counterfactual scenario.
+- [x] Later coordinate with Stream C before adding UI/WS fields.
 
 ### Phase 10 — Tests And Documentation
 
-- [ ] Unit-test dataset construction, graph shape, label logic, and live
+- [x] Unit-test dataset construction, graph shape, label logic, and live
   observation conversion.
-- [ ] Update `docs/CAUSAL_MODEL.md`.
-- [ ] If API/WS shape changes, update `docs/interfaces/` in the same PR.
+- [x] Update `docs/CAUSAL_MODEL.md`.
+- [x] If API/WS shape changes, update `docs/interfaces/` in the same PR.
+  No API/WS shape changed in this phase, so no interface document update was
+  required.
+
+### Post-Phase 10 Corrections
+
+- [x] Add a reproducible extended-data command:
+  `make prepare-causal-extended-data`.
+- [x] Add `scripts/fit_degradation.py --all-sessions` so newly ingested races
+  can contribute degradation coefficients instead of being excluded by
+  `--all-demo`.
+- [x] Add manual known-undercut curation import:
+  `make import-curated-known-undercuts`.
+- [x] Add a tracked curation template:
+  `data/curation/known_undercuts_curated.csv`.
+- [x] Preserve auto-derived known undercuts while importing curated rows with
+  `notes LIKE 'curated_manual_v1%'`.
+- [x] Improve `traffic_after_pit` from a coarse projected-gap proxy to a
+  field-aware projected pit-exit reconstruction.
+- [x] Add engine disagreement reporting:
+  `make compare-causal-engines`.
+- [x] Report XGBoost comparison as unavailable until `XGBoostPredictor.predict()`
+  has a runtime feature pipeline.
+- [x] Verify one additional race ingestion locally:
+  `mexico_city_2024_R`.
 
 ## MVP In 2 Days
 
