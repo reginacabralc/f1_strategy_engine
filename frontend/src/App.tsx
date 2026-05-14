@@ -5,6 +5,7 @@ import { RaceTable } from "./components/RaceTable";
 import { AlertPanel } from "./components/AlertPanel";
 import { MetricCard } from "./components/MetricCard";
 import { DegradationPlaceholder } from "./components/DegradationPlaceholder";
+import { TrackMapPanel } from "./components/TrackMapPanel";
 import { ReplayControls } from "./components/ReplayControls";
 
 const METRICS = [
@@ -47,7 +48,11 @@ export function App() {
 
             <RaceTable />
 
-            <DegradationPlaceholder />
+            {/* Lower panels: Degradation + Track Map, side-by-side on wider screens */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <DegradationPlaceholder />
+              <TrackMapPanel />
+            </div>
           </main>
 
           {/* Right column: alerts + metrics */}
