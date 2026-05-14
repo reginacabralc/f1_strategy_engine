@@ -1,8 +1,10 @@
 import { SessionPicker } from "./SessionPicker";
+import type { ConnectionStatus } from "../hooks/useRaceFeed";
 
 interface Props {
   selectedSession: string | null;
   onSelectSession: (id: string) => void;
+  connectionStatus?: ConnectionStatus;
 }
 
 function StatusDot({ color }: { color: "green" | "yellow" | "red" | "white" }) {
@@ -15,7 +17,16 @@ function StatusDot({ color }: { color: "green" | "yellow" | "red" | "white" }) {
   return <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${cls}`} />;
 }
 
-export function TopBar({ selectedSession, onSelectSession }: Props) {
+function connectionDotColor(
+  status: ConnectionStatus | undefined,
+): "green" | "yellow" | "red" | "white" {
+  if (status === "open") return "green";
+  if (status === "connecting" || status === "reconnecting") return "yellow";
+  if (status === "error" || status === "closed") return "red";
+  return "white";
+}
+
+export function TopBar({ selectedSession, onSelectSession, connectionStatus }: Props) {
   return (
     <header className="h-11 shrink-0 flex items-center gap-0 border-b border-pitwall-border bg-pitwall-surface px-3">
       {/* Brand */}
@@ -27,7 +38,7 @@ export function TopBar({ selectedSession, onSelectSession }: Props) {
 
       {/* Session label */}
       <div className="flex items-center gap-2 text-xs">
-        <StatusDot color="green" />
+        <StatusDot color={connectionDotColor(connectionStatus)} />
         <span className="text-pitwall-muted">Session</span>
         <span className="text-pitwall-text font-mono font-semibold">
           {selectedSession ?? "—"}

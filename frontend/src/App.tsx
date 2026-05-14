@@ -8,6 +8,7 @@ import { DegradationChart } from "./components/DegradationChart";
 import { TrackMapPanel } from "./components/TrackMapPanel";
 import { ReplayControls } from "./components/ReplayControls";
 import { useSessions } from "./hooks/useSessions";
+import { useRaceFeed } from "./hooks/useRaceFeed";
 
 const METRICS = [
   { label: "Track Temp", value: "42", unit: "°C", trend: "up" as const },
@@ -23,6 +24,7 @@ const METRICS = [
 export function App() {
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
   const { data: sessions } = useSessions();
+  const { status, snapshot, alerts } = useRaceFeed();
   const circuit = useMemo(() => {
     if (!selectedSession || !sessions) return "monaco";
     return (
@@ -36,6 +38,7 @@ export function App() {
       <TopBar
         selectedSession={selectedSession}
         onSelectSession={setSelectedSession}
+        connectionStatus={status}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -55,7 +58,11 @@ export function App() {
               )}
             </div>
 
-            <RaceTable />
+            <RaceTable
+              drivers={snapshot?.drivers}
+              isLive={status === "open"}
+              connectionStatus={status}
+            />
 
             {/* Lower panels: Degradation + Track Map, side-by-side on wider screens */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -66,7 +73,7 @@ export function App() {
 
           {/* Right column: alerts + metrics */}
           <aside className="w-64 shrink-0 flex flex-col gap-3 p-3 border-l border-pitwall-border overflow-y-auto">
-            <AlertPanel />
+            <AlertPanel alerts={alerts} />
 
             <div>
               <span className="label-caps block mb-2">Track Conditions</span>

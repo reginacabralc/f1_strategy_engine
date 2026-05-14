@@ -70,9 +70,9 @@ frontend/
 - [x] Conectar `<SessionPicker>` para que cambie circuito (derivado de la sesión seleccionada).
 
 ### Día 6 — Conexión real con WS (E8 + integración con B)
-- [ ] `useRaceFeed` consume mensajes reales del backend.
-- [ ] Tabla se actualiza con `snapshot` y `lap_update`.
-- [ ] Component `<AlertFeed>` muestra últimas 20 alertas con flash al recibir.
+- [x] `useRaceFeed` consume mensajes reales del backend.
+- [x] Tabla se actualiza con `snapshot` y `lap_update`.
+- [x] Component `<AlertFeed>` muestra últimas 20 alertas con flash al recibir.
 
 ### Día 7 — Toggle predictor + UX
 - [ ] Component `<PredictorToggle>` (radio scipy/xgb) que llama `POST /api/v1/config/predictor`.

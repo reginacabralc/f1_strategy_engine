@@ -78,14 +78,43 @@ function positionStyle(pos: number): string {
 
 interface Props {
   drivers?: DriverState[];
+  isLive?: boolean;
+  connectionStatus?: string;
 }
 
-export function RaceTable({ drivers = MOCK_DRIVERS }: Props) {
+export function RaceTable({ drivers = MOCK_DRIVERS, isLive, connectionStatus }: Props) {
+  const showEmpty = drivers.length === 0;
+
   return (
     <div
       className="overflow-x-auto rounded-lg border border-pitwall-border bg-pitwall-surface"
       data-testid="race-table-scroll"
     >
+      {isLive != null && (
+        <div className="px-3 py-1.5 border-b border-pitwall-border flex items-center gap-2">
+          <span
+            className={[
+              "inline-block w-1.5 h-1.5 rounded-full shrink-0",
+              connectionStatus === "open"
+                ? "bg-pitwall-green shadow-[0_0_6px_#22c55e]"
+                : connectionStatus === "connecting" || connectionStatus === "reconnecting"
+                  ? "bg-pitwall-yellow"
+                  : "bg-pitwall-muted",
+            ].join(" ")}
+          />
+          <span className="text-[10px] text-pitwall-muted uppercase tracking-wider">
+            {isLive ? "Live" : "Demo"}
+          </span>
+        </div>
+      )}
+      {showEmpty ? (
+        <p
+          className="px-3 py-8 text-[11px] text-pitwall-muted text-center"
+          data-testid="race-table-empty"
+        >
+          Waiting for race data…
+        </p>
+      ) : (
       <table className="min-w-[760px] w-full text-xs">
         <thead>
           <tr className="border-b border-pitwall-border">
@@ -166,6 +195,7 @@ export function RaceTable({ drivers = MOCK_DRIVERS }: Props) {
           })}
         </tbody>
       </table>
+      )}
     </div>
   );
 }
