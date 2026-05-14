@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { TopBar } from "./components/TopBar";
 import { Sidebar } from "./components/Sidebar";
 import { RaceTable } from "./components/RaceTable";
 import { AlertPanel } from "./components/AlertPanel";
 import { MetricCard } from "./components/MetricCard";
-import { DegradationPlaceholder } from "./components/DegradationPlaceholder";
+import { DegradationChart } from "./components/DegradationChart";
 import { TrackMapPanel } from "./components/TrackMapPanel";
 import { ReplayControls } from "./components/ReplayControls";
+import { useSessions } from "./hooks/useSessions";
 
 const METRICS = [
   { label: "Track Temp", value: "42", unit: "°C", trend: "up" as const },
@@ -21,6 +22,14 @@ const METRICS = [
 
 export function App() {
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
+  const { data: sessions } = useSessions();
+  const circuit = useMemo(() => {
+    if (!selectedSession || !sessions) return "monaco";
+    return (
+      sessions.find((s) => s.session_id === selectedSession)?.circuit_id ??
+      "monaco"
+    );
+  }, [selectedSession, sessions]);
 
   return (
     <div className="h-full flex flex-col bg-pitwall-bg overflow-hidden">
@@ -50,7 +59,7 @@ export function App() {
 
             {/* Lower panels: Degradation + Track Map, side-by-side on wider screens */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <DegradationPlaceholder />
+              <DegradationChart circuit={circuit} />
               <TrackMapPanel />
             </div>
           </main>

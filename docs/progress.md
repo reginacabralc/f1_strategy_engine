@@ -186,7 +186,16 @@
       and explicit tests for `ScipyPredictor` DB-row loading, confidence clamp,
       missing coefficients, and Stream B `evaluate_undercut()` compatibility.
 - [ ] Stream B: Motor calculando undercut V1 con `ScipyPredictor`.
-- [ ] Stream C: DegradationChart con datos mock.
+- [x] Stream C: DegradationChart con Recharts y datos reales de la API.
+      `src/hooks/useDegradation.ts` added — TanStack Query hook calling `getDegradation()`,
+      stable key `["degradation", circuit, compound]`, `retry: false`. `src/components/DegradationChart.tsx`
+      added — Recharts `LineChart` with fitted curve (computed from coefficients, tyre_age 0–40),
+      optional scatter-style dots for `sample_points` (aggregated per lap), compound selector
+      (SOFT/MEDIUM/HARD), R²/n display, and loading/error/empty states. `App.tsx` updated to
+      derive `circuit` from selected session via `useSessions()` (falls back to "monaco"), then
+      pass it to `DegradationChart` replacing `DegradationPlaceholder`. 4 new Vitest tests
+      (loading, error, R² display, compound buttons). Day 4 API/WebSocket foundation preserved.
+      `pnpm lint` ✅ · `pnpm test` 8/8 ✅ · `pnpm build` ✅ · `tsc --noEmit` ✅.
 - [ ] Stream D: CI verde con tests reales.
 - [ ] **Demo interna**: replay → motor → primer alert llega a un cliente WS de prueba.
 
