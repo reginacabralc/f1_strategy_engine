@@ -63,11 +63,11 @@ frontend/
 - [x] `hooks/useRaceFeed.ts` esqueleto con WebSocket reconectable (backoff exponencial).
 
 ### Día 5 — Chart de degradación (E8)
-- [ ] Component `<DegradationChart>` con Recharts.
+- [x] Component `<DegradationChart>` con Recharts.
   - X = tyre_age, Y = lap_time_ms.
-  - Curva ajustada (línea) + puntos reales (scatter).
-- [ ] Llamar a `/api/v1/degradation?circuit=&compound=`.
-- [ ] Conectar `<SessionPicker>` para que cambie circuito.
+  - Curva ajustada (línea) + puntos reales (scatter, si el backend los devuelve).
+- [x] Llamar a `/api/v1/degradation?circuit=&compound=` vía `useDegradation` hook.
+- [x] Conectar `<SessionPicker>` para que cambie circuito (derivado de la sesión seleccionada).
 
 ### Día 6 — Conexión real con WS (E8 + integración con B)
 - [ ] `useRaceFeed` consume mensajes reales del backend.
