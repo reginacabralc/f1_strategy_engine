@@ -160,7 +160,17 @@
       make fit-degradation`: Monaco MEDIUM tyre age 10 predicts 81,366 ms with
       confidence 0.362.
 - [ ] Stream B: Motor undercut esqueleto + RaceState.
-- [ ] Stream C: Cliente API + hook WS esqueleto.
+- [x] Stream C: Cliente API + hook WS esqueleto.
+      `openapi-typescript` added as dev dep; `pnpm generate:api` generates `src/api/openapi.ts`
+      from `docs/interfaces/openapi_v1.yaml`. `src/api/types.ts` replaced with re-export layer
+      (stable import surface, no hand-written types). `src/api/client.ts` rewritten with `ApiError`,
+      `buildUrl`, and 7 typed endpoint helpers (`getSessions`, `getSessionSnapshot`, `getDegradation`,
+      `startReplay`, `stopReplay`, `setPredictor`, `getBacktestResult`). `src/api/ws.ts` added —
+      hand-written WS envelope/payload types matching `websocket_messages.md`. `src/hooks/useRaceFeed.ts`
+      added — reconnectable WS hook with 1→2→4→8→16 s backoff, StrictMode-safe `cancelled` flag,
+      pong heartbeat response, and `snapshot`/`alerts`/`replayState`/`lastMessage`/`error`/`status` state.
+      `useSessions` updated to use typed `getSessions()`. `RaceTable` optional-field types widened.
+      All existing visual components preserved. `pnpm lint` ✅ · `pnpm test` 4/4 ✅ · `pnpm build` ✅.
 - [ ] Stream D: Logs estructurados, /health endpoint.
 
 ### Día 5 — Hito S1

@@ -8,7 +8,9 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint src --ext .ts,.tsx --report-unused-disable-directives --max-warnings 0",
-    "test": "vitest run"
+    "test": "vitest run",
+    "generate:api": "openapi-typescript ../docs/interfaces/openapi_v1.yaml -o src/api/openapi.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.29.0",
@@ -36,6 +38,7 @@
     "vitest": "^1.5.0",
     "@testing-library/react": "^15.0.0",
     "@testing-library/jest-dom": "^6.4.0",
-    "jsdom": "^24.0.0"
+    "jsdom": "^24.0.0",
+    "openapi-typescript": "^6.7.6"
   }
 }
