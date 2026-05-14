@@ -6,6 +6,7 @@ PIP ?= $(PYTHON) -m pip
         fit-degradation validate-degradation report-degradation \
         fit-pit-loss validate-pit-loss \
         fit-driver-offsets validate-driver-offsets \
+        audit-causal-inputs \
         build-xgb-dataset validate-xgb-dataset train-xgb validate-xgb-model \
         replay test test-backend lint demo serve-api
 
@@ -85,6 +86,9 @@ fit-driver-offsets: install db-wait
 
 validate-driver-offsets: install db-wait
 	$(PYTHON) scripts/validate_driver_offsets.py
+
+audit-causal-inputs: install
+	PYTHONPATH=backend/src $(PYTHON) scripts/audit_causal_inputs.py
 
 build-xgb-dataset: install db-wait
 	$(PYTHON) scripts/build_xgb_dataset.py
