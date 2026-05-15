@@ -65,11 +65,13 @@ async def ws_live(websocket: WebSocket) -> None:
             try:
                 # Block until the client sends any frame OR the heartbeat interval
                 # expires, whichever comes first.
-                await asyncio.wait_for(
-                    websocket.receive_bytes(),
+                message = await asyncio.wait_for(
+                    websocket.receive(),
                     timeout=_HEARTBEAT_INTERVAL,
                 )
-                # Client frame received — ignore content (V1).
+                if message.get("type") == "websocket.disconnect":
+                    break
+                # Client frame received — ignore text/binary content (V1).
             except TimeoutError:
                 # No message from client in 15 s — send a ping so slow clients
                 # are detected by their next failed receive.

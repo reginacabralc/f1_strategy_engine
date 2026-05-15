@@ -18,26 +18,54 @@ than monkey-patching this module::
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Any
 
 from fastapi import Request
 
 from pitwall.api.connections import ConnectionManager
 from pitwall.core.topics import Topics
+from pitwall.db.engine import create_db_engine, database_url_from_env
 from pitwall.engine.loop import EngineLoop
 from pitwall.engine.projection import PacePredictor
 from pitwall.engine.replay_manager import ReplayManager
 from pitwall.repositories.degradation import DegradationRepository, InMemoryDegradationRepository
 from pitwall.repositories.events import InMemorySessionEventLoader, SessionEventLoader
 from pitwall.repositories.sessions import InMemorySessionRepository, SessionRepository
+from pitwall.repositories.sql import (
+    SqlDegradationRepository,
+    SqlSessionEventLoader,
+    SqlSessionRepository,
+)
+
+
+@lru_cache(maxsize=1)
+def _sql_engine_if_configured() -> Any | None:
+    """Return a cached SQLAlchemy engine when DATABASE_URL is configured.
+
+    Unit tests and no-DB local API usage keep the in-memory fixtures. Docker,
+    ``make demo``, and DB-backed local development set ``DATABASE_URL`` and use
+    the real Stream A tables.
+    """
+    try:
+        database_url = database_url_from_env()
+    except RuntimeError:
+        return None
+    if not database_url:
+        return None
+    return create_db_engine(database_url)
 
 
 @lru_cache(maxsize=1)
 def get_session_repository() -> SessionRepository:
     """Return the active :class:`SessionRepository`.
 
-    V1 default: in-memory fixture with the three demo races.
-    Stream A can replace this body with a SQL-backed implementation.
+    Use Stream A's SQL-backed repository when ``DATABASE_URL`` is configured.
+    Without a DB URL, fall back to the in-memory demo catalogue used by unit
+    tests and no-DB local exploration.
     """
+    engine = _sql_engine_if_configured()
+    if engine is not None:
+        return SqlSessionRepository(engine)
     return InMemorySessionRepository()
 
 
@@ -45,9 +73,12 @@ def get_session_repository() -> SessionRepository:
 def get_degradation_repository() -> DegradationRepository:
     """Return the active :class:`DegradationRepository`.
 
-    V1 default: in-memory (empty → 404 until DB is seeded).
-    Stream A wires a SQL implementation once ``make fit-degradation`` has run.
+    Use Stream A's persisted ``degradation_coefficients`` when a DB is
+    configured. Without a DB URL, keep the empty in-memory repository.
     """
+    engine = _sql_engine_if_configured()
+    if engine is not None:
+        return SqlDegradationRepository(engine)
     return InMemoryDegradationRepository()
 
 
@@ -55,9 +86,12 @@ def get_degradation_repository() -> DegradationRepository:
 def get_event_loader() -> SessionEventLoader:
     """Return the active :class:`SessionEventLoader`.
 
-    V1 default: empty in-memory loader (returns [] → 404 on replay start).
-    Stream A wires a SQL loader here once the demo sessions are in the DB.
+    Use DB events when ``DATABASE_URL`` is configured; otherwise return the
+    empty in-memory loader so tests can inject fixture events explicitly.
     """
+    engine = _sql_engine_if_configured()
+    if engine is not None:
+        return SqlSessionEventLoader(engine)
     return InMemorySessionEventLoader()
 
 
@@ -91,7 +125,7 @@ def get_predictor(request: Request) -> PacePredictor:
     """
     try:
         loop: EngineLoop = request.app.state.engine_loop
-        return loop._predictor  # noqa: SLF001
+        return loop._predictor
     except AttributeError:
         from pitwall.degradation.predictor import ScipyPredictor
 

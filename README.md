@@ -1,10 +1,10 @@
 # PitWall — F1 Strategy Engine
 
-> Motor en tiempo real que detecta oportunidades de **undercut** durante una carrera de F1, comparando un baseline heurístico (`scipy`) contra un modelo ML (`XGBoost`) detrás de la misma interfaz. El backend, WebSocket y replay histórico ya existen; el dashboard React y el demo de navegador siguen en construcción.
+> Motor en tiempo real que detecta oportunidades de **undercut** durante una carrera de F1, comparando un baseline heurístico (`scipy`) contra un modelo ML (`XGBoost`) detrás de la misma interfaz. El backend, WebSocket, replay histórico y dashboard React ya existen; Stream D mantiene la ruta reproducible de demo.
 
-[![Lint](https://img.shields.io/badge/lint-pending-lightgrey)](.github/workflows/lint.yml)
-[![Tests](https://img.shields.io/badge/tests-pending-lightgrey)](.github/workflows/test.yml)
-[![Build](https://img.shields.io/badge/build-pending-lightgrey)](.github/workflows/build.yml)
+[![Lint](https://github.com/reginacabralc/f1_strategy_engine/actions/workflows/lint.yml/badge.svg)](.github/workflows/lint.yml)
+[![Tests](https://github.com/reginacabralc/f1_strategy_engine/actions/workflows/test.yml/badge.svg)](.github/workflows/test.yml)
+[![Build](https://github.com/reginacabralc/f1_strategy_engine/actions/workflows/build.yml/badge.svg)](.github/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ## ¿Qué hace?
@@ -19,7 +19,7 @@ Cuando un piloto entra a boxes pierde ~21 segundos. Para que un *undercut* (para
                                                          │
                                                   ┌──────▼─────┐
                                                   │ React UI   │
-                                                  │ (pending)  │
+                                                  │ :5173      │
                                                   └────────────┘
 ```
 
@@ -36,7 +36,7 @@ cp .env.example .env
 make demo
 ```
 
-`make demo` levanta TimescaleDB, crea `.venv`, instala el backend, corre migraciones, carga las 3 carreras demo de 2024 (Bahrain, Monaco y Hungary), arranca la API y abre Swagger automáticamente en <http://localhost:8000/docs>. No arranca todavía el frontend; `frontend/` no existe.
+`make demo` levanta TimescaleDB, crea `.venv`, instala el backend, corre migraciones, carga las 3 carreras demo de 2024 (Bahrain, Monaco y Hungary), ajusta coeficientes de degradación demo, arranca backend + frontend con Docker Compose y abre el dashboard React en <http://localhost:5173>. Swagger queda disponible en <http://localhost:8000/docs>.
 
 PostgreSQL se publica en `localhost:5433` para no chocar con instalaciones locales que suelen usar `5432`. Dentro de Docker los servicios siguen usando `db:5432`.
 
@@ -64,9 +64,9 @@ Demo race round numbers for 2024: **Bahrain = 1**, **Monaco = 8**, **Hungary = 1
 
 - **Backend**: Python 3.12, FastAPI, asyncio, Polars, scipy, **XGBoost**
 - **DB**: PostgreSQL 15 + TimescaleDB
-- **Frontend**: React + Vite + TypeScript + TanStack Query + Tailwind + Recharts (planned, not present yet)
+- **Frontend**: React + Vite + TypeScript + TanStack Query + Tailwind + Recharts
 - **Infra**: docker-compose
-- **CI**: GitHub Actions
+- **CI**: GitHub Actions (`lint`, `test`, `build`)
 - **Datos abiertos**: [FastF1](https://docs.fastf1.dev/), [OpenF1](https://openf1.org), [Jolpica](https://github.com/jolpica/jolpica-f1) (sucesor de Ergast)
 
 ## ML

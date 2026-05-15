@@ -1,6 +1,6 @@
-# Walkthrough — De clonar el repo a correr el backend
+# Walkthrough — De clonar el repo a correr PitWall
 
-> Tutorial paso a paso para alguien que llega al proyecto por primera vez. Refleja el estado actual del repo: DB + backend API + replay. El frontend React y el demo de navegador siguen pendientes.
+> Tutorial paso a paso para alguien que llega al proyecto por primera vez. Refleja el estado actual del repo: DB + backend API + WebSocket + replay + dashboard React.
 
 ## 1. Pre-requisitos
 
@@ -9,7 +9,8 @@
 - Git.
 - Python 3.12 recomendado.
 - Internet para descargar datos de FastF1 la primera vez.
-- (Opcional) `uv` para desarrollo local. `pnpm` será necesario cuando exista el frontend.
+- (Opcional) `uv` para desarrollo local.
+- (Opcional) `pnpm` para trabajar en `frontend/` fuera de Docker. Si no existe, el Makefile usa `npx -y pnpm@9.15.9`.
 
 Verificación rápida:
 
@@ -41,18 +42,19 @@ Esto:
 2. Crea `.venv` si no existe e instala el backend en modo editable.
 3. Corre migraciones (`alembic upgrade head`).
 4. Ingiere las 3 carreras demo de 2024: Bahrain, Monaco y Hungary.
-5. Arranca el servicio `backend` en Docker Compose.
-6. Espera a que `/health` responda y abre Swagger en el navegador.
+5. Ajusta coeficientes de degradación para las carreras demo.
+6. Arranca `backend` y `frontend` en Docker Compose.
+7. Espera a que `/health` responda y abre el dashboard React.
 
-Nota: en el estado actual, `make demo` no arranca el frontend. PostgreSQL se
-publica en `localhost:5433` para evitar conflictos con un Postgres local en
-`5432`; dentro de Docker sigue siendo `db:5432`.
+PostgreSQL se publica en `localhost:5433` para evitar conflictos con un
+Postgres local en `5432`; dentro de Docker sigue siendo `db:5432`.
 
 ## 4. Verificar la API
 
 Servicios disponibles:
 
 - Backend: <http://localhost:8000>
+- Frontend: <http://localhost:5173>
 - API docs (Swagger): <http://localhost:8000/docs>
 - Health: <http://localhost:8000/health>
 
@@ -84,6 +86,9 @@ Detener replay:
 ```bash
 curl -X POST http://localhost:8000/api/v1/replay/stop
 ```
+
+También puedes iniciar y detener el replay desde el footer del dashboard en
+<http://localhost:5173> después de seleccionar una sesión.
 
 ## 6. Cambiar de predictor (scipy <-> XGBoost)
 
@@ -150,12 +155,14 @@ FastF1 y llena `data/cache/`.
 ## 9. Correr tests
 
 ```bash
-make test          # backend unit tests
-make test-backend  # alias actual de make test
-make lint          # ruff + mypy
+make test           # backend unit tests + frontend vitest
+make test-backend   # pytest backend
+make test-frontend  # vitest frontend
+make lint           # ruff + mypy + eslint
 ```
 
-Frontend, Playwright y backtest comparativo siguen pendientes.
+Playwright e2e existe como target de frontend, pero requiere instalar los
+browsers de Playwright antes de correrlo localmente o en CI.
 
 ## 10. Apagar
 
@@ -200,7 +207,9 @@ Si llueve, se emite `UNDERCUT_DISABLED_RAIN` en su lugar.
 
 ### Agregar una métrica de backtest
 
-El backtest comparativo sigue pendiente. Cuando exista, documentar aquí el CLI/notebook exacto y actualizar `docs/quanta/07-backtest-leakage.md`.
+El panel de backtest ya existe en el frontend y consume la API cuando hay
+resultados disponibles. El comparativo final scipy vs XGBoost sigue pendiente
+de cierre y debe documentarse en `docs/quanta/07-backtest-leakage.md`.
 
 ## 13. Troubleshooting
 
@@ -209,5 +218,5 @@ Ver [`infra/runbook.md`](../infra/runbook.md) para diagnóstico de problemas com
 - "Cannot connect to db" — espera healthcheck.
 - "FastF1 cache permission denied" — chmod del volumen.
 - "WebSocket disconnects" — prueba primero `.venv/bin/python scripts/ws_demo_client.py`.
-- "XGBoost model not found" — usa `PACE_PREDICTOR=scipy`; el entrenamiento XGBoost sigue pendiente.
+- "XGBoost model not found" — usa `PACE_PREDICTOR=scipy` o genera el artifact con los targets `build-xgb-dataset`, `train-xgb` y `validate-xgb-model`.
 - "Backtest sale precision = 0" — revisa que cargaste la lista curada de undercuts.
