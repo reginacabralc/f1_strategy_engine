@@ -36,15 +36,9 @@ cp .env.example .env
 make demo
 ```
 
-Estado actual de `make demo`: levanta TimescaleDB, crea `.venv`, instala el backend, corre migraciones y carga las 3 carreras demo de 2024: Bahrain, Monaco y Hungary. No arranca todavía el frontend; `frontend/` no existe.
+`make demo` levanta TimescaleDB, crea `.venv`, instala el backend, corre migraciones, carga las 3 carreras demo de 2024 (Bahrain, Monaco y Hungary), arranca la API y abre Swagger automáticamente en <http://localhost:8000/docs>. No arranca todavía el frontend; `frontend/` no existe.
 
-Para levantar la API después del seed:
-
-```bash
-docker compose up -d backend
-```
-
-Luego abre <http://localhost:8000/docs> o prueba:
+Para probar la API manualmente:
 
 ```bash
 curl http://localhost:8000/health

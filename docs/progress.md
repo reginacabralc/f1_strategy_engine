@@ -20,6 +20,11 @@
 | **Backtest comparativo scipy vs XGBoost** | ⏳ | Día 9 | Stream A+B |
 | Demo end-to-end probada en limpio | ⏳ | Día 10 | Todos |
 
+### Fix — demo API localhost
+- [x] Stream B/D: `make demo` now starts the Docker backend, waits for
+      `http://localhost:8000/health`, and opens Swagger automatically at
+      `http://localhost:8000/docs`. README and walkthrough updated to match.
+
 ## Semana 1
 
 ### Día 0 — Pre-arranque

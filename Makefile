@@ -14,7 +14,7 @@ PIP ?= $(PYTHON) -m pip
         audit-causal-inputs reconstruct-race-gaps derive-known-undercuts \
         import-curated-known-undercuts build-causal-dataset run-causal-dowhy \
         compare-causal-engines prepare-causal-extended-data \
-        replay test test-backend lint demo serve-api
+        replay test test-backend lint demo serve-api api-wait
 
 install: .venv/.installed
 
@@ -162,16 +162,23 @@ lint: install
 serve-api: install
 	$(PYTHON) -m uvicorn pitwall.api.main:app --reload --port 8000
 
+api-wait:
+	@echo "Waiting for API to be ready..."
+	@until curl -fsS http://localhost:8000/health >/dev/null 2>&1; do \
+		sleep 1; \
+	done
+	@echo "API is ready."
+
 ## SPEED ?= 30  (replay speed multiplier)
 ## SESSION ?= monaco_2024_R
 replay: install db-wait
 	$(PYTHON) scripts/ingest_season.py --year 2024 --round 8 --session R --write-db
 	@echo "Replay via API: POST /api/v1/replay/start  (Stream B Day 3 target)"
 
-## demo: DB up (Docker), migrations and seed via local venv.
-## Then start Docker backend with: docker compose up -d backend
-## Frontend pending Stream C. Requires: cp .env.example .env first.
+## demo: DB up (Docker), migrations and seed via local venv, then API up.
+## Opens Swagger automatically. Requires: cp .env.example .env first.
 demo: db-up migrate seed
-	@echo "Data ready. Start the backend with: docker compose up -d backend"
-	@echo "Then open: http://localhost:8000/docs"
-	@echo "Frontend/browser demo is pending Stream C."
+	docker compose up -d backend
+	$(MAKE) api-wait
+	$(PYTHON) -m webbrowser -t http://localhost:8000/docs
+	@echo "Demo API is running at: http://localhost:8000/docs"
