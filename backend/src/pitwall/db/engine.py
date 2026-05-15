@@ -22,7 +22,7 @@ def database_url_from_env(*, load_dotenv_file: bool = True) -> str:
     if not database_url:
         raise RuntimeError(
             "DATABASE_URL is not set. Copy .env.example to .env or export "
-            "DATABASE_URL=postgresql+psycopg://pitwall:pitwall@localhost:5432/pitwall"
+            "DATABASE_URL=postgresql+psycopg://pitwall:pitwall@localhost:5433/pitwall"
         )
     return database_url
 
