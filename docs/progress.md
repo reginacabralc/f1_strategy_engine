@@ -28,6 +28,13 @@
       (`POSTGRES_HOST_PORT` overrideable) so the demo does not fail when a
       local Postgres already owns `5432`.
 
+### Causal graph verification
+- [x] Stream B: causal unit tests pass and the causal/scipy comparison command
+      runs against `data/causal/undercut_driver_rival_lap.parquet`.
+- [ ] Stream B: `run_causal_dowhy.py` currently fails in the active `.venv`
+      because `scipy.linalg` fails to import `decomp_lu`; the 2-day recovery
+      plan is documented in `.claude/plans/stream-b-causal-undercut.md`.
+
 ## Semana 1
 
 ### Día 0 — Pre-arranque

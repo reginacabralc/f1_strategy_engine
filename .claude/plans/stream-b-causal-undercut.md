@@ -1,8 +1,11 @@
 # Stream B — Causal undercut viability module
 
 > Owner: Stream B. Inputs: Stream A data/ML artifacts. Consumers: engine/API/WS and later Stream C explanations.
-> Status: Phase 1-10 implemented for the independent `causal_scipy` MVP.
-> API/WS wiring remains intentionally deferred until the output shape is accepted.
+> Status: Phase 1-10 implemented for the independent `causal_scipy` MVP,
+> but not yet production-ready as a running causal graph model.
+> Current verification gap: live structural prediction exists, but API/WS
+> integration is deferred and the local DoWhy command currently fails because
+> SciPy import is broken in the active `.venv`.
 
 ## Goal
 
@@ -616,6 +619,110 @@ Do not add these files until the conceptual gate is accepted.
 8. Add explanations for prediction and simulations.
 9. Add `docs/CAUSAL_MODEL.md` explaining limitations.
 10. Do not wire live API/WS until the offline labels pass sanity checks.
+
+## Next 2-Day Plan — Running Predictive Causal Graph Model
+
+Goal: have an actually runnable `causal_scipy` model that can be compared
+against the existing scipy and XGBoost paths without touching XGBoost code,
+model files, feature pipelines, or training scripts.
+
+### Current Verified State
+
+- [x] Causal package exists under `backend/src/pitwall/causal/`.
+- [x] Unit tests for causal helpers pass locally:
+  `PYTHONPATH=backend/src .venv/bin/python -m pytest backend/tests/unit/causal -q`.
+- [x] Offline causal dataset exists at
+  `data/causal/undercut_driver_rival_lap.parquet`.
+- [x] Latest metadata: `4,654` rows, `4,586` usable rows,
+  `1,022` `undercut_viable` rows, `19` observed success rows.
+- [x] `make compare-causal-engines` equivalent runs and writes
+  `data/causal/engine_disagreements.csv`.
+- [x] XGBoost comparison is correctly reported as
+  `unavailable_feature_pipeline`; causal code does not modify or depend on
+  XGBoost.
+- [ ] `make run-causal-dowhy` is not currently healthy in the active `.venv`.
+  It fails while importing DoWhy because `scipy.linalg` cannot import
+  `decomp_lu`.
+- [ ] No FastAPI route or WebSocket message exposes causal predictions yet.
+- [ ] Live causal inference currently reuses `evaluate_undercut()` for
+  projection math. This is acceptable for `causal_scipy` MVP, but the output
+  should be framed as a structural/rule-based causal prediction, not a
+  trained DoWhy classifier.
+
+### Day 1 — Make Offline Causal Model Reproducible
+
+Owner: Stream B. Do not edit XGBoost files.
+
+- [ ] Fix the active Python dependency environment for causal analysis.
+  Preferred conservative fix: constrain `numpy`/`scipy` to a known compatible
+  pair for Python 3.12, then rebuild `.venv` and run `pip check`.
+  Candidate target: `numpy>=1.26,<2.3` and `scipy>=1.11,<1.16`, unless local
+  testing proves a newer pair imports `scipy.linalg` cleanly.
+- [ ] Re-run the causal prep chain on the current DB volume:
+  `make audit-causal-inputs`,
+  `make reconstruct-race-gaps`,
+  `make fit-degradation`,
+  `make fit-pit-loss`,
+  `make fit-driver-offsets`,
+  `make derive-known-undercuts`,
+  `make build-causal-dataset`.
+- [ ] Run `make run-causal-dowhy` successfully and save/record the three
+  default effects:
+  `fresh_tyre_advantage_ms -> undercut_viable`,
+  `gap_to_rival_ms -> undercut_viable`,
+  `tyre_age_delta -> undercut_viable`.
+- [ ] Run all three refuters and document whether estimates are stable,
+  weak, or not supported.
+- [ ] Run `make compare-causal-engines`.
+  Keep XGBoost status as unavailable unless the existing XGBoost runtime
+  feature pipeline is already present; do not implement it in this stream.
+- [ ] Add/refresh a compact causal run report in `docs/CAUSAL_MODEL.md`:
+  dataset row counts, effect estimates, refuter results, and causal vs scipy
+  disagreement counts.
+
+Day 1 exit criteria:
+
+- `scipy.linalg` imports successfully.
+- `make run-causal-dowhy` exits 0.
+- `make compare-causal-engines` exits 0.
+- `docs/CAUSAL_MODEL.md` honestly states that DoWhy is offline analysis,
+  while prediction is produced by the `causal_scipy` structural equations.
+
+### Day 2 — Expose A Running Causal Prediction Path
+
+Owner: Stream B, with Stream C/API coordination only after output shape is
+accepted. Do not edit XGBoost files.
+
+- [ ] Add a small CLI smoke command for real predictions, for example
+  `scripts/predict_causal_undercut.py`, that loads one session/lap/pair from
+  DB or the causal dataset and prints:
+  `undercut_viable`, `support_level`, `required_gain_ms`,
+  `projected_gain_ms`, `projected_gap_after_pit_ms`, `top_factors`, and
+  counterfactual scenarios.
+- [ ] Use the existing `pitwall.causal.live_inference.evaluate_causal_live()`
+  for the CLI so the same code path can later be wired into API/WS.
+- [ ] Add unit tests for the CLI-facing adapter and one regression fixture
+  with a viable and non-viable pair.
+- [ ] Add a read-only FastAPI endpoint only if time remains and the output
+  shape is accepted:
+  `GET /api/v1/causal/prediction?session_id=&lap_number=&attacker=&defender=`.
+  The endpoint must be read-only and must not alter alert semantics.
+- [ ] If the endpoint is added, update `docs/interfaces/openapi_v1.yaml` and
+  frontend types in the same PR. If not, leave API/WS untouched and demo via
+  CLI plus docs.
+- [ ] Add a final comparison command/output that clearly prints:
+  `scipy_engine`, `xgb_engine` status, and `causal_scipy`, with XGBoost left
+  untouched and reported as unavailable when runtime predictions are absent.
+
+Day 2 exit criteria:
+
+- A human can run one command and see an actual causal prediction for a real
+  driver-rival-lap.
+- The output includes counterfactuals (`pit_now`, `pit_next_lap`,
+  traffic high/low, pit loss +/-1000 ms) and explanations.
+- Causal results are comparable beside scipy/XGBoost without replacing either.
+- No XGBoost implementation, training, model artifact, or feature schema is
+  modified by the causal work.
 
 ## Acceptance Criteria
 
