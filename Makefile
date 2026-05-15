@@ -54,50 +54,50 @@ ps:
 	docker compose ps
 
 migrate: install db-wait
-	cd backend && ../$(PYTHON) -m alembic -c alembic.ini upgrade head
+	cd backend && PYTHONPATH=src ../$(PYTHON) -m alembic -c alembic.ini upgrade head
 
 ingest-monaco: install db-wait
-	$(PYTHON) scripts/ingest_season.py --year 2024 --round 8 --session R --write-db
+	PYTHONPATH=backend/src $(PYTHON) scripts/ingest_season.py --year 2024 --round 8 --session R --write-db
 
 ## YEAR ?= 2024  ROUND ?= 8  SESSION_CODE ?= R
 ingest: install db-wait
-	$(PYTHON) scripts/ingest_season.py --year $(or $(YEAR),2024) --round $(or $(ROUND),8) --session $(or $(SESSION_CODE),R) --write-db
+	PYTHONPATH=backend/src $(PYTHON) scripts/ingest_season.py --year $(or $(YEAR),2024) --round $(or $(ROUND),8) --session $(or $(SESSION_CODE),R) --write-db
 
 ingest-demo: install db-wait
-	$(PYTHON) scripts/ingest_season.py --year 2024 --round 1 --session R --write-db
-	$(PYTHON) scripts/ingest_season.py --year 2024 --round 8 --session R --write-db
-	$(PYTHON) scripts/ingest_season.py --year 2024 --round 13 --session R --write-db
+	PYTHONPATH=backend/src $(PYTHON) scripts/ingest_season.py --year 2024 --round 1 --session R --write-db
+	PYTHONPATH=backend/src $(PYTHON) scripts/ingest_season.py --year 2024 --round 8 --session R --write-db
+	PYTHONPATH=backend/src $(PYTHON) scripts/ingest_season.py --year 2024 --round 13 --session R --write-db
 
 validate-demo: install db-wait
-	$(PYTHON) scripts/validate_demo_ingest.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/validate_demo_ingest.py
 
 seed: ingest-demo
 
 validate-ml-races: install
-	$(PYTHON) scripts/validate_race_manifest.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/validate_race_manifest.py
 
 ingest-ml-races: install db-wait
-	$(PYTHON) scripts/ingest_race_manifest.py --continue-on-error
+	PYTHONPATH=backend/src $(PYTHON) scripts/ingest_race_manifest.py --continue-on-error
 
 fit-degradation: install db-wait
-	$(PYTHON) scripts/fit_degradation.py --manifest data/reference/ml_race_manifest.yaml
+	PYTHONPATH=backend/src $(PYTHON) scripts/fit_degradation.py --manifest data/reference/ml_race_manifest.yaml
 
 validate-degradation: install db-wait
-	$(PYTHON) scripts/validate_degradation.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/validate_degradation.py
 
 report-degradation: validate-degradation
 
 fit-pit-loss: install db-wait
-	$(PYTHON) scripts/fit_pit_loss.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/fit_pit_loss.py
 
 validate-pit-loss: install db-wait
-	$(PYTHON) scripts/validate_pit_loss.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/validate_pit_loss.py
 
 fit-driver-offsets: install db-wait
-	$(PYTHON) scripts/fit_driver_offsets.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/fit_driver_offsets.py
 
 validate-driver-offsets: install db-wait
-	$(PYTHON) scripts/validate_driver_offsets.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/validate_driver_offsets.py
 
 audit-causal-inputs: install
 	PYTHONPATH=backend/src $(PYTHON) scripts/audit_causal_inputs.py
@@ -124,31 +124,31 @@ prepare-causal-extended-data: install
 	PYTHONPATH=backend/src $(PYTHON) scripts/prepare_causal_extended_data.py
 
 build-xgb-dataset: install db-wait
-	$(PYTHON) scripts/build_xgb_dataset.py --split-strategy $(or $(SPLIT_STRATEGY),temporal_expanding) --target-strategy $(or $(TARGET_STRATEGY),lap_time_delta)
+	PYTHONPATH=backend/src $(PYTHON) scripts/build_xgb_dataset.py --split-strategy $(or $(SPLIT_STRATEGY),temporal_expanding) --target-strategy $(or $(TARGET_STRATEGY),lap_time_delta)
 
 validate-xgb-dataset: install
-	$(PYTHON) scripts/validate_xgb_dataset.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/validate_xgb_dataset.py
 
 diagnose-xgb-shift: install db-wait
-	$(PYTHON) scripts/diagnose_xgb_dataset_shift.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/diagnose_xgb_dataset_shift.py
 
 evaluate-xgb-baselines: install
-	$(PYTHON) scripts/evaluate_xgb_baselines.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/evaluate_xgb_baselines.py
 
 run-xgb-ablations: install
-	$(PYTHON) scripts/run_xgb_ablation.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/run_xgb_ablation.py
 
 train-xgb: install
-	$(PYTHON) scripts/train_xgb.py --feature-set $(or $(FEATURE_SET),full)
+	PYTHONPATH=backend/src $(PYTHON) scripts/train_xgb.py --feature-set $(or $(FEATURE_SET),full)
 
 validate-xgb-model: install
-	$(PYTHON) scripts/validate_xgb_model.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/validate_xgb_model.py
 
 tune-xgb: install
-	$(PYTHON) scripts/tune_xgb.py --feature-set $(or $(FEATURE_SET),full)
+	PYTHONPATH=backend/src $(PYTHON) scripts/tune_xgb.py --feature-set $(or $(FEATURE_SET),full)
 
 plot-xgb-diagnostics: install
-	$(PYTHON) scripts/plot_xgb_diagnostics.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/plot_xgb_diagnostics.py
 
 test: install
 	cd backend && ../$(PYTHON) -m pytest tests/unit -q
@@ -160,7 +160,7 @@ lint: install
 	cd backend && ../$(PYTHON) -m mypy src tests
 
 serve-api: install
-	$(PYTHON) -m uvicorn pitwall.api.main:app --reload --port 8000
+	PYTHONPATH=backend/src $(PYTHON) -m uvicorn pitwall.api.main:app --reload --port 8000
 
 api-wait:
 	@echo "Waiting for API to be ready..."
