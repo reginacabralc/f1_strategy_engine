@@ -24,6 +24,7 @@ from fastapi import Request
 from pitwall.api.connections import ConnectionManager
 from pitwall.core.topics import Topics
 from pitwall.engine.loop import EngineLoop
+from pitwall.engine.projection import PacePredictor
 from pitwall.engine.replay_manager import ReplayManager
 from pitwall.repositories.degradation import DegradationRepository, InMemoryDegradationRepository
 from pitwall.repositories.events import InMemorySessionEventLoader, SessionEventLoader
@@ -78,3 +79,20 @@ def get_connection_manager(request: Request) -> ConnectionManager:
 def get_engine_loop(request: Request) -> EngineLoop:
     """Return the process-wide :class:`EngineLoop` from ``app.state``."""
     return request.app.state.engine_loop  # type: ignore[no-any-return]
+
+
+def get_predictor(request: Request) -> PacePredictor:
+    """Return the process-wide :class:`PacePredictor` from the engine loop.
+
+    Used by the causal prediction endpoint so it shares the same predictor
+    instance that the live engine uses.  Falls back to an empty ScipyPredictor
+    if ``app.state.engine_loop`` is not present (e.g. in unit tests that use
+    ``TestClient(create_app())`` without starting the lifespan).
+    """
+    try:
+        loop: EngineLoop = request.app.state.engine_loop
+        return loop._predictor  # noqa: SLF001
+    except AttributeError:
+        from pitwall.degradation.predictor import ScipyPredictor
+
+        return ScipyPredictor([])

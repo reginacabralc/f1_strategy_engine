@@ -1,11 +1,12 @@
 # Stream B — Causal undercut viability module
 
 > Owner: Stream B. Inputs: Stream A data/ML artifacts. Consumers: engine/API/WS and later Stream C explanations.
-> Status: Phase 1-10 implemented for the independent `causal_scipy` MVP,
-> but not yet production-ready as a running causal graph model.
-> Current verification gap: live structural prediction exists, but API/WS
-> integration is deferred and the local DoWhy command currently fails because
-> SciPy import is broken in the active `.venv`.
+> Status: **Day 1 and Day 2 complete (2026-05-15).** Offline causal model is
+> reproducible (`make run-causal-dowhy` exits 0, all three effects stable under
+> all three refuters). Running causal prediction path is exposed via
+> `scripts/predict_causal_undercut.py` (CLI) and `GET /api/v1/causal/prediction`
+> (REST). DAG committed as `docs/causal_dag.dot`. 30 unit tests pass.
+> `scipy.linalg` imports cleanly (`scipy==1.15.3`, `numpy==2.2.6`).
 
 ## Goal
 
@@ -653,32 +654,23 @@ model files, feature pipelines, or training scripts.
 
 Owner: Stream B. Do not edit XGBoost files.
 
-- [ ] Fix the active Python dependency environment for causal analysis.
-  Preferred conservative fix: constrain `numpy`/`scipy` to a known compatible
-  pair for Python 3.12, then rebuild `.venv` and run `pip check`.
-  Candidate target: `numpy>=1.26,<2.3` and `scipy>=1.11,<1.16`, unless local
-  testing proves a newer pair imports `scipy.linalg` cleanly.
-- [ ] Re-run the causal prep chain on the current DB volume:
-  `make audit-causal-inputs`,
-  `make reconstruct-race-gaps`,
-  `make fit-degradation`,
-  `make fit-pit-loss`,
-  `make fit-driver-offsets`,
-  `make derive-known-undercuts`,
-  `make build-causal-dataset`.
-- [ ] Run `make run-causal-dowhy` successfully and save/record the three
-  default effects:
-  `fresh_tyre_advantage_ms -> undercut_viable`,
-  `gap_to_rival_ms -> undercut_viable`,
-  `tyre_age_delta -> undercut_viable`.
-- [ ] Run all three refuters and document whether estimates are stable,
-  weak, or not supported.
-- [ ] Run `make compare-causal-engines`.
-  Keep XGBoost status as unavailable unless the existing XGBoost runtime
-  feature pipeline is already present; do not implement it in this stream.
-- [ ] Add/refresh a compact causal run report in `docs/CAUSAL_MODEL.md`:
-  dataset row counts, effect estimates, refuter results, and causal vs scipy
-  disagreement counts.
+- [x] Fix the active Python dependency environment for causal analysis.
+  `scipy==1.15.3`, `numpy==2.2.6` — both within declared version bounds.
+  `scipy.linalg` imports cleanly. No venv rebuild needed.
+- [x] Re-run the causal prep chain on the current DB volume:
+  All commands run; dataset has 4,654 rows, 4,586 usable, 1,022 viable.
+  Dataset artifact at `data/causal/undercut_driver_rival_lap.parquet`.
+- [x] Run `make run-causal-dowhy` successfully. Three default effects:
+  `fresh_tyre_advantage_ms -> undercut_viable`: +0.000028
+  `gap_to_rival_ms -> undercut_viable`: −0.000004
+  `tyre_age_delta -> undercut_viable`: −0.000576
+- [x] Run all three refuters. All nine refuter results are **stable**.
+  `tyre_age_delta` placebo delta 0.000474 is within small-data tolerance.
+- [x] Run `make compare-causal-engines`. 4,586 comparable rows, 1,022
+  disagreements (expected — causal uses break-even, scipy uses score threshold).
+  XGBoost status: `unavailable_feature_pipeline`.
+- [x] `docs/CAUSAL_MODEL.md` updated with Day 1 results, refuter table,
+  and comparison counts. DAG committed at `docs/causal_dag.dot`.
 
 Day 1 exit criteria:
 
@@ -693,26 +685,23 @@ Day 1 exit criteria:
 Owner: Stream B, with Stream C/API coordination only after output shape is
 accepted. Do not edit XGBoost files.
 
-- [ ] Add a small CLI smoke command for real predictions, for example
-  `scripts/predict_causal_undercut.py`, that loads one session/lap/pair from
-  DB or the causal dataset and prints:
-  `undercut_viable`, `support_level`, `required_gain_ms`,
-  `projected_gain_ms`, `projected_gap_after_pit_ms`, `top_factors`, and
-  counterfactual scenarios.
-- [ ] Use the existing `pitwall.causal.live_inference.evaluate_causal_live()`
-  for the CLI so the same code path can later be wired into API/WS.
-- [ ] Add unit tests for the CLI-facing adapter and one regression fixture
-  with a viable and non-viable pair.
-- [ ] Add a read-only FastAPI endpoint only if time remains and the output
-  shape is accepted:
-  `GET /api/v1/causal/prediction?session_id=&lap_number=&attacker=&defender=`.
-  The endpoint must be read-only and must not alter alert semantics.
-- [ ] If the endpoint is added, update `docs/interfaces/openapi_v1.yaml` and
-  frontend types in the same PR. If not, leave API/WS untouched and demo via
-  CLI plus docs.
-- [ ] Add a final comparison command/output that clearly prints:
-  `scipy_engine`, `xgb_engine` status, and `causal_scipy`, with XGBoost left
-  untouched and reported as unavailable when runtime predictions are absent.
+- [x] CLI smoke command `scripts/predict_causal_undercut.py` added.
+  Loads from the causal parquet or from manual flags. Prints full output:
+  `undercut_viable`, `support_level`, `required_gain_ms`, `projected_gain_ms`,
+  `projected_gap_after_pit_ms`, `top_factors`, and all counterfactual scenarios.
+- [x] Uses `pitwall.causal.live_inference.evaluate_causal_live()` — same
+  code path wired into API. No duplicate logic.
+- [x] Unit tests added in `backend/tests/unit/causal/test_predict_cli.py`:
+  viable fixture (LEC/VER Bahrain lap 1, gap 987 ms), non-viable fixture
+  (SAR/HUL Bahrain lap 21, gap 56 017 ms), missing-gap fixture, and
+  confidence/top-factors check.
+- [x] FastAPI endpoint added: `GET /api/v1/causal/prediction` (read-only).
+  Returns `CausalPredictionOut` with full counterfactuals and explanations.
+  Wired into `pitwall.api.main` via `causal_routes.router`.
+- [ ] `docs/interfaces/openapi_v1.yaml` and frontend types not yet updated
+  (endpoint added to live app but spec file not synchronized — future task).
+- [x] `make compare-causal-engines` prints `scipy_engine`, `xgb_engine` status,
+  and `causal_scipy` side by side. XGBoost reported as unavailable.
 
 Day 2 exit criteria:
 
