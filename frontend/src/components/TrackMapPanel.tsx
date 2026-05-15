@@ -308,7 +308,7 @@ export function TrackMapPanel({ drivers = MOCK_DRIVERS }: Props) {
 
       {/* Footer */}
       <p className="px-3 py-1.5 text-[10px] text-pitwall-muted border-t border-pitwall-border text-center shrink-0">
-        Live positions connect after Stream C Day 4 race feed
+        Static preview — live positions via race feed
       </p>
     </section>
   );

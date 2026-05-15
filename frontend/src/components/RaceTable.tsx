@@ -37,17 +37,18 @@ const COMPOUND_STYLES: Record<
 function ScoreBar({ score }: { score: number | null | undefined }) {
   if (score == null)
     return <span className="text-pitwall-muted font-mono">—</span>;
-  const pct = Math.round(score * 100);
+  const clamped = Math.max(0, Math.min(1, score));
+  const pct = Math.round(clamped * 100);
   const color =
-    score >= 0.6
+    clamped >= 0.65
       ? "bg-pitwall-accent"
-      : score >= 0.35
+      : clamped >= 0.35
         ? "bg-pitwall-yellow"
         : "bg-pitwall-green";
   const textColor =
-    score >= 0.6
+    clamped >= 0.65
       ? "text-pitwall-accent"
-      : score >= 0.35
+      : clamped >= 0.35
         ? "text-pitwall-yellow"
         : "text-pitwall-green";
   return (
@@ -56,6 +57,7 @@ function ScoreBar({ score }: { score: number | null | undefined }) {
         <div
           className={`h-full rounded-full ${color}`}
           style={{ width: `${pct}%` }}
+          data-score-level={clamped >= 0.65 ? "high" : clamped >= 0.35 ? "mid" : "low"}
         />
       </div>
       <span className={`text-xs tabular-nums font-mono font-semibold ${textColor}`}>
