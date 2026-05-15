@@ -24,6 +24,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), vers
   controles de replay, degradación y panel de backtest.
 - Pipeline scipy de degradación persistido en DB y targets XGBoost en Makefile.
 - CI `lint`, `test` y `build` en GitHub Actions.
+- Contrato OpenAPI v1 actualizado con `GET /api/v1/causal/prediction` y sus
+  esquemas de validación/respuesta para evitar drift entre FastAPI y
+  `docs/interfaces/openapi_v1.yaml`.
 
 ### Pendiente para v0.1.0 (entrega MVP)
 

@@ -60,6 +60,8 @@ tags:
     description: Compare engine alerts against curated known undercuts.
   - name: config
     description: Runtime configuration toggles (predictor selection, etc.).
+  - name: causal
+    description: Read-only causal undercut viability predictions.
 
 paths:
 
@@ -238,6 +240,137 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Problem" }
 
+  /api/v1/causal/prediction:
+    get:
+      tags: [causal]
+      operationId: getCausalPrediction
+      summary: Causal undercut viability prediction for one driver pair at one lap
+      description: |
+        Read-only endpoint that reconstructs a single attacker/defender state
+        from query parameters and evaluates the causal live-inference chain.
+        It does not require an active replay and does not modify engine state.
+      parameters:
+        - in: query
+          name: session_id
+          required: false
+          description: Session identifier, e.g. `bahrain_2024_R`.
+          schema:
+            type: string
+            default: bahrain_2024_R
+          example: bahrain_2024_R
+        - in: query
+          name: circuit_id
+          required: false
+          description: Circuit slug, e.g. `bahrain`.
+          schema:
+            type: string
+            default: bahrain
+          example: bahrain
+        - in: query
+          name: lap_number
+          required: false
+          description: Current race lap number.
+          schema:
+            type: integer
+            minimum: 1
+            default: 30
+        - in: query
+          name: total_laps
+          required: false
+          description: Total scheduled race laps.
+          schema:
+            type: integer
+            minimum: 1
+            nullable: true
+          example: 57
+        - in: query
+          name: attacker
+          required: false
+          description: Attacker driver code, e.g. `NOR`.
+          schema:
+            type: string
+            default: NOR
+          example: NOR
+        - in: query
+          name: attacker_compound
+          required: false
+          description: Attacker tyre compound.
+          schema:
+            $ref: "#/components/schemas/Compound"
+            default: MEDIUM
+        - in: query
+          name: attacker_tyre_age
+          required: false
+          description: Attacker tyre age in laps.
+          schema:
+            type: integer
+            minimum: 0
+            default: 15
+        - in: query
+          name: defender
+          required: false
+          description: Defender driver code, e.g. `VER`.
+          schema:
+            type: string
+            default: VER
+          example: VER
+        - in: query
+          name: defender_compound
+          required: false
+          description: Defender tyre compound.
+          schema:
+            $ref: "#/components/schemas/Compound"
+            default: HARD
+        - in: query
+          name: defender_tyre_age
+          required: false
+          description: Defender tyre age in laps.
+          schema:
+            type: integer
+            minimum: 0
+            default: 25
+        - in: query
+          name: gap_ms
+          required: false
+          description: Current gap attacker to defender in milliseconds.
+          schema:
+            type: integer
+            minimum: 0
+            default: 5000
+        - in: query
+          name: pit_loss_ms
+          required: false
+          description: Estimated pit-stop time loss in milliseconds.
+          schema:
+            type: integer
+            minimum: 0
+            default: 21000
+        - in: query
+          name: track_status
+          required: false
+          description: Current track status.
+          schema:
+            $ref: "#/components/schemas/TrackStatus"
+            default: GREEN
+        - in: query
+          name: rainfall
+          required: false
+          description: True if rainfall is reported at the circuit.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Prediction produced successfully.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CausalPredictionOut" }
+        "422":
+          description: Validation Error
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HTTPValidationError" }
+
   /api/v1/backtest/{session_id}:
     get:
       tags: [backtest]
@@ -363,6 +496,30 @@ components:
             - { type: array, items: { type: object } }
           example: Session 'monaco_2024_R' not found.
 
+    ValidationError:
+      type: object
+      required: [loc, msg, type]
+      properties:
+        loc:
+          type: array
+          items:
+            oneOf:
+              - { type: string }
+              - { type: integer }
+        msg:   { type: string }
+        type:  { type: string }
+        input: {}
+        ctx:
+          type: object
+          additionalProperties: true
+
+    HTTPValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items: { $ref: "#/components/schemas/ValidationError" }
+
     SessionSummary:
       type: object
       required: [session_id, circuit_id, season, round_number, date]
@@ -467,6 +624,66 @@ components:
             properties:
               tyre_age:    { type: integer }
               lap_time_ms: { type: integer }
+
+    CausalCounterfactualOut:
+      type: object
+      required:
+        - scenario_name
+        - undercut_viable
+        - main_limiting_factor
+        - explanation
+      properties:
+        scenario_name: { type: string }
+        undercut_viable: { type: boolean }
+        required_gain_ms: { type: integer, nullable: true }
+        projected_gain_ms: { type: integer, nullable: true }
+        projected_gap_after_pit_ms: { type: integer, nullable: true }
+        main_limiting_factor: { type: string }
+        explanation: { type: string }
+
+    CausalPredictionOut:
+      type: object
+      required:
+        - session_id
+        - circuit_id
+        - lap_number
+        - attacker_code
+        - defender_code
+        - undercut_viable
+        - support_level
+        - confidence
+        - traffic_after_pit
+        - top_factors
+        - explanations
+        - counterfactuals
+      properties:
+        session_id: { type: string }
+        circuit_id: { type: string }
+        lap_number: { type: integer }
+        attacker_code: { type: string }
+        defender_code: { type: string }
+        undercut_viable: { type: boolean }
+        support_level:
+          type: string
+          description: One of `strong`, `weak`, or `insufficient`.
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        required_gain_ms: { type: integer, nullable: true }
+        projected_gain_ms: { type: integer, nullable: true }
+        projected_gap_after_pit_ms: { type: integer, nullable: true }
+        traffic_after_pit: { type: string }
+        top_factors:
+          type: array
+          items: { type: string }
+        explanations:
+          type: array
+          items: { type: string }
+        counterfactuals:
+          type: array
+          items: { $ref: "#/components/schemas/CausalCounterfactualOut" }
 
     ReplayStartRequest:
       type: object

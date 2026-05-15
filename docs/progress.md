@@ -540,6 +540,10 @@
   3-race ingest + demo degradation fit + backend + frontend, while `demo-api` keeps
   the Swagger-only path. Added/kept Makefile targets `ingest`, `test-backend`,
   `serve-api`, `fit-degradation-demo`, and `demo-api` so documented commands exist.
+- [x] **Stream D**: OpenAPI contract drift corrected for the causal endpoint.
+  Added `/api/v1/causal/prediction` plus its response/validation schemas to
+  `docs/interfaces/openapi_v1.yaml` and extended the contract test's
+  `IMPLEMENTED` list so CI now enforces `operationId`/tag parity for that route too.
 - [ ] Stream D: changelog v0.1.0, video demo enlazado.
 - [ ] **Tag `v0.1.0` y release notes.**
 
