@@ -20,11 +20,11 @@ dependencies = [
     # Stream A, Day 2-3 — FastF1 ingestion, DB access, data processing
     "alembic>=1.13",
     "fastf1==3.8.3",
-    "numpy>=1.26",
+    "numpy>=1.26,<2.3",
     "polars>=1.0",
     "psycopg[binary]>=3.1",
     "python-dotenv>=1.0",
-    "scipy>=1.11",
+    "scipy>=1.11,<1.16",
     "sqlalchemy>=2.0",
     # Stream D, Day 1 — ML predictor runtime
     "xgboost>=2.0",

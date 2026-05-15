@@ -21,6 +21,7 @@ services:
     build:
       context: .
       dockerfile: docker/backend.Dockerfile
+      target: prod
     depends_on:
       db:
         condition: service_healthy
@@ -33,6 +34,7 @@ services:
     build:
       context: .
       dockerfile: docker/backend.Dockerfile
+      target: prod
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -44,6 +46,27 @@ services:
       PACE_PREDICTOR: scipy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+      target: dev
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_PROXY_TARGET: http://backend:8000
+      VITE_API_URL: http://localhost:8000
+      VITE_WS_URL: ws://localhost:8000/ws/v1/live
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:5173').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\""]
       interval: 10s
       timeout: 5s
       retries: 6
