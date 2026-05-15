@@ -75,9 +75,9 @@ frontend/
 - [x] Component `<AlertFeed>` muestra últimas 20 alertas con flash al recibir.
 
 ### Día 7 — Toggle predictor + UX
-- [ ] Component `<PredictorToggle>` (radio scipy/xgb) que llama `POST /api/v1/config/predictor`.
-- [ ] Indicador visual del predictor activo en la tabla.
-- [ ] Loading states + error states limpios.
+- [x] Component `<PredictorToggle>` (radio scipy/xgb) que llama `POST /api/v1/config/predictor`.
+- [x] Indicador visual del predictor activo en la tabla.
+- [x] Loading states + error states limpios.
 
 ### Día 8 — Pulido visual mínimo
 - [ ] Tailwind: paleta consistente (3 colores + grises).

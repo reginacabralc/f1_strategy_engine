@@ -272,7 +272,18 @@
   `ignore_missing_imports = true` added to `[tool.mypy]` — no flag divergence.
   `xgb_model_path` setting added to `Settings`.
   **210 tests, ruff clean, mypy clean (80 files).**
-- [ ] Stream C: AlertFeed funcional + toggle predictor.
+- [x] Stream C: AlertFeed funcional + toggle predictor.
+      `usePredictor.ts` hook wraps `setPredictor` API call, tracks `pendingTarget` and `error`.
+      `PredictorToggle.tsx` renders scipy/xgboost radio buttons, shows optimistic pending state,
+      "Switching…" label, 409-specific error ("XGBoost model not available. Staying on scipy."),
+      and generic network error. `RaceTable` gains `activePredictor?` prop rendering a compact
+      badge (`data-testid="predictor-badge"`). `TopBar` predictor chip now shows live
+      `snapshot.active_predictor` instead of hardcoded "scipy". `App.tsx` threads
+      `snapshot?.active_predictor` to TopBar, RaceTable, and PredictorToggle; PredictorToggle
+      placed in right column between AlertPanel and Track Conditions. Day 6 live WS, Day 9
+      BacktestView, and backend untouched. 10 new PredictorToggle tests + 3 new RaceTable tests;
+      total 37 tests passing.
+      `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm test` 37/37 ✅ · `pnpm build` ✅.
 - [ ] Stream D: Dockerfile frontend + nginx prod.
 
 ### Día 8

@@ -7,6 +7,7 @@ import { MetricCard } from "./components/MetricCard";
 import { DegradationChart } from "./components/DegradationChart";
 import { TrackMapPanel } from "./components/TrackMapPanel";
 import { ReplayControls } from "./components/ReplayControls";
+import { PredictorToggle } from "./components/PredictorToggle";
 import { useSessions } from "./hooks/useSessions";
 import { useRaceFeed } from "./hooks/useRaceFeed";
 
@@ -39,6 +40,7 @@ export function App() {
         selectedSession={selectedSession}
         onSelectSession={setSelectedSession}
         connectionStatus={status}
+        activePredictor={snapshot?.active_predictor}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -62,6 +64,7 @@ export function App() {
               drivers={snapshot?.drivers}
               isLive={status === "open"}
               connectionStatus={status}
+              activePredictor={snapshot?.active_predictor}
             />
 
             {/* Lower panels: Degradation + Track Map, side-by-side on wider screens */}
@@ -71,9 +74,11 @@ export function App() {
             </div>
           </main>
 
-          {/* Right column: alerts + metrics */}
+          {/* Right column: alerts + predictor toggle + metrics */}
           <aside className="w-64 shrink-0 flex flex-col gap-3 p-3 border-l border-pitwall-border overflow-y-auto">
             <AlertPanel alerts={alerts} />
+
+            <PredictorToggle activePredictor={snapshot?.active_predictor} />
 
             <div>
               <span className="label-caps block mb-2">Track Conditions</span>
