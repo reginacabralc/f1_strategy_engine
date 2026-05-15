@@ -30,6 +30,7 @@ from fastapi import FastAPI
 from pitwall import __version__
 from pitwall.api.connections import ConnectionManager
 from pitwall.api.routes import backtest as backtest_routes
+from pitwall.api.routes import causal as causal_routes
 from pitwall.api.routes import config as config_routes
 from pitwall.api.routes import degradation as degradation_routes
 from pitwall.api.routes import replay as replay_routes
@@ -163,6 +164,7 @@ def create_app() -> FastAPI:
     app.include_router(degradation_routes.router)
     app.include_router(config_routes.router)
     app.include_router(backtest_routes.router)
+    app.include_router(causal_routes.router)
     app.include_router(ws_router)
 
     return app
