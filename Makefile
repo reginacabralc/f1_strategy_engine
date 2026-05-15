@@ -1,5 +1,6 @@
 PYTHON ?= .venv/bin/python
 PIP ?= $(PYTHON) -m pip
+PNPM ?= $(shell command -v pnpm >/dev/null 2>&1 && echo pnpm || echo "corepack pnpm")
 
 .PHONY: install db-up db-wait db-down up down down-v logs ps migrate \
         ingest ingest-monaco ingest-demo validate-demo seed \
@@ -14,7 +15,8 @@ PIP ?= $(PYTHON) -m pip
         audit-causal-inputs reconstruct-race-gaps derive-known-undercuts \
         import-curated-known-undercuts build-causal-dataset run-causal-dowhy \
         compare-causal-engines prepare-causal-extended-data \
-        replay test test-backend lint demo serve-api api-wait
+        replay test test-backend test-frontend lint lint-backend lint-frontend \
+        demo serve-api api-wait
 
 install: .venv/.installed
 
@@ -37,7 +39,7 @@ db-wait: db-up
 db-down:
 	docker compose down
 
-## Compose currently includes db, migrate, and backend; frontend is pending Stream C.
+## Compose includes db, migrate, backend, and frontend.
 up:
 	docker compose up -d
 
@@ -150,14 +152,24 @@ tune-xgb: install
 plot-xgb-diagnostics: install
 	PYTHONPATH=backend/src $(PYTHON) scripts/plot_xgb_diagnostics.py
 
-test: install
+test: test-backend test-frontend
+
+test-backend: install
 	cd backend && ../$(PYTHON) -m pytest tests/unit -q
 
-test-backend: test
+test-frontend:
+	cd frontend && $(PNPM) install --frozen-lockfile
+	cd frontend && $(PNPM) test
 
-lint: install
+lint: lint-backend lint-frontend
+
+lint-backend: install
 	cd backend && ../$(PYTHON) -m ruff check .
 	cd backend && ../$(PYTHON) -m mypy src tests
+
+lint-frontend:
+	cd frontend && $(PNPM) install --frozen-lockfile
+	cd frontend && $(PNPM) lint
 
 serve-api: install
 	PYTHONPATH=backend/src $(PYTHON) -m uvicorn pitwall.api.main:app --reload --port 8000
@@ -172,7 +184,7 @@ api-wait:
 ## SPEED ?= 30  (replay speed multiplier)
 ## SESSION ?= monaco_2024_R
 replay: install db-wait
-	$(PYTHON) scripts/ingest_season.py --year 2024 --round 8 --session R --write-db
+	PYTHONPATH=backend/src $(PYTHON) scripts/ingest_season.py --year 2024 --round 8 --session R --write-db
 	@echo "Replay via API: POST /api/v1/replay/start  (Stream B Day 3 target)"
 
 ## demo: DB up (Docker), migrations and seed via local venv, then API up.

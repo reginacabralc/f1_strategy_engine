@@ -38,22 +38,24 @@ docs/walkthrough.md (mantenimiento)
 ## Tareas
 
 ### Día 1 — Kickoff + bootstrap (E1)
-- [ ] Branch `bootstrap`.
-- [ ] `.gitignore` Python+Node+Docker.
-- [ ] `backend/pyproject.toml` con `uv` (Python 3.12, FastAPI, asyncio, polars, scipy, xgboost, pytest, ruff, mypy).
-- [ ] `frontend/package.json` con Vite + React + TS + Tailwind.
-- [ ] Esqueleto `docker-compose.yaml` (servicios placeholder).
-- [ ] `Makefile` con targets vacíos: `up`, `down`, `test`, `lint`, `seed`, `migrate`, `replay`, `demo`.
-- [ ] ADRs 0001-0004 escritos (stack, replay-first, timescale, baseline-scipy).
+- [x] Branch `bootstrap`.
+      Implementado sobre la rama activa `causal2`; no se creó/renombró rama
+      para evitar mover trabajo existente.
+- [x] `.gitignore` Python+Node+Docker.
+- [x] `backend/pyproject.toml` con `uv` (Python 3.12, FastAPI, asyncio, polars, scipy, xgboost, pytest, ruff, mypy).
+- [x] `frontend/package.json` con Vite + React + TS + Tailwind.
+- [x] Esqueleto `docker-compose.yaml` (servicios placeholder).
+- [x] `Makefile` con targets vacíos: `up`, `down`, `test`, `lint`, `seed`, `migrate`, `replay`, `demo`.
+- [x] ADRs 0001-0004 escritos (stack, replay-first, timescale, baseline-scipy).
 
 ### Día 2 — Docker funcional (E1, E11) ⭐
-- [ ] `docker/backend.Dockerfile` multi-stage (builder + dev + prod).
-- [ ] `docker/frontend.Dockerfile` (vite dev / nginx prod).
-- [ ] `docker/postgres-init.sql` con `CREATE EXTENSION timescaledb`.
-- [ ] `docker compose up` levanta los 3 servicios sin errores.
-- [ ] Healthchecks reales (no `sleep 5`).
-- [ ] `.github/workflows/lint.yml` con ruff + eslint.
-- [ ] `.github/workflows/test.yml` con pytest + vitest (placeholder — pasa porque no hay tests).
+- [x] `docker/backend.Dockerfile` multi-stage (builder + dev + prod).
+- [x] `docker/frontend.Dockerfile` (vite dev / nginx prod).
+- [x] `docker/postgres-init.sql` con `CREATE EXTENSION timescaledb`.
+- [x] `docker compose up` levanta los 3 servicios sin errores.
+- [x] Healthchecks reales (no `sleep 5`).
+- [x] `.github/workflows/lint.yml` con ruff + eslint.
+- [x] `.github/workflows/test.yml` con pytest + vitest.
 
 ### Día 3 — Migraciones (E4)
 - [ ] Setup alembic en `backend/src/pitwall/db/migrations/`.

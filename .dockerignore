@@ -20,8 +20,12 @@ models/*.json
 models/*.bin
 models/*.ubj
 
-# Frontend build artifacts (service not wired until Stream C scaffolds it)
-frontend/
+# Frontend dependency/build artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/playwright-report/
+frontend/test-results/
 node_modules/
 
 # Local env overrides

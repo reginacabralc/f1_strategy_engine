@@ -35,6 +35,14 @@
       because `scipy.linalg` fails to import `decomp_lu`; the 2-day recovery
       plan is documented in `.claude/plans/stream-b-causal-undercut.md`.
 
+### Stream D Day 1-2 completion
+- [x] Stream D Day 1: bootstrap artifacts are present on the active branch:
+      `.gitignore`, backend `pyproject.toml`, frontend `package.json`,
+      Compose skeleton, Make targets, and ADRs 0001-0004.
+- [x] Stream D Day 2: backend Dockerfile is multi-stage, frontend Dockerfile
+      supports Vite dev and nginx prod, Compose wires db/backend/frontend with
+      real healthchecks, and CI lint/test now includes frontend eslint/vitest.
+
 ## Semana 1
 
 ### Día 0 — Pre-arranque
