@@ -1,5 +1,3 @@
-// Replay playback bar — controls wired to replay engine in Day 4.
-
 const SPEEDS = ["×1", "×10", "×30", "×100"] as const;
 
 function SkipBackIcon() {
@@ -117,8 +115,8 @@ export function ReplayControls() {
         </div>
       </div>
 
-      <span className="text-[10px] text-pitwall-muted ml-1">
-        Replay — Day 4
+      <span className="text-[10px] text-pitwall-muted ml-1 hidden sm:inline">
+        Select a session to enable replay
       </span>
     </footer>
   );

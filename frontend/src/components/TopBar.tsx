@@ -1,8 +1,14 @@
 import { SessionPicker } from "./SessionPicker";
+import type { ConnectionStatus } from "../hooks/useRaceFeed";
+import type { PredictorName } from "../api/types";
 
 interface Props {
   selectedSession: string | null;
   onSelectSession: (id: string) => void;
+  connectionStatus?: ConnectionStatus;
+  activePredictor?: PredictorName;
+  currentLap?: number;
+  totalLaps?: number;
 }
 
 function StatusDot({ color }: { color: "green" | "yellow" | "red" | "white" }) {
@@ -15,11 +21,21 @@ function StatusDot({ color }: { color: "green" | "yellow" | "red" | "white" }) {
   return <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${cls}`} />;
 }
 
-export function TopBar({ selectedSession, onSelectSession }: Props) {
+function connectionDotColor(
+  status: ConnectionStatus | undefined,
+): "green" | "yellow" | "red" | "white" {
+  if (status === "open") return "green";
+  if (status === "connecting" || status === "reconnecting") return "yellow";
+  if (status === "error" || status === "closed") return "red";
+  return "white";
+}
+
+export function TopBar({ selectedSession, onSelectSession, connectionStatus, activePredictor, currentLap, totalLaps }: Props) {
   return (
     <header className="h-11 shrink-0 flex items-center gap-0 border-b border-pitwall-border bg-pitwall-surface px-3">
       {/* Brand */}
       <div className="flex items-center gap-2 pr-4 border-r border-pitwall-border mr-4">
+        <span className="text-base leading-none select-none" aria-hidden="true">🏎</span>
         <span className="text-pitwall-accent font-black text-sm tracking-tighter leading-none">
           PIT<span className="text-pitwall-text">WALL</span>
         </span>
@@ -27,7 +43,7 @@ export function TopBar({ selectedSession, onSelectSession }: Props) {
 
       {/* Session label */}
       <div className="flex items-center gap-2 text-xs">
-        <StatusDot color="green" />
+        <StatusDot color={connectionDotColor(connectionStatus)} />
         <span className="text-pitwall-muted">Session</span>
         <span className="text-pitwall-text font-mono font-semibold">
           {selectedSession ?? "—"}
@@ -36,10 +52,16 @@ export function TopBar({ selectedSession, onSelectSession }: Props) {
 
       <div className="w-px h-5 bg-pitwall-border mx-4" />
 
-      {/* Lap placeholder */}
+      {/* Lap counter */}
       <div className="flex items-center gap-1.5 text-xs">
         <span className="text-pitwall-muted">LAP</span>
-        <span className="text-pitwall-text font-mono font-bold">—/—</span>
+        <span className="text-pitwall-text font-mono font-bold">
+          {currentLap != null ? currentLap : "—"}
+        </span>
+        <span className="text-pitwall-muted">/</span>
+        <span className="text-pitwall-muted font-mono">
+          {totalLaps != null ? totalLaps : "—"}
+        </span>
       </div>
 
       <div className="w-px h-5 bg-pitwall-border mx-4" />
@@ -60,7 +82,7 @@ export function TopBar({ selectedSession, onSelectSession }: Props) {
           Predictor
         </span>
         <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-pitwall-accent/10 text-pitwall-accent border border-pitwall-accent/30 uppercase tracking-wide">
-          scipy
+          {activePredictor ?? "scipy"}
         </span>
       </div>
 

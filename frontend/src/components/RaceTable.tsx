@@ -1,4 +1,4 @@
-import type { DriverState } from "../api/types";
+import type { DriverState, PredictorName } from "../api/types";
 import mockRaceOrder from "../data/mockRaceOrder.json";
 
 const MOCK_DRIVERS = mockRaceOrder as DriverState[];
@@ -34,20 +34,21 @@ const COMPOUND_STYLES: Record<
   },
 };
 
-function ScoreBar({ score }: { score: number | null }) {
-  if (score === null)
+function ScoreBar({ score }: { score: number | null | undefined }) {
+  if (score == null)
     return <span className="text-pitwall-muted font-mono">—</span>;
-  const pct = Math.round(score * 100);
+  const clamped = Math.max(0, Math.min(1, score));
+  const pct = Math.round(clamped * 100);
   const color =
-    score >= 0.6
+    clamped >= 0.65
       ? "bg-pitwall-accent"
-      : score >= 0.35
+      : clamped >= 0.35
         ? "bg-pitwall-yellow"
         : "bg-pitwall-green";
   const textColor =
-    score >= 0.6
+    clamped >= 0.65
       ? "text-pitwall-accent"
-      : score >= 0.35
+      : clamped >= 0.35
         ? "text-pitwall-yellow"
         : "text-pitwall-green";
   return (
@@ -56,6 +57,7 @@ function ScoreBar({ score }: { score: number | null }) {
         <div
           className={`h-full rounded-full ${color}`}
           style={{ width: `${pct}%` }}
+          data-score-level={clamped >= 0.65 ? "high" : clamped >= 0.35 ? "mid" : "low"}
         />
       </div>
       <span className={`text-xs tabular-nums font-mono font-semibold ${textColor}`}>
@@ -65,8 +67,8 @@ function ScoreBar({ score }: { score: number | null }) {
   );
 }
 
-function msToGap(ms: number | null): string {
-  if (ms === null || ms === 0) return "—";
+function msToGap(ms: number | null | undefined): string {
+  if (ms == null || ms === 0) return "—";
   return `+${(ms / 1000).toFixed(3)}s`;
 }
 
@@ -78,14 +80,58 @@ function positionStyle(pos: number): string {
 
 interface Props {
   drivers?: DriverState[];
+  isLive?: boolean;
+  connectionStatus?: string;
+  activePredictor?: PredictorName;
 }
 
-export function RaceTable({ drivers = MOCK_DRIVERS }: Props) {
+export function RaceTable({ drivers = MOCK_DRIVERS, isLive, connectionStatus, activePredictor }: Props) {
+  const showEmpty = drivers.length === 0;
+  const showInfoBar = isLive != null || activePredictor != null;
+
   return (
     <div
       className="overflow-x-auto rounded-lg border border-pitwall-border bg-pitwall-surface"
       data-testid="race-table-scroll"
     >
+      {showInfoBar && (
+        <div className="px-3 py-1.5 border-b border-pitwall-border flex items-center gap-2">
+          {isLive != null && (
+            <>
+              <span
+                className={[
+                  "inline-block w-1.5 h-1.5 rounded-full shrink-0",
+                  connectionStatus === "open"
+                    ? "bg-pitwall-green shadow-[0_0_6px_#22c55e]"
+                    : connectionStatus === "connecting" || connectionStatus === "reconnecting"
+                      ? "bg-pitwall-yellow"
+                      : "bg-pitwall-muted",
+                ].join(" ")}
+              />
+              <span className="text-[10px] text-pitwall-muted uppercase tracking-wider">
+                {isLive ? "Live" : "Demo"}
+              </span>
+            </>
+          )}
+          {activePredictor != null && (
+            <span
+              className="ml-auto text-[10px] font-mono text-pitwall-muted"
+              data-testid="predictor-badge"
+            >
+              predictor:{" "}
+              <span className="font-semibold text-pitwall-accent">{activePredictor}</span>
+            </span>
+          )}
+        </div>
+      )}
+      {showEmpty ? (
+        <p
+          className="px-3 py-8 text-[11px] text-pitwall-muted text-center"
+          data-testid="race-table-empty"
+        >
+          No race data — start a replay to see live timing
+        </p>
+      ) : (
       <table className="min-w-[760px] w-full text-xs">
         <thead>
           <tr className="border-b border-pitwall-border">
@@ -166,6 +212,7 @@ export function RaceTable({ drivers = MOCK_DRIVERS }: Props) {
           })}
         </tbody>
       </table>
+      )}
     </div>
   );
 }

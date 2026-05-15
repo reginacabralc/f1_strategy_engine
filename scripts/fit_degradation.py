@@ -69,6 +69,11 @@ def parse_args() -> argparse.Namespace:
         const=str(DEFAULT_MANIFEST_PATH),
         help="Fit enabled sessions from a race manifest, defaulting to data/reference/ml_race_manifest.yaml.",
     )
+    target.add_argument(
+        "--all-sessions",
+        action="store_true",
+        help="Fit every ingested session in clean_air_lap_times.",
+    )
     parser.add_argument(
         "--no-refresh-clean-air",
         dest="refresh_clean_air",

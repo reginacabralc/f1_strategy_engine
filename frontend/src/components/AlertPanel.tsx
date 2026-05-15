@@ -1,38 +1,17 @@
-// Placeholder alert panel — will be populated by the WebSocket alert stream in Day 5.
+import type { AlertPayload } from "../api/ws";
+import type { AlertType } from "../api/types";
+
+interface Props {
+  alerts?: AlertPayload[];
+}
 
 type AlertLevel = "critical" | "warning" | "info";
 
-interface AlertItem {
-  id: string;
-  level: AlertLevel;
-  driver: string;
-  message: string;
-  lap: number;
+function alertLevel(type: AlertType): AlertLevel {
+  if (type === "UNDERCUT_VIABLE") return "critical";
+  if (type === "UNDERCUT_RISK") return "warning";
+  return "info";
 }
-
-const MOCK_ALERTS: AlertItem[] = [
-  {
-    id: "a1",
-    level: "critical",
-    driver: "LEC",
-    message: "Undercut window open — pit now",
-    lap: 27,
-  },
-  {
-    id: "a2",
-    level: "warning",
-    driver: "SAI",
-    message: "Gap closing — monitor",
-    lap: 27,
-  },
-  {
-    id: "a3",
-    level: "info",
-    driver: "HAM",
-    message: "Pit window opens in 3 laps",
-    lap: 27,
-  },
-];
 
 const LEVEL_STYLES: Record<AlertLevel, { bar: string; badge: string; text: string }> = {
   critical: {
@@ -58,7 +37,11 @@ const LEVEL_LABEL: Record<AlertLevel, string> = {
   info: "INFO",
 };
 
-export function AlertPanel() {
+function msToSec(ms: number): string {
+  return `+${(ms / 1000).toFixed(1)}s`;
+}
+
+export function AlertPanel({ alerts = [] }: Props) {
   return (
     <section
       aria-label="Strategy alerts"
@@ -67,49 +50,70 @@ export function AlertPanel() {
       <div className="flex items-center justify-between px-3 py-2 border-b border-pitwall-border shrink-0">
         <span className="label-caps">Strategy Alerts</span>
         <span className="text-[10px] font-mono text-pitwall-muted">
-          {MOCK_ALERTS.length} active
+          {alerts.length} active
         </span>
       </div>
 
-      <ul className="flex flex-col gap-2 p-2 overflow-y-auto">
-        {MOCK_ALERTS.map((alert) => {
-          const s = LEVEL_STYLES[alert.level];
-          return (
-            <li
-              key={alert.id}
-              className="relative flex gap-2.5 bg-pitwall-panel rounded-md px-3 py-2.5 overflow-hidden"
-            >
-              {/* left accent bar */}
-              <span
-                className={`absolute left-0 top-0 bottom-0 w-0.5 rounded-r ${s.bar}`}
-              />
+      {alerts.length === 0 ? (
+        <p
+          className="px-3 py-6 text-[11px] text-pitwall-muted text-center"
+          data-testid="alert-empty"
+        >
+          No alerts — start a replay to receive live strategy alerts
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2 p-2 overflow-y-auto">
+          {alerts.map((alert, idx) => {
+            const level = alertLevel(alert.alert_type);
+            const s = LEVEL_STYLES[level];
+            const isNewest = idx === 0;
+            return (
+              <li
+                key={alert.alert_id}
+                className={[
+                  "relative flex gap-2.5 bg-pitwall-panel rounded-md px-3 py-2.5 overflow-hidden",
+                  isNewest ? "alert-flash" : "",
+                ].join(" ")}
+              >
+                <span
+                  className={`absolute left-0 top-0 bottom-0 w-0.5 rounded-r ${s.bar}`}
+                />
 
-              <div className="flex flex-col gap-0.5 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-pitwall-text">
-                    {alert.driver}
-                  </span>
-                  <span
-                    className={`inline-flex px-1 py-px rounded text-[9px] font-bold border ${s.badge}`}
-                  >
-                    {LEVEL_LABEL[alert.level]}
-                  </span>
-                  <span className="ml-auto text-[10px] font-mono text-pitwall-muted">
-                    L{alert.lap}
-                  </span>
+                <div className="flex flex-col gap-0.5 min-w-0 w-full">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-pitwall-text">
+                      {alert.attacker_code}
+                    </span>
+                    <span className="text-[9px] text-pitwall-muted">→</span>
+                    <span className="text-xs font-semibold text-pitwall-muted">
+                      {alert.defender_code}
+                    </span>
+                    <span
+                      className={`inline-flex px-1 py-px rounded text-[9px] font-bold border ${s.badge}`}
+                    >
+                      {LEVEL_LABEL[level]}
+                    </span>
+                    <span className="ml-auto text-[10px] font-mono text-pitwall-muted">
+                      L{alert.lap_number}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className={`text-[10px] font-mono font-semibold ${s.text}`}>
+                      {msToSec(alert.estimated_gain_ms)}
+                    </span>
+                    <span className="text-[10px] text-pitwall-muted">
+                      score {Math.round(alert.score * 100)}%
+                    </span>
+                    <span className="text-[10px] text-pitwall-muted">
+                      conf {Math.round(alert.confidence * 100)}%
+                    </span>
+                  </div>
                 </div>
-                <p className="text-xs text-pitwall-muted leading-snug">
-                  {alert.message}
-                </p>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-
-      <p className="px-3 py-2 text-[10px] text-pitwall-muted border-t border-pitwall-border text-center shrink-0">
-        Live alerts connect in Day 5
-      </p>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 }

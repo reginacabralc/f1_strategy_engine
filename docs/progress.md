@@ -161,7 +161,17 @@
       make fit-degradation`: Monaco MEDIUM tyre age 10 predicts 81,366 ms with
       confidence 0.362.
 - [ ] Stream B: Motor undercut esqueleto + RaceState.
-- [ ] Stream C: Cliente API + hook WS esqueleto.
+- [x] Stream C: Cliente API + hook WS esqueleto.
+      `openapi-typescript` added as dev dep; `pnpm generate:api` generates `src/api/openapi.ts`
+      from `docs/interfaces/openapi_v1.yaml`. `src/api/types.ts` replaced with re-export layer
+      (stable import surface, no hand-written types). `src/api/client.ts` rewritten with `ApiError`,
+      `buildUrl`, and 7 typed endpoint helpers (`getSessions`, `getSessionSnapshot`, `getDegradation`,
+      `startReplay`, `stopReplay`, `setPredictor`, `getBacktestResult`). `src/api/ws.ts` added —
+      hand-written WS envelope/payload types matching `websocket_messages.md`. `src/hooks/useRaceFeed.ts`
+      added — reconnectable WS hook with 1→2→4→8→16 s backoff, StrictMode-safe `cancelled` flag,
+      pong heartbeat response, and `snapshot`/`alerts`/`replayState`/`lastMessage`/`error`/`status` state.
+      `useSessions` updated to use typed `getSessions()`. `RaceTable` optional-field types widened.
+      All existing visual components preserved. `pnpm lint` ✅ · `pnpm test` 4/4 ✅ · `pnpm build` ✅.
 - [ ] Stream D: Logs estructurados, /health endpoint.
 
 ### Día 5 — Hito S1
@@ -177,7 +187,16 @@
       and explicit tests for `ScipyPredictor` DB-row loading, confidence clamp,
       missing coefficients, and Stream B `evaluate_undercut()` compatibility.
 - [ ] Stream B: Motor calculando undercut V1 con `ScipyPredictor`.
-- [ ] Stream C: DegradationChart con datos mock.
+- [x] Stream C: DegradationChart con Recharts y datos reales de la API.
+      `src/hooks/useDegradation.ts` added — TanStack Query hook calling `getDegradation()`,
+      stable key `["degradation", circuit, compound]`, `retry: false`. `src/components/DegradationChart.tsx`
+      added — Recharts `LineChart` with fitted curve (computed from coefficients, tyre_age 0–40),
+      optional scatter-style dots for `sample_points` (aggregated per lap), compound selector
+      (SOFT/MEDIUM/HARD), R²/n display, and loading/error/empty states. `App.tsx` updated to
+      derive `circuit` from selected session via `useSessions()` (falls back to "monaco"), then
+      pass it to `DegradationChart` replacing `DegradationPlaceholder`. 4 new Vitest tests
+      (loading, error, R² display, compound buttons). Day 4 API/WebSocket foundation preserved.
+      `pnpm lint` ✅ · `pnpm test` 8/8 ✅ · `pnpm build` ✅ · `tsc --noEmit` ✅.
 - [ ] Stream D: CI verde con tests reales.
 - [ ] **Demo interna**: replay → motor → primer alert llega a un cliente WS de prueba.
 
@@ -221,7 +240,17 @@
   `SessionRepository`). `scripts/ws_demo_client.py` WebSocket demo client added.
   Contract test extended to 7 implemented paths — all `operationId`s match static spec.
   **198 tests, ruff clean, mypy clean.**
-- [ ] Stream C: tabla y feed conectados a WS real.
+- [x] Stream C: tabla y feed conectados a WS real.
+      `useRaceFeed` upgraded with `applyLapUpdate` / `applyPitStop` / `applyTrackStatus`
+      pure helpers (exported for unit tests) and three new WS message handlers.
+      `MAX_ALERTS` reduced 50 → 20. `AlertPanel` rewritten to accept real `AlertPayload[]`,
+      shows attacker→defender, estimated gain, score/confidence, empty state, and CSS-only
+      flash animation on newest alert entry. `RaceTable` gains `isLive?` / `connectionStatus?`
+      props and an empty-state row. `TopBar` drives StatusDot colour from `ConnectionStatus`
+      (green/yellow/red/white). `App.tsx` calls `useRaceFeed()` and threads `snapshot.drivers`,
+      `alerts`, and `status` to all three components. 6 new Vitest tests (pure helpers) + 8
+      AlertPanel tests + 2 new RaceTable tests; total 24 tests passing.
+      `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm test` 24/24 ✅ · `pnpm build` ✅.
 - [ ] Stream D: pre-commit, badges, README mejorado.
 
 ### Día 7
@@ -244,10 +273,32 @@
   `ignore_missing_imports = true` added to `[tool.mypy]` — no flag divergence.
   `xgb_model_path` setting added to `Settings`.
   **210 tests, ruff clean, mypy clean (80 files).**
-- [ ] Stream C: AlertFeed funcional + toggle predictor.
+- [x] Stream C: AlertFeed funcional + toggle predictor.
+      `usePredictor.ts` hook wraps `setPredictor` API call, tracks `pendingTarget` and `error`.
+      `PredictorToggle.tsx` renders scipy/xgboost radio buttons, shows optimistic pending state,
+      "Switching…" label, 409-specific error ("XGBoost model not available. Staying on scipy."),
+      and generic network error. `RaceTable` gains `activePredictor?` prop rendering a compact
+      badge (`data-testid="predictor-badge"`). `TopBar` predictor chip now shows live
+      `snapshot.active_predictor` instead of hardcoded "scipy". `App.tsx` threads
+      `snapshot?.active_predictor` to TopBar, RaceTable, and PredictorToggle; PredictorToggle
+      placed in right column between AlertPanel and Track Conditions. Day 6 live WS, Day 9
+      BacktestView, and backend untouched. 10 new PredictorToggle tests + 3 new RaceTable tests;
+      total 37 tests passing.
+      `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm test` 37/37 ✅ · `pnpm build` ✅.
 - [ ] Stream D: Dockerfile frontend + nginx prod.
 
 ### Día 8
+- [x] Stream C: pulido visual mínimo completado.
+      All four Day 8 tasks were addressed. Responsive horizontal scroll (`overflow-x-auto` +
+      `min-w-[760px]`) and CSS-only alert flash animation (`@keyframes alert-flash`) were
+      already in place from Days 3 and 6 respectively. New work this session: `ScoreBar` in
+      `RaceTable.tsx` now clamps score to [0,1] and uses threshold 0.65 (was 0.6) for
+      red/accent; palette consistency pass replaced `text-red-400` in `SessionPicker` error
+      state with `text-pitwall-accent`; stale dev-day copy strings removed from
+      `ReplayControls` and `TrackMapPanel`. Six new Vitest tests cover low/mid/high score
+      colour classes, null score dash, and over-1 clamping; total 43 tests passing.
+      `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm test` 43/43 ✅ · `pnpm build` ✅.
+      Day 9 BacktestView not started.
 - [x] **Stream A: XGBoost entrenado, serializado, métricas reportadas.**
   Added `backend/src/pitwall/ml/train.py`, `scripts/train_xgb.py`,
   `scripts/validate_xgb_model.py`, `make train-xgb`, and
@@ -332,6 +383,18 @@
   (11.4%), and all five folds improve over zero-delta.
 
 ### Día 9
+- [x] **Stream C: BacktestView frontend completado.**
+  `src/hooks/useBacktest.ts` — TanStack Query hook wrapping `getBacktestResult()`, disabled when
+  `sessionId` is falsy, `predictor` included in query key, `retry: false`, `staleTime: 5 min`.
+  `src/components/BacktestView.tsx` — two-column panel (scipy | xgboost) inside `App.tsx`
+  center column, below DegradationChart + TrackMapPanel grid. Each panel shows precision/recall/f1
+  as percentages, optional lead-time and MAE k1/k3/k5 metrics, and TP/FP/FN match tables
+  (attacker, defender, lap alerted, lap actual). Empty state when no session selected; per-predictor
+  loading/unavailable states; one erroring predictor does not hide the other.
+  15 new Vitest tests — all passing. Total: 58 tests.
+  `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm test` 58/58 ✅ · `pnpm build` ✅.
+  Day 6 WS, Day 7 PredictorToggle, Day 8 visual polish untouched.
+  **Frontend view complete; actual backtest data depends on backend/Stream A+B data availability.**
 - [ ] **Stream A+B: backtest comparativo scipy vs XGBoost completo.**
 - [x] **Stream B**: confidence final, `data_quality_factor`, calibratable cold-tyre penalties,
   hypothesis property tests, and `/api/v1/backtest/{session_id}` endpoint.
@@ -354,7 +417,66 @@
   ScipyPredictor, predictor switching, XGBoostPredictor stub graceful handling, alert
   payload shape, replay_state integration (HTTP + WS). 2 new WS reconnect tests.
   **280 tests (246 unit + 34 contract), ruff clean, mypy clean (90 files).**
-- [ ] Stream C: copy y branding mínimo, demo polish.
+- [x] **Stream B**: causal undercut Phase 1-2 verificada y pre-Phase 3 prep ejecutada.
+  Added `make reconstruct-race-gaps` and `scripts/reconstruct_race_gaps.py` to populate
+  `laps.gap_to_leader_ms` / `gap_to_ahead_ms` from FastF1 lap-end timestamps without a
+  schema change. Local DB volume prep result: gaps populated at 99.9% leader / 94.4% ahead
+  coverage, degradation coefficients=8, pit-loss estimates=28, driver offsets=103.
+  Added `make derive-known-undercuts` to populate observed pit-cycle outcomes without
+  waiting for manual curation. Final local DB volume prep result: `known_undercuts=35`
+  (`13` successful, `22` unsuccessful). Phase 3 is unblocked for `undercut_viable`
+  label construction and initial success/backtest evaluation; labels must still carry
+  source/confidence flags.
+- [x] **Stream B**: causal undercut Phase 3-4 implemented independently from XGBoost.
+  Added `pitwall.causal.dataset_builder`, `pitwall.causal.labels`, and
+  `make build-causal-dataset`. Latest local output:
+  `data/causal/undercut_driver_rival_lap.parquet` with 3,512 driver-rival-lap rows,
+  3,512 usable rows, 1,026 `undercut_viable=true` rows, and 14 observed
+  `undercut_success` labels. Metadata records `pace_source=causal_scipy` and states
+  XGBoost features/predictions/importances are not used.
+- [x] **Stream B**: causal undercut Phase 5-6 implemented.
+  Added `pitwall.causal.graph` with the domain-authored DAG, DOT/GML exports,
+  treatment/outcome/confounder lists, and acyclic validation tests. Added ADR 0010
+  and persisted `dowhy>=0.12,<0.14` in `backend/pyproject.toml`. Added
+  `pitwall.causal.estimators` and `make run-causal-dowhy` for the first DoWhy
+  prototype over the causal driver-rival-lap dataset. XGBoost remains untouched.
+- [x] **Stream B**: causal undercut Phase 7-10 implemented.
+  Added DoWhy refuters (`random_common_cause`, `placebo_treatment_refuter`,
+  `data_subset_refuter`) to `make run-causal-dowhy`, plus stability reporting for
+  unsupported effects. Added `pitwall.causal.live_inference` and
+  `pitwall.causal.explain` for current-lap `undercut_viable`, support level,
+  counterfactual scenarios (`base_case`, `pit_now`, `pit_next_lap`,
+  traffic high/low, pit-loss ±1000 ms), top factors, and human-readable
+  explanations. No API/WS shape changed; interface docs do not need updates yet.
+  Latest refuter read on the original demo dataset: `fresh_tyre_advantage_ms`
+  and `gap_to_rival_ms` are stable; `tyre_age_delta` is unstable under placebo
+  and should not be treated as robust causal evidence yet.
+- [x] **Stream B**: causal undercut corrections implemented after Phase 10.
+  Added `make prepare-causal-extended-data` for multi-race ingestion and causal
+  artifact rebuilds, plus `fit_degradation.py --all-sessions` so new races
+  actually contribute degradation coefficients. Added `make
+  import-curated-known-undercuts` and `data/curation/known_undercuts_curated.csv`
+  for human-reviewed labels without overwriting auto-derived rows. Improved
+  `traffic_after_pit` with projected pit-exit gap/position, nearby-car count,
+  and nearest-traffic gap. Added `make compare-causal-engines` producing
+  `data/causal/engine_disagreements.csv`. Local verified run added
+  `mexico_city_2024_R`: causal dataset now has 4,654 rows, 4,586 usable rows,
+  1,022 viable rows, and 19 observed success rows. DoWhy refuters are stable for
+  all three default treatments on this four-race dataset. XGBoost comparison is
+  reported as `unavailable_feature_pipeline` until Stream A wires runtime XGB
+  prediction.
+- [x] **Stream C: demo polish completado (Day 10).**
+  Copy: English throughout, removed stale dev-day comments from `ReplayControls` and
+  `TrackMapPanel`. Empty states: `no-session-hint` banner in `App.tsx`; actionable copy in
+  `AlertPanel` ("start a replay"), `RaceTable` ("start a replay to see live timing"),
+  `DegradationChart` error ("run make fit-degradation"), `SessionPicker` empty
+  ("run make ingest-demo"), `TrackMapPanel` footer updated.
+  Branding: 🏎 emoji added before PITWALL in `TopBar`; live lap counter (currentLap / totalLaps)
+  wired to `snapshot?.current_lap` and session `total_laps`.
+  Playwright: `@playwright/test 1.60.0` added; `playwright.config.ts` + `tests/e2e/demo.spec.ts`
+  with 1 happy-path test (mocked API, no live backend required).
+  Vitest `include` scoped to `src/**` so e2e tests don't conflict with Vitest runner.
+  `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm test` 58/58 ✅ · `pnpm build` ✅ · `pnpm test:e2e` 1/1 ✅.
 - [x] **Stream D**: quickstart/runbook corrected to match current implementation.
   README, walkthrough, infra README, runbook, and docker-compose architecture now state
   the current truth: `make demo` is DB + local migration + 3-race ingest, backend can be
@@ -380,3 +502,4 @@ _(ninguno por ahora)_
 | 2026-05-09 | asyncio in-process, sin broker | 0007 |
 | 2026-05-09 | OpenAPI auto-generado como fuente de verdad | 0008 |
 | 2026-05-?? | Resultado XGBoost vs scipy | 0009 (post-E10) |
+| 2026-05-14 | DoWhy para causal undercut offline/refuters | 0010 |

@@ -11,6 +11,9 @@ PIP ?= $(PYTHON) -m pip
         evaluate-xgb-baselines run-xgb-ablations \
         tune-xgb train-xgb validate-xgb-model \
         plot-xgb-diagnostics \
+        audit-causal-inputs reconstruct-race-gaps derive-known-undercuts \
+        import-curated-known-undercuts build-causal-dataset run-causal-dowhy \
+        compare-causal-engines prepare-causal-extended-data \
         replay test test-backend lint demo serve-api
 
 install: .venv/.installed
@@ -95,6 +98,30 @@ fit-driver-offsets: install db-wait
 
 validate-driver-offsets: install db-wait
 	$(PYTHON) scripts/validate_driver_offsets.py
+
+audit-causal-inputs: install
+	PYTHONPATH=backend/src $(PYTHON) scripts/audit_causal_inputs.py
+
+reconstruct-race-gaps: install
+	PYTHONPATH=backend/src $(PYTHON) scripts/reconstruct_race_gaps.py
+
+derive-known-undercuts: install
+	PYTHONPATH=backend/src $(PYTHON) scripts/derive_known_undercuts.py
+
+import-curated-known-undercuts: install
+	PYTHONPATH=backend/src $(PYTHON) scripts/import_curated_known_undercuts.py
+
+build-causal-dataset: install
+	PYTHONPATH=backend/src $(PYTHON) scripts/build_causal_dataset.py
+
+run-causal-dowhy: install
+	MPLCONFIGDIR=/tmp/pitwall-matplotlib PYTHONPATH=backend/src $(PYTHON) scripts/run_causal_dowhy.py
+
+compare-causal-engines: install
+	PYTHONPATH=backend/src $(PYTHON) scripts/compare_causal_engines.py
+
+prepare-causal-extended-data: install
+	PYTHONPATH=backend/src $(PYTHON) scripts/prepare_causal_extended_data.py
 
 build-xgb-dataset: install db-wait
 	$(PYTHON) scripts/build_xgb_dataset.py --split-strategy $(or $(SPLIT_STRATEGY),temporal_expanding) --target-strategy $(or $(TARGET_STRATEGY),lap_time_delta)

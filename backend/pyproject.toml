@@ -28,6 +28,8 @@ dependencies = [
     "sqlalchemy>=2.0",
     # Stream D, Day 1 — ML predictor runtime
     "xgboost>=2.0",
+    # Stream B causal — graph-based causal effect estimation
+    "dowhy>=0.12,<0.14",
 ]
 
 [project.optional-dependencies]

@@ -58,45 +58,64 @@ frontend/
 - [x] Layout responsive básico (móvil OK pero no prioritario).
 
 ### Día 4 — Cliente API + WS skeleton (E8)
-- [ ] `api/client.ts` con `fetch` tipado.
-- [ ] `api/types.ts` generado de `docs/interfaces/openapi_v1.yaml` con `openapi-typescript`.
-- [ ] `hooks/useRaceFeed.ts` esqueleto con WebSocket reconectable (backoff exponencial).
+- [x] `api/client.ts` con `fetch` tipado.
+- [x] `api/types.ts` generado de `docs/interfaces/openapi_v1.yaml` con `openapi-typescript`.
+- [x] `hooks/useRaceFeed.ts` esqueleto con WebSocket reconectable (backoff exponencial).
 
 ### Día 5 — Chart de degradación (E8)
-- [ ] Component `<DegradationChart>` con Recharts.
+- [x] Component `<DegradationChart>` con Recharts.
   - X = tyre_age, Y = lap_time_ms.
-  - Curva ajustada (línea) + puntos reales (scatter).
-- [ ] Llamar a `/api/v1/degradation?circuit=&compound=`.
-- [ ] Conectar `<SessionPicker>` para que cambie circuito.
+  - Curva ajustada (línea) + puntos reales (scatter, si el backend los devuelve).
+- [x] Llamar a `/api/v1/degradation?circuit=&compound=` vía `useDegradation` hook.
+- [x] Conectar `<SessionPicker>` para que cambie circuito (derivado de la sesión seleccionada).
 
 ### Día 6 — Conexión real con WS (E8 + integración con B)
-- [ ] `useRaceFeed` consume mensajes reales del backend.
-- [ ] Tabla se actualiza con `snapshot` y `lap_update`.
-- [ ] Component `<AlertFeed>` muestra últimas 20 alertas con flash al recibir.
+- [x] `useRaceFeed` consume mensajes reales del backend.
+- [x] Tabla se actualiza con `snapshot` y `lap_update`.
+- [x] Component `<AlertFeed>` muestra últimas 20 alertas con flash al recibir.
 
 ### Día 7 — Toggle predictor + UX
-- [ ] Component `<PredictorToggle>` (radio scipy/xgb) que llama `POST /api/v1/config/predictor`.
-- [ ] Indicador visual del predictor activo en la tabla.
-- [ ] Loading states + error states limpios.
+- [x] Component `<PredictorToggle>` (radio scipy/xgb) que llama `POST /api/v1/config/predictor`.
+- [x] Indicador visual del predictor activo en la tabla.
+- [x] Loading states + error states limpios.
 
 ### Día 8 — Pulido visual mínimo
-- [ ] Tailwind: paleta consistente (3 colores + grises).
-- [ ] Score: barra de color verde→rojo según score 0..1.
-- [ ] Animación sutil cuando llega alerta (CSS only, no JS).
-- [ ] Responsive: tabla scroll horizontal en móvil.
+- [x] Tailwind: paleta consistente (3 colores + grises).
+- [x] Score: barra de color verde→rojo según score 0..1.
+- [x] Animación sutil cuando llega alerta (CSS only, no JS).
+- [x] Responsive: tabla scroll horizontal en móvil.
 
 ### Día 9 — Backtest view + tests
-- [ ] Component `<BacktestView>` que muestra resultados de `/api/v1/backtest/{session}`.
+- [x] Component `<BacktestView>` que muestra resultados de `/api/v1/backtest/{session}`.
   - Tabla de TP, FP, FN.
   - Comparación scipy vs xgboost lado a lado.
-- [ ] Vitest tests para componentes (snapshot básico).
-- [ ] 1 happy-path Playwright: cargar app, seleccionar sesión, play, ver alertas.
+  - Added `src/hooks/useBacktest.ts` (TanStack Query, disabled when no session, predictor in key).
+  - Added `src/components/BacktestView.tsx` — two-panel grid, per-predictor metrics + TP/FP/FN tables,
+    graceful empty/loading/unavailable states. One failing predictor does not hide the other.
+  - Integrated into `App.tsx` below the Degradation + TrackMap row.
+  - 15 Vitest tests in `src/components/BacktestView.test.tsx` — all passing.
+  - `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm test` 58/58 ✅ · `pnpm build` ✅.
+- [x] Vitest tests para componentes (snapshot básico).
+- [x] 1 happy-path Playwright: cargar app, seleccionar sesión, play, ver alertas.
+      Added `@playwright/test 1.60.0`, `playwright.config.ts` (Firefox, webServer: pnpm dev,
+      mocked API), and `tests/e2e/demo.spec.ts` (1 test: branding → session pick → table/alert/chart
+      panels present). `.playwright-libs/` holds extracted `libasound.so.2` for WSL2 environments
+      without system ALSA; gitignored, populated by `pnpm test:e2e:setup`.
+      `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1 playwright test` → 1 passed.
 
 ### Día 10 — Demo polish
-- [ ] Copy y mensajes de error en español o inglés (consistente).
-- [ ] Página vacía (no hay datos) con mensaje útil.
-- [ ] Branding mínimo (logo emoji + nombre).
-- [ ] Build prod (`pnpm build`) funciona.
+- [x] Copy y mensajes de error en español o inglés (consistente).
+      English throughout. Removed stale dev-day comments. All empty states, error messages, and
+      hint copy are consistent English. Actionable messages tell user what to do next (select a
+      session, start a replay, run make fit-degradation, etc.).
+- [x] Página vacía (no hay datos) con mensaje útil.
+      Added `no-session-hint` banner in App.tsx when no session selected.
+      Improved empty states: AlertPanel, RaceTable, DegradationChart, SessionPicker.
+      TrackMapPanel and ReplayControls footer copy cleaned up.
+- [x] Branding mínimo (logo emoji + nombre).
+      Added 🏎 emoji before PITWALL in TopBar. Live lap counter (currentLap / totalLaps)
+      now uses real data from snapshot and session list when available.
+- [x] Build prod (`pnpm build`) funciona.
 
 ## Definition of Done por tarea
 - Tipos generados de OpenAPI, no escritos a mano.

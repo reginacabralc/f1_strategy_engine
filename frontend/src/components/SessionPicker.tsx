@@ -20,13 +20,14 @@ export function SessionPicker({ selected, onSelect }: Props) {
   }
   if (isError || !sessions) {
     return (
-      <span className="text-red-400 text-sm">Failed to load sessions</span>
+      <span className="text-pitwall-accent text-sm">Failed to load sessions</span>
     );
   }
   if (sessions.length === 0) {
     return (
       <span className="text-pitwall-muted text-sm">
-        No sessions in DB — run <code>make seed</code>
+        No sessions available — run{" "}
+        <code className="font-mono text-pitwall-text/80">make ingest-demo</code>
       </span>
     );
   }

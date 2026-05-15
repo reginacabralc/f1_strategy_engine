@@ -1,5 +1,44 @@
-// Base URL is empty — Vite proxy forwards /api/* to backend in dev.
-// In production, nginx handles the same routing.
+// Base URL is intentionally empty — the Vite dev proxy forwards /api/* and
+// /health/* to the backend. In production, nginx does the same routing.
+// Never hardcode a host here.
+
+import type {
+  BacktestResult,
+  Compound,
+  DegradationCurve,
+  PredictorName,
+  RaceSnapshot,
+  ReplayRun,
+  ReplayStopResponse,
+  SessionSummary,
+  SetPredictorResponse,
+} from "./types";
+
+// ─── Error ───────────────────────────────────────────────────────────────────
+
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly statusText: string,
+    readonly path: string,
+  ) {
+    super(`API ${status}: ${statusText} — ${path}`);
+    this.name = "ApiError";
+  }
+}
+
+// ─── Core fetch ──────────────────────────────────────────────────────────────
+
+function buildUrl(
+  path: string,
+  params?: Record<string, string | undefined>,
+): string {
+  const defined = Object.fromEntries(
+    Object.entries(params ?? {}).filter(([, v]) => v !== undefined),
+  ) as Record<string, string>;
+  if (Object.keys(defined).length === 0) return path;
+  return `${path}?${new URLSearchParams(defined).toString()}`;
+}
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -7,10 +46,12 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
   });
   if (!res.ok) {
-    throw new Error(`API ${res.status}: ${res.statusText} — ${path}`);
+    throw new ApiError(res.status, res.statusText, path);
   }
   return res.json() as Promise<T>;
 }
+
+// ─── Generic helpers (backward compat for useSessions etc.) ──────────────────
 
 export const api = {
   get: <T>(path: string) => apiFetch<T>(path),
@@ -20,3 +61,73 @@ export const api = {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     }),
 };
+
+// ─── Typed endpoint helpers ───────────────────────────────────────────────────
+
+/** GET /api/v1/sessions */
+export function getSessions(): Promise<SessionSummary[]> {
+  return apiFetch<SessionSummary[]>("/api/v1/sessions");
+}
+
+/** GET /api/v1/sessions/{session_id}/snapshot */
+export function getSessionSnapshot(sessionId: string): Promise<RaceSnapshot> {
+  return apiFetch<RaceSnapshot>(
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/snapshot`,
+  );
+}
+
+/** GET /api/v1/degradation?circuit=&compound= */
+export function getDegradation(params: {
+  circuit: string;
+  compound: Compound;
+}): Promise<DegradationCurve> {
+  return apiFetch<DegradationCurve>(
+    buildUrl("/api/v1/degradation", {
+      circuit: params.circuit,
+      compound: params.compound,
+    }),
+  );
+}
+
+/** POST /api/v1/replay/start */
+export function startReplay(
+  sessionId: string,
+  speedFactor?: number,
+): Promise<ReplayRun> {
+  return apiFetch<ReplayRun>("/api/v1/replay/start", {
+    method: "POST",
+    body: JSON.stringify({
+      session_id: sessionId,
+      ...(speedFactor !== undefined ? { speed_factor: speedFactor } : {}),
+    }),
+  });
+}
+
+/** POST /api/v1/replay/stop */
+export function stopReplay(): Promise<ReplayStopResponse> {
+  return apiFetch<ReplayStopResponse>("/api/v1/replay/stop", {
+    method: "POST",
+  });
+}
+
+/** POST /api/v1/config/predictor */
+export function setPredictor(
+  predictor: PredictorName,
+): Promise<SetPredictorResponse> {
+  return apiFetch<SetPredictorResponse>("/api/v1/config/predictor", {
+    method: "POST",
+    body: JSON.stringify({ predictor }),
+  });
+}
+
+/** GET /api/v1/backtest/{session_id} */
+export function getBacktestResult(
+  sessionId: string,
+  predictor?: PredictorName,
+): Promise<BacktestResult> {
+  return apiFetch<BacktestResult>(
+    buildUrl(`/api/v1/backtest/${encodeURIComponent(sessionId)}`, {
+      predictor,
+    }),
+  );
+}
