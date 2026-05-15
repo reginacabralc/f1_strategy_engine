@@ -129,6 +129,8 @@ interface Props {
   drivers?: TrackMapDriver[];
 }
 
+// Backend snapshots contain no car telemetry coordinates in V1 — FastF1 historical
+// data does not provide real-time positional streams. MOCK_DRIVERS are always shown.
 export function TrackMapPanel({ drivers = MOCK_DRIVERS }: Props) {
   return (
     <section
@@ -144,7 +146,7 @@ export function TrackMapPanel({ drivers = MOCK_DRIVERS }: Props) {
           </span>
         </div>
         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-pitwall-accent/10 text-pitwall-accent border border-pitwall-accent/30 uppercase tracking-wide">
-          Static preview
+          Static circuit preview
         </span>
       </div>
 
@@ -305,7 +307,7 @@ export function TrackMapPanel({ drivers = MOCK_DRIVERS }: Props) {
 
       {/* Footer */}
       <p className="px-3 py-1.5 text-[10px] text-pitwall-muted border-t border-pitwall-border text-center shrink-0">
-        Monaco 2024 preview · positions update when replay is active
+        Monaco 2024 · static preview — live car coordinates unavailable in V1
       </p>
     </section>
   );
