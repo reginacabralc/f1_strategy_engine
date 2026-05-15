@@ -12,8 +12,8 @@ from pitwall.ml import train
 from pitwall.ml.dataset import TARGET_COLUMN
 
 DIAGNOSIS = (
-    "functional_training_pipeline_but_weak_holdout_generalization_on_3_race_"
-    "unseen_circuit_loro"
+    "functional_training_pipeline; model_quality_depends_on_manifest_coverage_"
+    "and_loro_validation"
 )
 
 
@@ -186,6 +186,54 @@ def test_loro_evaluation_uses_only_fold_train_and_holdout_rows() -> None:
     assert result.aggregate_metrics["holdout_rows"] == 2
 
 
+def test_temporal_evaluation_uses_validation_split() -> None:
+    frame = pl.DataFrame(
+        [
+            _row("fold_001", "s1", "bahrain", "VER", "red_bull_racing", "HARD", 100.0, "train"),
+            _row("fold_001", "s2", "jeddah", "LEC", "ferrari", "HARD", 200.0, "train"),
+            _row(
+                "fold_001",
+                "s3",
+                "melbourne",
+                "VER",
+                "red_bull_racing",
+                "HARD",
+                300.0,
+                "validation",
+            ),
+        ]
+    )
+    dataset_metadata = {
+        "split_strategy": "temporal_expanding",
+        "folds": [
+            {
+                "fold_id": "fold_001",
+                "train_session_ids": ["s1", "s2"],
+                "validation_session_ids": ["s3"],
+            }
+        ],
+        "sessions_included": ["s1", "s2", "s3"],
+    }
+    seen_train_rows: list[int] = []
+
+    def fake_trainer(dtrain: Any, _params: dict[str, Any], _rounds: int) -> _ZeroModel:
+        seen_train_rows.append(dtrain.num_row())
+        return _ZeroModel(dtrain.num_row())
+
+    result = train.evaluate_folds(
+        frame,
+        dataset_metadata,
+        hyperparameters=train.default_hyperparameters(),
+        num_boost_round=1,
+        trainer=fake_trainer,
+    )
+
+    assert seen_train_rows == [2]
+    assert result.fold_metrics[0]["evaluation_split"] == "validation"
+    assert result.fold_metrics[0]["evaluation_sessions"] == ["s3"]
+    assert result.fold_metrics[0]["validation_mae_ms"] == result.fold_metrics[0]["holdout_mae_ms"]
+
+
 def test_feature_importance_extracts_sorted_gain_scores() -> None:
     importances = train.extract_feature_importances(
         _ImportanceModel(train_rows=1),
@@ -232,6 +280,7 @@ def test_training_metadata_contains_required_keys() -> None:
     assert metadata["diagnosis"] == DIAGNOSIS
     assert metadata["target_distribution_by_fold"][0]["holdout_session"] == "a"
     assert metadata["top_feature_importances"][0]["feature"] == "fuel_proxy"
+    assert metadata["split_strategy"] == "loro"
 
 
 def test_validation_rejects_pit_loss_feature_leakage() -> None:

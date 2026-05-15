@@ -171,13 +171,34 @@ on the same undercut/backtest decision surface.
 
 ## V2 Improvements
 
-- Add 8-10+ races before drawing strong model-quality conclusions.
-- Prefer repeated circuits across seasons when possible.
+- Add manifest-driven 2024/2025 race coverage before drawing strong
+  model-quality conclusions.
+- Prefer repeated circuits across recent seasons when possible.
+- Use `temporal_expanding` as the main validation strategy; keep LORO as a
+  stress test only.
+- Tune XGBoost on temporal validation folds with `make tune-xgb`.
+- Generate plots with `make plot-xgb-diagnostics`.
 - Add richer circuit descriptors or historical reference pace for unseen tracks.
 - Add a known-circuit evaluation later, separate from unseen-circuit LORO.
-- Tune only after the larger dataset is available.
 - Add better traffic modeling and safety-car/VSC context.
 - Improve reference pace fallback for sparse circuit/compound groups.
 - Add a pair-level undercut outcome dataset for Day 9+ backtesting.
 - Persist or register model metadata in `model_registry` once the runtime
   loader needs DB-level model discovery.
+
+## Day 8.5 Temporal Pivot
+
+Implemented in the augmented modeling patch:
+
+- `data/reference/ml_race_manifest.yaml` enables all 2024 and 2025 race sessions.
+- `scripts/ingest_race_manifest.py` writes `data/ml/ingestion_report.json`.
+- `scripts/build_xgb_dataset.py` defaults to `temporal_expanding`.
+- Dataset rows now include `season`, `round_number`, `event_order`,
+  `split_strategy`, `fold_id`, and `split`.
+- `scripts/tune_xgb.py` runs a small 12-candidate search and writes
+  `data/ml/xgb_tuning_report.json`.
+- `scripts/plot_xgb_diagnostics.py` writes matplotlib diagnostics under
+  `reports/figures/`.
+
+The 3-race temporal run remains a smoke test only. Full model-quality claims
+require running the manifest ingestion first.

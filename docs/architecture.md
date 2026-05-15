@@ -9,7 +9,7 @@ PitWall es un sistema event-driven con un único proceso backend (FastAPI + asyn
 ```text
 ┌──────────────────────┐
 │  FastF1 (cache)      │
-│  CSV/Parquet local   │
+│  Manifest 2024/2025  │
 └──────────┬───────────┘
            │  scripts/ingest_season.py
            ▼
@@ -29,7 +29,7 @@ PitWall es un sistema event-driven con un único proceso backend (FastAPI + asyn
 ┌─────────────────┐              ┌──────────────────────────────┐
 │ Replay Engine   │              │ Degradation Fit (scipy)      │
 │ (ReplayFeed)    │              │ + XGBoost Trainer            │
-│ implements      │              │  → models/xgb_pace_v1.json   │
+│ implements      │              │  temporal CV + tuning        │
 │ RaceFeed        │              └────────────┬─────────────────┘
 └────────┬────────┘                           │
          │ asyncio.Queue                      │
@@ -64,7 +64,7 @@ PitWall es un sistema event-driven con un único proceso backend (FastAPI + asyn
 |---|------------|----------|-------|-------|
 | 1 | Ingestor histórico | Python (Polars + FastF1) | Stream A | CLI scripts; carga 2024 a TimescaleDB |
 | 2 | Degradation fit (scipy) | Python | Stream A | Cuadrática por (circuito × compuesto) |
-| 3 | XGBoost trainer | Python | Stream A | Dataset LORO con target `lap_time_delta_ms`; serializa Booster JSON + sidecar metadata |
+| 3 | XGBoost trainer | Python | Stream A | Manifest-driven dataset; `temporal_expanding` CV by default; LORO kept as stress test |
 | 4 | RaceFeed interface | Python (abstract) | Stream B | Contrato común para replay y futuro live |
 | 5 | ReplayFeed | Python (asyncio) | Stream B | Lee DB, emite eventos al ritmo del factor |
 | 6 | OpenF1Feed (stub V1) | Python | Stream B | Implementación dummy; real en V2 |
@@ -155,6 +155,7 @@ class RaceState:
 | Asyncio sin broker | [ADR 0007](adr/0007-asyncio-sin-broker.md) | `asyncio.Queue` in-process suficiente |
 | OpenAPI como fuente de verdad | [ADR 0008](adr/0008-openapi-como-fuente-verdad.md) | Generado por FastAPI; cliente TS lo consume |
 | Resultado XGBoost vs scipy | [ADR 0009](adr/0009-xgboost-vs-scipy-resultados.md) | Por escribir tras E10 |
+| Validación temporal XGBoost | [ADR 0010](adr/0010-temporal-expanding-xgboost-validation.md) | 2024/2025 + expanding-window CV para evitar leakage |
 
 ## 6. Boundaries y dependencias entre módulos
 
@@ -180,10 +181,11 @@ Reglas:
 
 ### XGBoost training baseline
 
-Stream A Day 8 trains two kinds of models from the Day 7 pace dataset:
+Stream A trains two kinds of models from the pace dataset:
 
-- Fold models: one native `xgboost.Booster` per leave-one-race-out fold, used
-  only for evaluation.
+- Fold models: one native `xgboost.Booster` per evaluation fold, used only for
+  validation. `temporal_expanding` is the main strategy; LORO remains available
+  as `SPLIT_STRATEGY=loro`.
 - Final model: one native `xgboost.Booster` trained on all usable rows and
   written to `models/xgb_pace_v1.json` with metadata in
   `models/xgb_pace_v1.meta.json`.
@@ -195,14 +197,18 @@ left as `NaN` for XGBoost. `session_id` remains a fold/split identifier and is
 not a training feature. Pit loss is intentionally excluded from this lap-level
 pace model; it belongs to Day 9 undercut/backtest decision features.
 
-Current 3-race metrics are functional but weak. Day 8.1 diagnostics show
+Current 3-race metrics are functional but weak. Day 8.1 diagnostics showed
 sub-second training error (MAE 294.7 ms, R² 0.943) but poor holdout error
 (MAE 7,396.0 ms, R² -0.080). With only Bahrain, Monaco, and Hungary, LORO is
 effectively leave-one-circuit-out, so target/reference shift dominates. The
 model barely improves over the zero-delta baseline and is documented as a
-serialized engineering baseline, not as an accurate pace model. V2 needs 8-10+
-races, ideally repeated circuits across seasons or richer circuit/reference
-descriptors.
+serialized engineering baseline, not as an accurate pace model.
+
+The augmented Stream A path uses `data/reference/ml_race_manifest.yaml` to
+target full 2024 and 2025 race sessions, optional disabled 2026 candidates,
+temporal expanding-window validation, `make tune-xgb`, and matplotlib
+diagnostics under `reports/figures/`. CatBoost and LightGBM are deferred to V2
+to avoid adding dependency risk before the time-aware data pipeline is proven.
 
 | Recurso | Tamaño | Dónde |
 |---------|--------|-------|

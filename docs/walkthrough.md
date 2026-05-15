@@ -91,16 +91,17 @@ PitWall integra dos predictores de pace. Para alternar sin redeploy:
 
 ```bash
 # Opción 1: vía variable de entorno (requiere reiniciar backend)
-export PACE_PREDICTOR=xgb
+export PACE_PREDICTOR=xgboost
 docker compose restart backend
 
 # Opción 2: vía endpoint
 curl -X POST http://localhost:8000/api/v1/config/predictor \
   -H 'Content-Type: application/json' \
-  -d '{"predictor": "xgb"}'
+  -d '{"predictor": "xgboost"}'
 ```
 
-Hoy `xgb` puede responder 409 si no existe `models/xgb_pace_v1.json`; el entrenamiento XGBoost sigue pendiente en `docs/progress.md`.
+`xgboost` responde 409 si no existe `models/xgb_pace_v1.json`. Genera el
+artifact con `make train-xgb` después de construir el dataset.
 
 ## 7. Cargar otra carrera
 
@@ -125,7 +126,26 @@ Listas: ver [`docs/quanta/05-replay-engine.md`](quanta/05-replay-engine.md).
 
 ## 8. Reentrenar XGBoost
 
-Pendiente. El target existe en el plan, pero `make train-xgb` aún no está implementado en el Makefile actual. Ver `docs/progress.md` para el estado de Stream A.
+Smoke rápido con los datos ya cargados:
+
+```bash
+make build-xgb-dataset SPLIT_STRATEGY=temporal_expanding
+make validate-xgb-dataset
+make tune-xgb
+make train-xgb
+make validate-xgb-model
+make plot-xgb-diagnostics
+```
+
+Para el run completo de Stream A, primero carga el manifiesto 2024/2025:
+
+```bash
+make validate-ml-races
+make ingest-ml-races
+```
+
+La ingesta completa puede tardar horas la primera vez porque descarga datos de
+FastF1 y llena `data/cache/`.
 
 ## 9. Correr tests
 

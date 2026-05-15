@@ -2,7 +2,11 @@
 
 ## Estado
 
-**Propuesto** — _se cierra al final de E10 (Día 10 del sprint)_
+**Propuesto** — _queda abierto hasta Day 9 backtesting_
+
+Nota 2026-05-13: Day 8 diagnostics showed the 3-race XGBoost model is
+engineering-complete but too weak to decide the runtime default. ADR 0010 now
+defines the required temporal validation path before this ADR can be closed.
 
 ## Contexto
 
@@ -73,5 +77,6 @@ _(Se llenan al cerrar.)_
 ## Referencias
 
 - [ADR 0004](0004-baseline-scipy-antes-de-xgboost.md) — la decisión que dio origen al experimento.
+- [ADR 0010](0010-temporal-expanding-xgboost-validation.md) — validación temporal sin leakage.
 - [`docs/quanta/06-curva-fit-vs-xgboost.md`](../quanta/06-curva-fit-vs-xgboost.md)
 - [`notebooks/04_backtest_v1.ipynb`](../../notebooks/04_backtest_v1.ipynb) — fuente de los números.

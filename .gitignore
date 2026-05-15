@@ -62,6 +62,11 @@ docker-compose.override.yaml
 data/cache/
 data/raw/
 data/processed/
+data/ml/*.json
+data/ml/*.parquet
+reports/figures/
+reports/ml/
+
 data/ml/
 data/causal/
 

@@ -1,0 +1,60 @@
+default_session: R
+as_of_date: 2026-05-13
+races:
+  - {year: 2024, round: 1, session: R, label: Bahrain Grand Prix, race_date: 2024-03-02}
+  - {year: 2024, round: 2, session: R, label: Saudi Arabian Grand Prix, race_date: 2024-03-09}
+  - {year: 2024, round: 3, session: R, label: Australian Grand Prix, race_date: 2024-03-24}
+  - {year: 2024, round: 4, session: R, label: Japanese Grand Prix, race_date: 2024-04-07}
+  - {year: 2024, round: 5, session: R, label: Chinese Grand Prix, race_date: 2024-04-21}
+  - {year: 2024, round: 6, session: R, label: Miami Grand Prix, race_date: 2024-05-05}
+  - {year: 2024, round: 7, session: R, label: Emilia Romagna Grand Prix, race_date: 2024-05-19}
+  - {year: 2024, round: 8, session: R, label: Monaco Grand Prix, race_date: 2024-05-26}
+  - {year: 2024, round: 9, session: R, label: Canadian Grand Prix, race_date: 2024-06-09}
+  - {year: 2024, round: 10, session: R, label: Spanish Grand Prix, race_date: 2024-06-23}
+  - {year: 2024, round: 11, session: R, label: Austrian Grand Prix, race_date: 2024-06-30}
+  - {year: 2024, round: 12, session: R, label: British Grand Prix, race_date: 2024-07-07}
+  - {year: 2024, round: 13, session: R, label: Hungarian Grand Prix, race_date: 2024-07-21}
+  - {year: 2024, round: 14, session: R, label: Belgian Grand Prix, race_date: 2024-07-28}
+  - {year: 2024, round: 15, session: R, label: Dutch Grand Prix, race_date: 2024-08-25}
+  - {year: 2024, round: 16, session: R, label: Italian Grand Prix, race_date: 2024-09-01}
+  - {year: 2024, round: 17, session: R, label: Azerbaijan Grand Prix, race_date: 2024-09-15}
+  - {year: 2024, round: 18, session: R, label: Singapore Grand Prix, race_date: 2024-09-22}
+  - {year: 2024, round: 19, session: R, label: United States Grand Prix, race_date: 2024-10-20}
+  - {year: 2024, round: 20, session: R, label: Mexico City Grand Prix, race_date: 2024-10-27}
+  - {year: 2024, round: 21, session: R, label: São Paulo Grand Prix, race_date: 2024-11-03}
+  - {year: 2024, round: 22, session: R, label: Las Vegas Grand Prix, race_date: 2024-11-23}
+  - {year: 2024, round: 23, session: R, label: Qatar Grand Prix, race_date: 2024-12-01}
+  - {year: 2024, round: 24, session: R, label: Abu Dhabi Grand Prix, race_date: 2024-12-08}
+  - {year: 2025, round: 1, session: R, label: Australian Grand Prix, race_date: 2025-03-16}
+  - {year: 2025, round: 2, session: R, label: Chinese Grand Prix, race_date: 2025-03-23}
+  - {year: 2025, round: 3, session: R, label: Japanese Grand Prix, race_date: 2025-04-06}
+  - {year: 2025, round: 4, session: R, label: Bahrain Grand Prix, race_date: 2025-04-13}
+  - {year: 2025, round: 5, session: R, label: Saudi Arabian Grand Prix, race_date: 2025-04-20}
+  - {year: 2025, round: 6, session: R, label: Miami Grand Prix, race_date: 2025-05-04}
+  - {year: 2025, round: 7, session: R, label: Emilia Romagna Grand Prix, race_date: 2025-05-18}
+  - {year: 2025, round: 8, session: R, label: Monaco Grand Prix, race_date: 2025-05-25}
+  - {year: 2025, round: 9, session: R, label: Spanish Grand Prix, race_date: 2025-06-01}
+  - {year: 2025, round: 10, session: R, label: Canadian Grand Prix, race_date: 2025-06-15}
+  - {year: 2025, round: 11, session: R, label: Austrian Grand Prix, race_date: 2025-06-29}
+  - {year: 2025, round: 12, session: R, label: British Grand Prix, race_date: 2025-07-06}
+  - {year: 2025, round: 13, session: R, label: Belgian Grand Prix, race_date: 2025-07-27}
+  - {year: 2025, round: 14, session: R, label: Hungarian Grand Prix, race_date: 2025-08-03}
+  - {year: 2025, round: 15, session: R, label: Dutch Grand Prix, race_date: 2025-08-31}
+  - {year: 2025, round: 16, session: R, label: Italian Grand Prix, race_date: 2025-09-07}
+  - {year: 2025, round: 17, session: R, label: Azerbaijan Grand Prix, race_date: 2025-09-21}
+  - {year: 2025, round: 18, session: R, label: Singapore Grand Prix, race_date: 2025-10-05}
+  - {year: 2025, round: 19, session: R, label: United States Grand Prix, race_date: 2025-10-19}
+  - {year: 2025, round: 20, session: R, label: Mexico City Grand Prix, race_date: 2025-10-26}
+  - {year: 2025, round: 21, session: R, label: São Paulo Grand Prix, race_date: 2025-11-09}
+  - {year: 2025, round: 22, session: R, label: Las Vegas Grand Prix, race_date: 2025-11-23}
+  - {year: 2025, round: 23, session: R, label: Qatar Grand Prix, race_date: 2025-11-30}
+  - {year: 2025, round: 24, session: R, label: Abu Dhabi Grand Prix, race_date: 2025-12-07}
+
+  # 2026 current-season candidates remain disabled by default. Enable only after
+  # confirming FastF1 has race-session data and the race_date is not in the future.
+  - {year: 2026, round: 1, session: R, label: Australian Grand Prix, race_date: 2026-03-08, enabled: false}
+  - {year: 2026, round: 2, session: R, label: Chinese Grand Prix, race_date: 2026-03-15, enabled: false}
+  - {year: 2026, round: 3, session: R, label: Japanese Grand Prix, race_date: 2026-03-29, enabled: false}
+  - {year: 2026, round: 4, session: R, label: Miami Grand Prix, race_date: 2026-05-03, enabled: false}
+  - {year: 2026, round: 5, session: R, label: Canadian Grand Prix, race_date: 2026-05-24, enabled: false}
+  - {year: 2026, round: 6, session: R, label: Monaco Grand Prix, race_date: 2026-06-07, enabled: false}

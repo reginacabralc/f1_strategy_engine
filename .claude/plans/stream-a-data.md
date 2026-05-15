@@ -229,6 +229,64 @@ docs/adr/0009-xgboost-vs-scipy-resultados.md
     filesystem; registrar el modelo en DB puede agregarse en Day 9/10 sin
     cambiar el artifact.
 
+### Día 8.5 — Augmented temporal XGBoost
+- [x] Manifest-based race coverage.
+  - `data/reference/ml_race_manifest.yaml` enables full 2024 and 2025 race
+    sessions.
+  - 2026 candidates are disabled by default and must be enabled only after
+    FastF1 availability is confirmed and `race_date <= as_of_date`.
+  - `scripts/validate_race_manifest.py` / `make validate-ml-races`.
+  - `scripts/ingest_race_manifest.py` / `make ingest-ml-races`.
+  - Ingestion reports write to `data/ml/ingestion_report.json`.
+- [x] Temporal dataset strategies.
+  - `loro` remains available as stress-test mode.
+  - `temporal_expanding` is now the default build strategy.
+  - `temporal_year` supports explicit train/validation/test year boundaries.
+  - Dataset rows include `season`, `round_number`, `event_order`,
+    `split_strategy`, `fold_id`, and `split`.
+  - Reference pace and driver offsets are still computed from fold training
+    sessions only.
+- [x] Training, tuning, and plots.
+  - `train.py` evaluates generic folds, then trains the final runtime model.
+  - `scripts/tune_xgb.py` runs a curated 12-candidate XGBoost search.
+  - `scripts/plot_xgb_diagnostics.py` writes matplotlib plots under
+    `reports/figures/`.
+  - XGBoost remains the only implemented model family; CatBoost/LightGBM are
+    deferred in code/docs.
+- [x] Documentation.
+  - Added ADR 0010 and `docs/ml_temporal_modeling_plan.md`.
+  - Added `notebooks/07_augmented_temporal_model.md`.
+  - Updated architecture, quanta 06, training report, and progress.
+
+### Día 8.2 — Temporal model diagnostics before backtest
+- [x] Target/reference shift diagnostics.
+  - `backend/src/pitwall/ml/diagnostics.py`.
+  - `scripts/diagnose_xgb_dataset_shift.py` / `make diagnose-xgb-shift`.
+  - Reports fold/session target distributions, reference-source counts,
+    driver-offset source counts, failed ingestions, and zero-usable sessions.
+- [x] Leakage-safe baseline ladder.
+  - `backend/src/pitwall/ml/baselines.py`.
+  - `scripts/evaluate_xgb_baselines.py` / `make evaluate-xgb-baselines`.
+  - Baselines: zero, train mean, circuit+compound median,
+    circuit+compound+tyre-age curve, and driver/team-adjusted median.
+- [x] Feature ablations and target variants.
+  - `backend/src/pitwall/ml/ablation.py`.
+  - `scripts/run_xgb_ablation.py` / `make run-xgb-ablations`.
+  - `TARGET_STRATEGY` supports current delta, session-normalized,
+    stint-relative, absolute lap time, and season+circuit+compound delta.
+- [x] Data-quality cleanup.
+  - Dataset metadata records requested sessions that produce zero usable rows.
+  - Wet/mixed or missing-compound sessions are explicit instead of silently
+    absent.
+  - `scripts/fit_degradation.py --manifest` supports full manifest fitting.
+- [x] Day 8.2 quality gate.
+  - Selected `TARGET_STRATEGY=session_normalized_delta` and
+    `FEATURE_SET=no_reference_lap_time_ms`.
+  - Aggregate temporal CV: XGBoost MAE 1,561.9 ms vs zero-delta 1,762.7 ms
+    and train-mean 1,612.9 ms.
+  - Gate passed by 200.8 ms vs zero-delta (11.4%) and all five folds improved
+    over zero-delta.
+
 ### Día 9 — Backtest comparativo (E9 + E10) ⭐
 - [ ] `backend/src/pitwall/engine/backtest.py` con métricas precision/recall/MAE@k.
 - [ ] Notebook `04_backtest_v1.ipynb` corriendo replay determinista para 5 sesiones hold-out.
