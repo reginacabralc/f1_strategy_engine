@@ -119,7 +119,8 @@ export function DegradationChart({ circuit = "monaco" }: Props) {
             data-testid="degradation-error"
           >
             <span className="text-pitwall-muted text-xs text-center">
-              No degradation data for {circuit} / {compound}
+              No degradation data for {circuit} / {compound} — run{" "}
+              <code className="font-mono text-pitwall-text/70">make fit-degradation</code>
             </span>
           </div>
         )}

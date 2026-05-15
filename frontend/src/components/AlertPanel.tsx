@@ -59,7 +59,7 @@ export function AlertPanel({ alerts = [] }: Props) {
           className="px-3 py-6 text-[11px] text-pitwall-muted text-center"
           data-testid="alert-empty"
         >
-          No alerts yet
+          No alerts — start a replay to receive live strategy alerts
         </p>
       ) : (
         <ul className="flex flex-col gap-2 p-2 overflow-y-auto">

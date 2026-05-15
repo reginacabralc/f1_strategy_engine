@@ -36,6 +36,12 @@ pnpm-debug.log*
 frontend/dist/
 frontend/.vite/
 
+# Playwright
+frontend/playwright-report/
+frontend/test-results/
+frontend/.playwright-libs/
+frontend/libasound2t64*.deb
+
 # Editor / OS
 .vscode/
 .idea/

@@ -96,13 +96,26 @@ frontend/
   - 15 Vitest tests in `src/components/BacktestView.test.tsx` — all passing.
   - `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm test` 58/58 ✅ · `pnpm build` ✅.
 - [x] Vitest tests para componentes (snapshot básico).
-- [ ] 1 happy-path Playwright: cargar app, seleccionar sesión, play, ver alertas. Playwright deferred to Day 10.
+- [x] 1 happy-path Playwright: cargar app, seleccionar sesión, play, ver alertas.
+      Added `@playwright/test 1.60.0`, `playwright.config.ts` (Firefox, webServer: pnpm dev,
+      mocked API), and `tests/e2e/demo.spec.ts` (1 test: branding → session pick → table/alert/chart
+      panels present). `.playwright-libs/` holds extracted `libasound.so.2` for WSL2 environments
+      without system ALSA; gitignored, populated by `pnpm test:e2e:setup`.
+      `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1 playwright test` → 1 passed.
 
 ### Día 10 — Demo polish
-- [ ] Copy y mensajes de error en español o inglés (consistente).
-- [ ] Página vacía (no hay datos) con mensaje útil.
-- [ ] Branding mínimo (logo emoji + nombre).
-- [ ] Build prod (`pnpm build`) funciona.
+- [x] Copy y mensajes de error en español o inglés (consistente).
+      English throughout. Removed stale dev-day comments. All empty states, error messages, and
+      hint copy are consistent English. Actionable messages tell user what to do next (select a
+      session, start a replay, run make fit-degradation, etc.).
+- [x] Página vacía (no hay datos) con mensaje útil.
+      Added `no-session-hint` banner in App.tsx when no session selected.
+      Improved empty states: AlertPanel, RaceTable, DegradationChart, SessionPicker.
+      TrackMapPanel and ReplayControls footer copy cleaned up.
+- [x] Branding mínimo (logo emoji + nombre).
+      Added 🏎 emoji before PITWALL in TopBar. Live lap counter (currentLap / totalLaps)
+      now uses real data from snapshot and session list when available.
+- [x] Build prod (`pnpm build`) funciona.
 
 ## Definition of Done por tarea
 - Tipos generados de OpenAPI, no escritos a mano.

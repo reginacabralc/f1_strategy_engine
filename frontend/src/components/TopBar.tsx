@@ -7,6 +7,8 @@ interface Props {
   onSelectSession: (id: string) => void;
   connectionStatus?: ConnectionStatus;
   activePredictor?: PredictorName;
+  currentLap?: number;
+  totalLaps?: number;
 }
 
 function StatusDot({ color }: { color: "green" | "yellow" | "red" | "white" }) {
@@ -28,11 +30,12 @@ function connectionDotColor(
   return "white";
 }
 
-export function TopBar({ selectedSession, onSelectSession, connectionStatus, activePredictor }: Props) {
+export function TopBar({ selectedSession, onSelectSession, connectionStatus, activePredictor, currentLap, totalLaps }: Props) {
   return (
     <header className="h-11 shrink-0 flex items-center gap-0 border-b border-pitwall-border bg-pitwall-surface px-3">
       {/* Brand */}
       <div className="flex items-center gap-2 pr-4 border-r border-pitwall-border mr-4">
+        <span className="text-base leading-none select-none" aria-hidden="true">🏎</span>
         <span className="text-pitwall-accent font-black text-sm tracking-tighter leading-none">
           PIT<span className="text-pitwall-text">WALL</span>
         </span>
@@ -49,10 +52,16 @@ export function TopBar({ selectedSession, onSelectSession, connectionStatus, act
 
       <div className="w-px h-5 bg-pitwall-border mx-4" />
 
-      {/* Lap placeholder */}
+      {/* Lap counter */}
       <div className="flex items-center gap-1.5 text-xs">
         <span className="text-pitwall-muted">LAP</span>
-        <span className="text-pitwall-text font-mono font-bold">—/—</span>
+        <span className="text-pitwall-text font-mono font-bold">
+          {currentLap != null ? currentLap : "—"}
+        </span>
+        <span className="text-pitwall-muted">/</span>
+        <span className="text-pitwall-muted font-mono">
+          {totalLaps != null ? totalLaps : "—"}
+        </span>
       </div>
 
       <div className="w-px h-5 bg-pitwall-border mx-4" />

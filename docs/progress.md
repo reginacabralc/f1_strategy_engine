@@ -413,7 +413,18 @@
   all three default treatments on this four-race dataset. XGBoost comparison is
   reported as `unavailable_feature_pipeline` until Stream A wires runtime XGB
   prediction.
-- [ ] Stream C: copy y branding mínimo, demo polish.
+- [x] **Stream C: demo polish completado (Day 10).**
+  Copy: English throughout, removed stale dev-day comments from `ReplayControls` and
+  `TrackMapPanel`. Empty states: `no-session-hint` banner in `App.tsx`; actionable copy in
+  `AlertPanel` ("start a replay"), `RaceTable` ("start a replay to see live timing"),
+  `DegradationChart` error ("run make fit-degradation"), `SessionPicker` empty
+  ("run make ingest-demo"), `TrackMapPanel` footer updated.
+  Branding: 🏎 emoji added before PITWALL in `TopBar`; live lap counter (currentLap / totalLaps)
+  wired to `snapshot?.current_lap` and session `total_laps`.
+  Playwright: `@playwright/test 1.60.0` added; `playwright.config.ts` + `tests/e2e/demo.spec.ts`
+  with 1 happy-path test (mocked API, no live backend required).
+  Vitest `include` scoped to `src/**` so e2e tests don't conflict with Vitest runner.
+  `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm test` 58/58 ✅ · `pnpm build` ✅ · `pnpm test:e2e` 1/1 ✅.
 - [x] **Stream D**: quickstart/runbook corrected to match current implementation.
   README, walkthrough, infra README, runbook, and docker-compose architecture now state
   the current truth: `make demo` is DB + local migration + 3-race ingest, backend can be
