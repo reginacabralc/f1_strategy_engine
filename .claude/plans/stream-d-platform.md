@@ -58,39 +58,44 @@ docs/walkthrough.md (mantenimiento)
 - [x] `.github/workflows/test.yml` con pytest + vitest.
 
 ### Día 3 — Migraciones (E4)
-- [ ] Setup alembic en `backend/src/pitwall/db/migrations/`.
-- [ ] Primera migración: schema base (acordado con A en `docs/interfaces/db_schema_v1.sql`).
-- [ ] `make migrate` corre alembic.
-- [ ] Servicio `migrate` en docker-compose como one-shot.
+- [x] Setup alembic en `backend/src/pitwall/db/migrations/`.
+- [x] Primera migración: schema base (acordado con A en `docs/interfaces/db_schema_v1.sql`).
+- [x] `make migrate` corre alembic.
+- [x] Servicio `migrate` en docker-compose como one-shot.
+- [x] Recuperación Stream D: providers FastAPI usan repositorios SQL cuando
+      `DATABASE_URL` está configurado, preservando fallback in-memory para tests.
 
 ### Día 4 — Backend Dockerfile multi-stage
-- [ ] Builder image con `uv` y deps.
-- [ ] Dev image con bind mount + reload.
-- [ ] Prod image solo con código + deps necesarias.
-- [ ] CI: build de imágenes en `.github/workflows/build.yml`.
+- [x] Builder image con `uv` y deps.
+- [x] Dev image con bind mount + reload.
+- [x] Prod image solo con código + deps necesarias.
+- [x] CI: build de imágenes en `.github/workflows/build.yml`.
+- [x] Recuperación Stream D: `make demo` arranca backend + frontend; `demo-api`
+      mantiene el flujo solo Swagger.
 
 ### Día 5 — Logs y health (E12)
-- [ ] `core/logging.py` con structlog → JSON.
-- [ ] Endpoints `/health` y `/ready`.
-- [ ] Manejo global de excepciones FastAPI.
-- [ ] WebSocket heartbeat ping/pong cada 15 s.
-- [ ] **Hito S1 contribución**: `make demo` arranca todo.
+- [x] `core/logging.py` con structlog → JSON.
+- [x] Endpoints `/health` y `/ready`; `/ready` valida conectividad DB.
+- [x] Manejo global de excepciones FastAPI.
+- [x] WebSocket heartbeat ping/pong cada 15 s.
+- [x] **Hito S1 contribución**: `make demo` arranca todo el stack local.
 
 ### Día 6 — Pre-commit + badges + README polish
 - [ ] `.pre-commit-config.yaml` con ruff, prettier, eslint.
-- [ ] Badges de CI en README.
+- [x] Badges de CI en README.
 - [ ] `.env.example` documentado.
 - [ ] Issue templates en `.github/ISSUE_TEMPLATE/`.
 - [ ] PR template `.github/pull_request_template.md`.
 
 ### Día 7 — Frontend prod + nginx
-- [ ] `docker/frontend.Dockerfile` con stage `prod` que sirve `dist/` por nginx.
-- [ ] Probar `docker compose --profile prod up` para validar build prod.
-- [ ] Cache de layers optimizado (deps separadas de código).
+- [x] `docker/frontend.Dockerfile` con stage `prod` que sirve `dist/` por nginx.
+- [x] Build prod validado en CI vía `.github/workflows/build.yml`.
+- [x] Cache de layers optimizado (deps separadas de código).
+- [ ] Agregar/validar un profile compose `prod` si la demo necesita servir nginx localmente.
 
 ### Día 8 — Test suite verde + ADRs revisados
 - [ ] `backend/tests/conftest.py` con fixtures de DB (testcontainers).
-- [ ] CI corre tests en cada PR.
+- [x] CI corre tests en cada PR.
 - [ ] ADRs 0005-0008 escritos.
 - [ ] Validador `openapi-spec-validator` en CI.
 

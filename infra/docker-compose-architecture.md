@@ -1,27 +1,36 @@
 # docker-compose Architecture
 
-> Diagrama y descripción de los servicios. Si tocas `docker-compose.yaml`, actualiza este doc. Estado actual: `db`, `migrate` y `backend` existen; `frontend` sigue pendiente.
+> Diagrama y descripción de los servicios. Si tocas `docker-compose.yaml`, actualiza este doc. Estado actual: `db`, `migrate`, `backend` y `frontend` levantan con `make demo`.
 
 ## Diagrama
 
 ```text
         host (laptop / VM)
         │
-        │                          :8000                  :5432
-        ▼   ▼                      ▼                      ▼
-                         ┌───────────────────┐    ┌──────────────────┐
-                         │     backend       │    │       db         │
-                         │ FastAPI + uvicorn │───▶│ TimescaleDB pg15 │
-                         │ asyncio engine    │ TCP│  + ext timescale │
-                         │ replay + motor    │    │  pgdata volume   │
-                         └─────────┬─────────┘    └────────┬─────────┘
-                                   │                        │
-                                   │ depends_on             │
-                                   ▼                        │
-                          ┌──────────────────┐              │
-                          │     migrate      │              │
-                          │ alembic one-shot │──────────────┘
-                          └──────────────────┘
+        │             :5173        :8000                  :5433
+        ▼              ▼           ▼                      ▼
+                 ┌──────────────┐  ┌───────────────────┐    ┌──────────────────┐
+                 │   frontend   │  │     backend       │    │       db         │
+                 │ React + Vite │─▶│ FastAPI + uvicorn │───▶│ TimescaleDB pg15 │
+                 │ Vite proxy   │  │ asyncio engine    │ TCP│  + ext timescale │
+                 └──────────────┘  │ replay + motor    │    │  pgdata volume   │
+                                   └─────────┬─────────┘    └────────┬─────────┘
+                                             │                        │
+                                             │ depends_on             │
+                                             ▼                        │
+                                    ┌──────────────────┐              │
+                                    │     migrate      │              │
+                                    │ alembic one-shot │──────────────┘
+                                    └──────────────────┘
+```
+
+Service dependency graph:
+
+```text
+db (healthy)
+  → migrate (run-to-completion)
+    → backend (healthy)
+      → frontend (healthy)
 ```
 
 ## Servicios
@@ -29,7 +38,7 @@
 ### `db`
 
 - **Imagen**: `timescale/timescaledb:2.17.2-pg15`
-- **Puerto**: 5432 (expuesto al host para scripts locales de ingesta)
+- **Puerto**: `127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432`
 - **Volumen**: `pgdata:/var/lib/postgresql/data`
 - **Init**: `docker/postgres-init.sql` — `timescaledb` + `pgcrypto` (belt-and-suspenders; migration 0001 también los crea)
 - **Healthcheck**: `pg_isready -U pitwall -d pitwall` cada 5s
@@ -44,26 +53,21 @@
 
 ### `backend`
 
-- **Imagen**: build local de `docker/backend.Dockerfile` (python:3.12-slim, single-stage)
+- **Imagen**: build local de `docker/backend.Dockerfile` target `prod` (builder + prod sobre `python:3.12-slim`)
 - **Puerto**: 8000
 - **Comando**: `uvicorn pitwall.api.main:app --host 0.0.0.0 --port 8000 --workers 1`
 - **`depends_on`**: `migrate` → `service_completed_successfully`
 - **Healthcheck**: `python -c "urllib.request.urlopen('http://localhost:8000/health')"` cada 10s
 - **Estado in-memory**: 1 worker obligatorio en V1 (RaceState no es serializable)
 
-### `frontend` _(pendiente Stream D Day 7)_
+### `frontend`
 
-- `frontend/` directory now exists (Stream C Day 2+3 catch-up).
-- Dev server: `pnpm dev` (Vite proxy → backend `:8000`).
-- Production: `docker/frontend.Dockerfile` + nginx to be added in Stream D Day 7.
-
-## Dependencias
-
-```text
-db (healthy)
-  → migrate (run-to-completion)
-    → backend (healthy)
-```
+- **Imagen dev**: build local de `docker/frontend.Dockerfile` target `dev`.
+- **Puerto**: 5173.
+- **Comando**: `pnpm dev` / Vite dev server.
+- **Proxy**: `VITE_PROXY_TARGET=http://backend:8000` para `/api`, `/health`, `/ready` y `/ws`.
+- **Healthcheck**: fetch a `http://localhost:5173`.
+- **Prod image**: `docker/frontend.Dockerfile --target prod` sirve `dist/` con nginx y se valida en `.github/workflows/build.yml`.
 
 ## Networks
 
@@ -76,8 +80,8 @@ Una sola red por defecto (`default`). Servicios se ven entre sí por nombre (`ba
 | `pgdata` | Docker volume | Datos persistentes de Postgres |
 | `./data/cache` | Bind mount | Cache de FastF1 (varios GB) |
 | `./models` | Bind mount | Modelos XGBoost serializados |
-| `./backend/src` | Bind mount (dev) | Hot reload del backend |
-| `./frontend/src` | Bind mount futuro | HMR del frontend cuando exista |
+| `./backend/src` | Bind mount opcional | Hot reload del backend en flujos dev locales |
+| `./frontend/src` | Bind mount opcional | HMR del frontend en flujos dev locales |
 
 ## Por qué un solo worker en backend
 
@@ -95,7 +99,8 @@ make logs        # docker compose logs -f
 make ps          # docker compose ps
 make migrate     # alembic upgrade head desde .venv local
 make ingest      # ingiere YEAR/ROUND/SESSION_CODE a DB
-make demo        # db + migrate + seed de 3 carreras demo
+make demo-api    # db + migrate + seed + backend + Swagger
+make demo        # db + migrate + seed + fit degradación + backend + frontend
 ```
 
 ## CI

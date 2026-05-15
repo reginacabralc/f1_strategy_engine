@@ -1,11 +1,11 @@
 PYTHON ?= .venv/bin/python
 PIP ?= $(PYTHON) -m pip
-PNPM ?= $(shell command -v pnpm >/dev/null 2>&1 && echo pnpm || echo "corepack pnpm")
+PNPM ?= $(shell if command -v pnpm >/dev/null 2>&1; then echo pnpm; elif command -v corepack >/dev/null 2>&1; then echo "corepack pnpm"; else echo "npx -y pnpm@9.15.9"; fi)
 
 .PHONY: install db-up db-wait db-down up down down-v logs ps migrate \
         ingest ingest-monaco ingest-demo validate-demo seed \
         ingest-ml-races validate-ml-races \
-        fit-degradation validate-degradation report-degradation \
+        fit-degradation fit-degradation-demo validate-degradation report-degradation \
         fit-pit-loss validate-pit-loss \
         fit-driver-offsets validate-driver-offsets \
         build-xgb-dataset validate-xgb-dataset diagnose-xgb-shift \
@@ -16,7 +16,7 @@ PNPM ?= $(shell command -v pnpm >/dev/null 2>&1 && echo pnpm || echo "corepack p
         import-curated-known-undercuts build-causal-dataset run-causal-dowhy \
         compare-causal-engines prepare-causal-extended-data \
         replay test test-backend test-frontend lint lint-backend lint-frontend \
-        demo serve-api api-wait
+        demo demo-api serve-api api-wait
 
 install: .venv/.installed
 
@@ -83,6 +83,9 @@ ingest-ml-races: install db-wait
 
 fit-degradation: install db-wait
 	PYTHONPATH=backend/src $(PYTHON) scripts/fit_degradation.py --manifest data/reference/ml_race_manifest.yaml
+
+fit-degradation-demo: install db-wait
+	PYTHONPATH=backend/src $(PYTHON) scripts/fit_degradation.py --all-demo
 
 validate-degradation: install db-wait
 	PYTHONPATH=backend/src $(PYTHON) scripts/validate_degradation.py
@@ -158,8 +161,11 @@ test-backend: install
 	cd backend && ../$(PYTHON) -m pytest tests/unit -q
 
 test-frontend:
-	cd frontend && $(PNPM) install --frozen-lockfile
-	cd frontend && $(PNPM) test
+	cd frontend && if [ -x ./node_modules/.bin/vitest ]; then \
+		./node_modules/.bin/vitest run; \
+	else \
+		$(PNPM) install --frozen-lockfile && $(PNPM) test; \
+	fi
 
 lint: lint-backend lint-frontend
 
@@ -168,8 +174,11 @@ lint-backend: install
 	cd backend && ../$(PYTHON) -m mypy src tests
 
 lint-frontend:
-	cd frontend && $(PNPM) install --frozen-lockfile
-	cd frontend && $(PNPM) lint
+	cd frontend && if [ -x ./node_modules/.bin/eslint ]; then \
+		./node_modules/.bin/eslint src --ext .ts,.tsx --report-unused-disable-directives --max-warnings 0; \
+	else \
+		$(PNPM) install --frozen-lockfile && $(PNPM) lint; \
+	fi
 
 serve-api: install
 	PYTHONPATH=backend/src $(PYTHON) -m uvicorn pitwall.api.main:app --reload --port 8000
@@ -187,10 +196,19 @@ replay: install db-wait
 	PYTHONPATH=backend/src $(PYTHON) scripts/ingest_season.py --year 2024 --round 8 --session R --write-db
 	@echo "Replay via API: POST /api/v1/replay/start  (Stream B Day 3 target)"
 
-## demo: DB up (Docker), migrations and seed via local venv, then API up.
+## demo-api: DB up (Docker), migrations and seed via local venv, then API up.
 ## Opens Swagger automatically. Requires: cp .env.example .env first.
-demo: db-up migrate seed
+demo-api: db-up migrate seed fit-degradation-demo
 	docker compose up -d backend
 	$(MAKE) api-wait
 	$(PYTHON) -m webbrowser -t http://localhost:8000/docs
 	@echo "Demo API is running at: http://localhost:8000/docs"
+
+## demo: full local demo stack (DB + migrate + seeded data + backend + frontend).
+## Opens the React dashboard and leaves Swagger available at :8000/docs.
+demo: db-up migrate seed fit-degradation-demo
+	docker compose up -d backend frontend
+	$(MAKE) api-wait
+	$(PYTHON) -m webbrowser -t http://localhost:5173
+	@echo "Demo frontend is running at: http://localhost:5173"
+	@echo "Swagger is available at: http://localhost:8000/docs"

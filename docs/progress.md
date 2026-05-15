@@ -7,7 +7,7 @@
 | Hito | Estado | Fecha objetivo | Notas |
 |------|--------|----------------|-------|
 | Andamiaje docs creado | ✅ | Día 0 | Este commit |
-| Setup repo + Docker + CI verde | ⏳ | Día 2 | Stream D |
+| Setup repo + Docker + CI verde | ✅ | Día 2 | Stream D — local lint/test green; build workflow present |
 | Kickoff e interfaces acordadas | ⏳ | Día 1 | Todos |
 | 1 temporada (2024) ingerida en DB | ⏳ | Día 3 | Stream A — 3 demo races loaded; full season pending |
 | Replay engine funcional con fixture | ⏳ | Día 3 | Stream B |
@@ -42,6 +42,26 @@
 - [x] Stream D Day 2: backend Dockerfile is multi-stage, frontend Dockerfile
       supports Vite dev and nginx prod, Compose wires db/backend/frontend with
       real healthchecks, and CI lint/test now includes frontend eslint/vitest.
+
+### Stream D Day 3-5 recovery + integration
+- [x] Stream D Day 3: Alembic and the one-shot `migrate` service already exist;
+      recovered the missing integration layer by wiring FastAPI dependency
+      providers to Stream A SQL repositories/loaders whenever `DATABASE_URL`
+      is configured, preserving in-memory providers for unit tests.
+- [x] Stream D Day 4: `.github/workflows/build.yml` now builds compose images
+      and the frontend prod image. `Makefile` has a pnpm fallback via
+      `npx -y pnpm@9.15.9` so local lint/test no longer fail only because
+      `pnpm` or `corepack` is absent.
+- [x] Stream D Day 5: `/ready` now checks database connectivity, `make demo`
+      starts backend + frontend and opens the React dashboard, and
+      `demo-api` preserves the Swagger-only path. Replay controls now call
+      `POST /api/v1/replay/start` / `stop`, WebSocket text/pong frames no
+      longer crash the server, and the global FastAPI exception handler
+      returns JSON 500 responses.
+- [x] Stream D docs: README, walkthrough, infra README, runbook, changelog,
+      and `stream-d-platform.md` were aligned with the current repo truth.
+- [ ] Remaining Stream D polish: decide whether Playwright browsers should be
+      installed in CI for e2e.
 
 ## Semana 1
 
@@ -88,12 +108,13 @@
       Next: Stream D Day 2 — `docker/backend.Dockerfile` multi-stage + `docker compose up` all 4 services.
 
 ### Día 2
-- [x] **Stream D**: `docker compose up` funcional — `db` + `migrate` + `backend` (3 of 4 services; frontend pending Stream C).
-      `docker/backend.Dockerfile` (python:3.12-slim, single-stage), `docker/postgres-init.sql`
-      (timescaledb + pgcrypto), `.dockerignore`. `docker-compose.yaml` updated with `migrate`
-      (one-shot, depends_on db healthy) and `backend` (depends_on migrate completed_successfully,
-      `/health` healthcheck, port 8000). Smoke test: `/health`, `/ready`, `/api/v1/sessions` all
-      respond 200 from container. `make test` (280 passed) and `make lint` remain green.
+- [x] **Stream D**: `docker compose up` funcional. Inicialmente cubría
+      `db` + `migrate` + `backend`; PR de recuperación Day 3-5 lo extendió
+      a `frontend` y dejó `make demo` como stack completo. `docker/backend.Dockerfile`
+      es multi-stage, `docker/frontend.Dockerfile` cubre Vite dev + nginx prod,
+      `docker/postgres-init.sql` crea extensions base, y los healthchecks de
+      `db`, `backend` y `frontend` son reales. Última verificación: `/health`,
+      `/ready`, `/api/v1/sessions`, Swagger, frontend y WS replay smoke pasan.
 - [x] **Stream D**: GitHub Actions `lint.yml` + `test.yml` added (Day 1 carry-over, landed with audit PR).
 - [x] **Stream B**: `RaceFeed` Protocol + event payload `TypedDict`s
       in `backend/src/pitwall/feeds/base.py`; `ReplayFeed` skeleton in
@@ -162,7 +183,8 @@
       `bahrain_2024_R`, `monaco_2024_R`, `hungary_2024_R`; replay start/stop
       for `monaco_2024_R` returned 202/200 using DB events.
 - [x] Stream C: SessionPicker + RaceTable mock funcional.
-- [ ] Stream D: Dockerfile multi-stage para backend.
+- [x] Stream D: Dockerfile multi-stage para backend.
+      Verificado en recuperación Day 3-5 con `docker compose build`.
 
 ### Día 4
 - [x] Stream A: `fit_degradation.py` funcional, R² reportado.
@@ -195,7 +217,8 @@
       pong heartbeat response, and `snapshot`/`alerts`/`replayState`/`lastMessage`/`error`/`status` state.
       `useSessions` updated to use typed `getSessions()`. `RaceTable` optional-field types widened.
       All existing visual components preserved. `pnpm lint` ✅ · `pnpm test` 4/4 ✅ · `pnpm build` ✅.
-- [ ] Stream D: Logs estructurados, /health endpoint.
+- [x] Stream D: Logs estructurados, `/health`, `/ready`, manejo global de
+      excepciones FastAPI y WebSocket heartbeat/text-frame handling.
 
 ### Día 5 — Hito S1
 - [x] Stream A: Coeficientes en DB + notebook/reporte 02 con R²/RMSE reales.
@@ -220,8 +243,12 @@
       pass it to `DegradationChart` replacing `DegradationPlaceholder`. 4 new Vitest tests
       (loading, error, R² display, compound buttons). Day 4 API/WebSocket foundation preserved.
       `pnpm lint` ✅ · `pnpm test` 8/8 ✅ · `pnpm build` ✅ · `tsc --noEmit` ✅.
-- [ ] Stream D: CI verde con tests reales.
-- [ ] **Demo interna**: replay → motor → primer alert llega a un cliente WS de prueba.
+- [x] Stream D: CI/workflows de lint, test y build presentes; verificación local
+      verde con `make lint`, `make test`, `docker compose build`, frontend
+      typecheck/build y `make demo`.
+- [x] **Demo interna (plataforma)**: replay start/stop y mensajes WS
+      `replay_state` + `snapshot` llegan a un cliente de prueba. La alerta
+      `UNDERCUT_*` sigue dependiendo del cierre funcional del motor Stream B.
 
 ## Semana 2
 
@@ -274,7 +301,9 @@
       `alerts`, and `status` to all three components. 6 new Vitest tests (pure helpers) + 8
       AlertPanel tests + 2 new RaceTable tests; total 24 tests passing.
       `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm test` 24/24 ✅ · `pnpm build` ✅.
-- [ ] Stream D: pre-commit, badges, README mejorado.
+- [x] Stream D: README badges and demo/docs polish completed.
+      Remaining Day 6 platform items: pre-commit config, `.env.example`
+      detail pass, issue templates, and PR template.
 
 ### Día 7
 - [x] Stream A: dataset XGBoost preparado (features + split LORO).
@@ -308,7 +337,9 @@
       BacktestView, and backend untouched. 10 new PredictorToggle tests + 3 new RaceTable tests;
       total 37 tests passing.
       `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm test` 37/37 ✅ · `pnpm build` ✅.
-- [ ] Stream D: Dockerfile frontend + nginx prod.
+- [x] Stream D: Dockerfile frontend + nginx prod.
+      `docker/frontend.Dockerfile` has `dev`, `build`, and nginx `prod`
+      stages; `.github/workflows/build.yml` validates the prod target.
 
 ### Día 8
 - [x] Stream C: pulido visual mínimo completado.
@@ -352,7 +383,10 @@
   satisfies `PacePredictor` Protocol. Optional `.meta.json` sidecar support.
   **234 tests, ruff clean, mypy clean (85 files).** 3 smoke tests pass.
 - [ ] Stream C: pulido visual mínimo, responsive.
-- [ ] Stream D: test suite verde, ADRs revisados.
+- [x] Stream D: test suite verde for current local PR surface.
+      Verified with `make lint`, `make test`, frontend `tsc --noEmit`,
+      frontend build, `docker compose build`, and `make demo`.
+      Remaining Day 8 platform item: ADR review/closure pass.
 
 ### Día 8.5 — Augmented temporal ML
 - [x] **Stream A: manifest multi-season agregado.**
@@ -501,10 +535,15 @@
   Vitest `include` scoped to `src/**` so e2e tests don't conflict with Vitest runner.
   `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm test` 58/58 ✅ · `pnpm build` ✅ · `pnpm test:e2e` 1/1 ✅.
 - [x] **Stream D**: quickstart/runbook corrected to match current implementation.
-  README, walkthrough, infra README, runbook, and docker-compose architecture now state
-  the current truth: `make demo` is DB + local migration + 3-race ingest, backend can be
-  started with `docker compose up -d backend`, and frontend/browser demo remains pending.
-  Added Makefile targets `ingest`, `test-backend`, and `serve-api` so documented commands exist.
+  README, walkthrough, infra README, runbook, docker-compose architecture, changelog,
+  and Stream D plan now state the current truth: `make demo` is DB + local migration +
+  3-race ingest + demo degradation fit + backend + frontend, while `demo-api` keeps
+  the Swagger-only path. Added/kept Makefile targets `ingest`, `test-backend`,
+  `serve-api`, `fit-degradation-demo`, and `demo-api` so documented commands exist.
+- [x] **Stream D**: OpenAPI contract drift corrected for the causal endpoint.
+  Added `/api/v1/causal/prediction` plus its response/validation schemas to
+  `docs/interfaces/openapi_v1.yaml` and extended the contract test's
+  `IMPLEMENTED` list so CI now enforces `operationId`/tag parity for that route too.
 - [ ] Stream D: changelog v0.1.0, video demo enlazado.
 - [ ] **Tag `v0.1.0` y release notes.**
 

@@ -14,7 +14,8 @@ curl http://localhost:8000/api/v1/sessions
 # [{"session_id":"monaco_2024_R", ...}]
 ```
 
-Si ambos responden bien, el backend demo está sano. El frontend todavía no existe en el repo.
+También verifica el dashboard en <http://localhost:5173>. Si `/health`,
+`/ready`, `/api/v1/sessions` y el frontend cargan, el demo base está sano.
 
 ---
 
@@ -54,7 +55,7 @@ docker compose logs backend | tail -50
    - Verifica `DATABASE_URL`.
    - `docker compose ps db` debe mostrar `(healthy)`.
 2. **Modelo XGBoost no cargado** y `PACE_PREDICTOR=xgb`.
-   - Cambiar a `PACE_PREDICTOR=scipy` temporalmente; el entrenamiento XGBoost sigue pendiente.
+   - Cambiar a `PACE_PREDICTOR=scipy` temporalmente o regenerar el artifact con los targets `build-xgb-dataset`, `train-xgb` y `validate-xgb-model`.
 3. **Migraciones no aplicadas**.
    - `docker compose run migrate alembic current`.
 
@@ -83,7 +84,9 @@ docker compose logs backend | tail -50
 
 ## Problema: la UI muestra "No active replay"
 
-Pendiente: el frontend aún no existe. Para probar el replay usa la API:
+El frontend está conectado por WebSocket, pero no emite datos de carrera hasta
+que arranca un replay. Usa el selector de sesión y el botón de play del footer,
+o arráncalo por API:
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/replay/start \
@@ -107,7 +110,7 @@ curl -X POST http://localhost:8000/api/v1/replay/start \
   -d '{"session_id": "monaco_2024_R", "speed_factor": 30}'
 ```
 
-Cuando el frontend exista, el botón "Play" debería llamar al mismo endpoint.
+El botón "Play" del dashboard llama al mismo endpoint.
 
 ---
 
@@ -173,9 +176,17 @@ docker compose logs -f backend | grep -i "alert\|undercut\|engine"
 
 ---
 
-## Problema: `make train-xgb` no existe
+## Problema: `PACE_PREDICTOR=xgb` no carga en runtime
 
-El entrenamiento XGBoost está planificado, pero aún no implementado en el Makefile actual. Usa `PACE_PREDICTOR=scipy` para el demo backend.
+`make train-xgb` existe, pero el demo reproducible no depende de XGBoost. Para
+la demo usa `PACE_PREDICTOR=scipy`. Para validar XGBoost localmente:
+
+```bash
+make build-xgb-dataset SPLIT_STRATEGY=temporal_expanding
+make validate-xgb-dataset
+make train-xgb
+make validate-xgb-model
+```
 
 ---
 

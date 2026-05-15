@@ -31,14 +31,9 @@ degradation. The exaggerated coefficients make the fixtures deterministic and
 clearly illustrate the structural-equation logic.
 """
 
-from __future__ import annotations
-
-import pytest
-
 from pitwall.causal.live_inference import CausalLiveResult, evaluate_causal_live
 from pitwall.degradation.predictor import ScipyCoefficient, ScipyPredictor
 from pitwall.engine.state import DriverState, RaceState
-
 
 # ---------------------------------------------------------------------------
 # Shared test predictor
