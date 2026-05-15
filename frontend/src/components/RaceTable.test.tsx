@@ -48,14 +48,16 @@ describe("RaceTable", () => {
     "Score",
   ];
 
-  it("renders mock driver rows", () => {
+  it("shows empty state when no drivers prop is passed", () => {
     render(<RaceTable />);
-    expect(screen.getByText("VER")).toBeInTheDocument();
-    expect(screen.getByText("LEC")).toBeInTheDocument();
+    expect(screen.getByTestId("race-table-empty")).toBeInTheDocument();
+    expect(
+      screen.getByText("No race data yet — select a session and start replay."),
+    ).toBeInTheDocument();
   });
 
-  it("renders the Day 3 race order columns", () => {
-    render(<RaceTable />);
+  it("renders the race order columns when drivers are provided", () => {
+    render(<RaceTable drivers={LIVE_DRIVERS} />);
     for (const header of expectedHeaders) {
       expect(
         screen.getByRole("columnheader", { name: header }),
@@ -63,15 +65,15 @@ describe("RaceTable", () => {
     }
   });
 
-  it("renders compound, tyre age, and score from the JSON mock", () => {
-    render(<RaceTable />);
-    expect(screen.getAllByText("MEDIUM")).toHaveLength(2);
-    expect(screen.getByText("14")).toBeInTheDocument();
-    expect(screen.getByText("72%")).toBeInTheDocument();
+  it("renders compound, tyre age, and score from driver props", () => {
+    render(<RaceTable drivers={LIVE_DRIVERS} />);
+    expect(screen.getByText("HARD")).toBeInTheDocument();
+    expect(screen.getByText("15")).toBeInTheDocument();
+    expect(screen.getByText("10%")).toBeInTheDocument();
   });
 
   it("uses a horizontally scrollable wrapper for small screens", () => {
-    render(<RaceTable />);
+    render(<RaceTable drivers={LIVE_DRIVERS} />);
     expect(screen.getByTestId("race-table-scroll")).toHaveClass(
       "overflow-x-auto",
     );

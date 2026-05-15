@@ -12,17 +12,6 @@ import { BacktestView } from "./components/BacktestView";
 import { useSessions } from "./hooks/useSessions";
 import { useRaceFeed } from "./hooks/useRaceFeed";
 
-const METRICS = [
-  { label: "Track Temp", value: "42", unit: "°C", trend: "up" as const },
-  { label: "Air Temp", value: "28", unit: "°C", trend: "neutral" as const },
-  { label: "Pit Loss", value: "~23", unit: "s", trend: "neutral" as const },
-  {
-    label: "Undercut Risk",
-    value: "HIGH",
-    alert: "red" as const,
-  },
-];
-
 export function App() {
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
   const { data: sessions } = useSessions();
@@ -38,6 +27,27 @@ export function App() {
     if (!selectedSession || !sessions) return undefined;
     return sessions.find((s) => s.session_id === selectedSession)?.total_laps ?? undefined;
   }, [selectedSession, sessions]);
+
+  const trackTemp = snapshot?.track_temp_c != null
+    ? snapshot.track_temp_c.toFixed(1)
+    : "—";
+  const airTemp = snapshot?.air_temp_c != null
+    ? snapshot.air_temp_c.toFixed(1)
+    : "—";
+
+  const maxScore = snapshot?.drivers?.length
+    ? Math.max(...snapshot.drivers.map((d) => d.undercut_score ?? 0))
+    : null;
+  const undercutRisk: { value: string; alert?: "red" | "yellow" | "green" } =
+    maxScore == null
+      ? { value: "—" }
+      : maxScore >= 0.7
+        ? { value: "HIGH", alert: "red" }
+        : maxScore >= 0.4
+          ? { value: "MEDIUM", alert: "yellow" }
+          : maxScore > 0
+            ? { value: "LOW", alert: "green" }
+            : { value: "NONE" };
 
   return (
     <div className="h-full flex flex-col bg-pitwall-bg overflow-hidden">
@@ -105,9 +115,10 @@ export function App() {
             <div>
               <span className="label-caps block mb-2">Track Conditions</span>
               <div className="grid grid-cols-2 gap-2">
-                {METRICS.map((m) => (
-                  <MetricCard key={m.label} {...m} />
-                ))}
+                <MetricCard label="Track Temp" value={trackTemp} unit="°C" trend="neutral" />
+                <MetricCard label="Air Temp" value={airTemp} unit="°C" trend="neutral" />
+                <MetricCard label="Pit Loss" value="~23" unit="s" trend="neutral" />
+                <MetricCard label="Undercut Risk" {...undercutRisk} />
               </div>
             </div>
           </aside>

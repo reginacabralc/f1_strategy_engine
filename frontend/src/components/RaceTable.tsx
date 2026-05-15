@@ -1,7 +1,4 @@
 import type { DriverState, PredictorName } from "../api/types";
-import mockRaceOrder from "../data/mockRaceOrder.json";
-
-const MOCK_DRIVERS = mockRaceOrder as DriverState[];
 
 const COMPOUND_STYLES: Record<
   string,
@@ -85,8 +82,8 @@ interface Props {
   activePredictor?: PredictorName;
 }
 
-export function RaceTable({ drivers = MOCK_DRIVERS, isLive, connectionStatus, activePredictor }: Props) {
-  const showEmpty = drivers.length === 0;
+export function RaceTable({ drivers, isLive, connectionStatus, activePredictor }: Props) {
+  const showEmpty = !drivers || drivers.length === 0;
   const showInfoBar = isLive != null || activePredictor != null;
 
   return (
@@ -129,7 +126,7 @@ export function RaceTable({ drivers = MOCK_DRIVERS, isLive, connectionStatus, ac
           className="px-3 py-8 text-[11px] text-pitwall-muted text-center"
           data-testid="race-table-empty"
         >
-          No race data — start a replay to see live timing
+          No race data yet — select a session and start replay.
         </p>
       ) : (
       <table className="min-w-[760px] w-full text-xs">
@@ -162,7 +159,7 @@ export function RaceTable({ drivers = MOCK_DRIVERS, isLive, connectionStatus, ac
           </tr>
         </thead>
         <tbody className="divide-y divide-pitwall-border">
-          {drivers.map((d) => {
+          {drivers!.map((d) => {
             const compound = COMPOUND_STYLES[d.compound] ?? {
               text: "text-pitwall-muted",
               bg: "bg-pitwall-panel",
