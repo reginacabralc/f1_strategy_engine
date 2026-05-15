@@ -41,14 +41,12 @@ Esto:
 2. Crea `.venv` si no existe e instala el backend en modo editable.
 3. Corre migraciones (`alembic upgrade head`).
 4. Ingiere las 3 carreras demo de 2024: Bahrain, Monaco y Hungary.
+5. Arranca el servicio `backend` en Docker Compose.
+6. Espera a que `/health` responda y abre Swagger en el navegador.
 
-Nota: en el estado actual, `make demo` no arranca el backend ni el frontend. El backend Docker existe; el frontend todavía no.
+Nota: en el estado actual, `make demo` no arranca el frontend.
 
-## 4. Levantar la API
-
-```bash
-docker compose up -d backend
-```
+## 4. Verificar la API
 
 Servicios disponibles:
 
