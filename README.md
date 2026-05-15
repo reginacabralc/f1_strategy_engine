@@ -38,6 +38,8 @@ make demo
 
 `make demo` levanta TimescaleDB, crea `.venv`, instala el backend, corre migraciones, carga las 3 carreras demo de 2024 (Bahrain, Monaco y Hungary), arranca la API y abre Swagger automáticamente en <http://localhost:8000/docs>. No arranca todavía el frontend; `frontend/` no existe.
 
+PostgreSQL se publica en `localhost:5433` para no chocar con instalaciones locales que suelen usar `5432`. Dentro de Docker los servicios siguen usando `db:5432`.
+
 Para probar la API manualmente:
 
 ```bash

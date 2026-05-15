@@ -44,7 +44,9 @@ Esto:
 5. Arranca el servicio `backend` en Docker Compose.
 6. Espera a que `/health` responda y abre Swagger en el navegador.
 
-Nota: en el estado actual, `make demo` no arranca el frontend.
+Nota: en el estado actual, `make demo` no arranca el frontend. PostgreSQL se
+publica en `localhost:5433` para evitar conflictos con un Postgres local en
+`5432`; dentro de Docker sigue siendo `db:5432`.
 
 ## 4. Verificar la API
 

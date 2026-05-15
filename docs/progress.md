@@ -24,6 +24,9 @@
 - [x] Stream B/D: `make demo` now starts the Docker backend, waits for
       `http://localhost:8000/health`, and opens Swagger automatically at
       `http://localhost:8000/docs`. README and walkthrough updated to match.
+- [x] Stream D: Docker now publishes Postgres on `localhost:5433` by default
+      (`POSTGRES_HOST_PORT` overrideable) so the demo does not fail when a
+      local Postgres already owns `5432`.
 
 ## Semana 1
 
