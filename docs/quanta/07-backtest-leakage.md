@@ -83,7 +83,17 @@ Solución: en el training set, usamos `tyre_age` calculado online (acumulando la
 
 ## Backtest del motor (no solo del modelo)
 
-Además del backtest de la **predicción de pace** (MAE@k), evaluamos la **señal del motor**:
+Además del backtest de la **predicción de pace** (MAE@k), evaluamos la **señal
+del motor** como una señal pre-pit:
+
+```text
+undercut_viable = ¿es viable el undercut ahora?
+```
+
+No usamos `pit_decision`, `pit_now` ni `undercut_success` como features de
+viabilidad. `undercut_success` puede aparecer solo como outcome de evaluación
+cuando hubo una parada real; no debe sobrescribir la etiqueta pre-pit
+`undercut_viable`.
 
 1. Curamos lista de ~15 undercuts conocidos: `(session, attacker, defender, lap, was_successful)`.
 2. Replay determinista de cada sesión.

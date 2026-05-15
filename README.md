@@ -1,6 +1,6 @@
 # PitWall — F1 Strategy Engine
 
-> Motor en tiempo real que detecta oportunidades de **undercut** durante una carrera de F1, comparando un baseline heurístico (`scipy`) contra un modelo ML (`XGBoost`) detrás de la misma interfaz. El backend, WebSocket y replay histórico ya existen; el dashboard React y el demo de navegador siguen en construcción.
+> Motor en tiempo real que detecta oportunidades de **undercut** durante una carrera de F1, comparando un baseline heurístico (`scipy`) contra un modelo ML (`XGBoost`) detrás de la misma interfaz. El backend, WebSocket, replay histórico y dashboard React están integrados para demo local.
 
 [![Lint](https://img.shields.io/badge/lint-pending-lightgrey)](.github/workflows/lint.yml)
 [![Tests](https://img.shields.io/badge/tests-pending-lightgrey)](.github/workflows/test.yml)
@@ -11,6 +11,12 @@
 
 Cuando un piloto entra a boxes pierde ~21 segundos. Para que un *undercut* (parar antes que el rival) sea viable, hay que recuperar ese tiempo siendo más rápido con neumáticos nuevos antes de que el rival también pare. PitWall calcula esa ventana en vivo para cada par de pilotos consecutivos en pista, y emite alertas con score y ganancia estimada.
 
+La señal causal principal del proyecto es **`undercut_viable`**: una estimación
+pre-pit de si el undercut es viable ahora mismo. No modela si el equipo decide
+parar (`pit_decision`), si el piloto efectivamente para (`pit_now`), ni si el
+undercut acaba teniendo éxito (`undercut_success`); esas variables son
+downstream y se usan solo como contexto de evaluación/backtest.
+
 ```
 ┌─────────────────┐      ┌────────────────┐      ┌──────────────┐
 │  Replay Engine  │─────▶│ Undercut Engine│─────▶│  WebSocket   │
@@ -19,7 +25,7 @@ Cuando un piloto entra a boxes pierde ~21 segundos. Para que un *undercut* (para
                                                          │
                                                   ┌──────▼─────┐
                                                   │ React UI   │
-                                                  │ (pending)  │
+                                                  │ Dashboard  │
                                                   └────────────┘
 ```
 
@@ -27,7 +33,7 @@ Más detalle: [`docs/architecture.md`](docs/architecture.md).
 
 ## Quickstart
 
-Pre-requisitos: Docker Desktop, GNU Make, Python 3.12 recomendado, ~10 GB libres, internet para descargar datos de FastF1 la primera vez.
+Pre-requisitos: Docker Desktop, GNU Make, Python 3.12 recomendado, Node.js/pnpm para el dashboard, ~10 GB libres e internet para descargar datos de FastF1 la primera vez.
 
 ```bash
 git clone https://github.com/reginacabralc/f1_strategy_engine.git
@@ -36,7 +42,9 @@ cp .env.example .env
 make demo
 ```
 
-Estado actual de `make demo`: levanta TimescaleDB, crea `.venv`, instala el backend, corre migraciones y carga las 3 carreras demo de 2024: Bahrain, Monaco y Hungary. No arranca todavía el frontend; `frontend/` no existe.
+`make demo` levanta TimescaleDB, crea `.venv`, instala el backend, corre migraciones y carga las 3 carreras demo de 2024: Bahrain, Monaco y Hungary.
+
+> Nota: PostgreSQL se expone en el puerto local `5433` para evitar conflictos con instalaciones locales que suelen usar `5432`. Desde la máquina host se usa `localhost:5433`; dentro de Docker, los servicios siguen usando `db:5432`.
 
 Para levantar la API después del seed:
 
@@ -50,6 +58,16 @@ Luego abre <http://localhost:8000/docs> o prueba:
 curl http://localhost:8000/health
 curl http://localhost:8000/api/v1/sessions
 ```
+
+Para abrir el dashboard React en navegador, usa una segunda terminal:
+
+```bash
+cd frontend
+pnpm install
+pnpm dev
+```
+
+Abre la URL que imprima Vite, normalmente <http://localhost:5173>. Asegúrate de que el backend esté corriendo en <http://localhost:8000>.
 
 Ver más en [`docs/walkthrough.md`](docs/walkthrough.md).
 
@@ -68,7 +86,7 @@ Demo race round numbers for 2024: **Bahrain = 1**, **Monaco = 8**, **Hungary = 1
 
 - **Backend**: Python 3.12, FastAPI, asyncio, Polars, scipy, **XGBoost**
 - **DB**: PostgreSQL 15 + TimescaleDB
-- **Frontend**: React + Vite + TypeScript + TanStack Query + Tailwind + Recharts (planned, not present yet)
+- **Frontend**: React + Vite + TypeScript + TanStack Query + Tailwind + Recharts
 - **Infra**: docker-compose
 - **CI**: GitHub Actions
 - **Datos abiertos**: [FastF1](https://docs.fastf1.dev/), [OpenF1](https://openf1.org), [Jolpica](https://github.com/jolpica/jolpica-f1) (sucesor de Ergast)
@@ -81,6 +99,13 @@ PitWall integra dos predictores de pace intercambiables detrás de la interfaz `
 2. **`XGBoostPredictor`** — modelo entrenado con features: tyre_age, compound, circuit, track_temp, lap_in_stint_ratio, driver/team, fuel_proxy.
 
 Switch en runtime con `PACE_PREDICTOR=scipy|xgb`. Resultados del experimento en [`docs/adr/0009-xgboost-vs-scipy-resultados.md`](docs/adr/0009-xgboost-vs-scipy-resultados.md) y [`docs/quanta/06-curva-fit-vs-xgboost.md`](docs/quanta/06-curva-fit-vs-xgboost.md).
+
+El fitting scipy se normaliza antes de ajustar la curva por
+`(circuit_id, compound)`: se neutralizan offsets de piloto, combustible
+aproximado por vuelta de carrera y tráfico/aire sucio con `gap_to_ahead_ms`.
+El predictor XGBoost ya reconstruye el feature schema guardado en el sidecar
+del modelo y devuelve predicciones de lap time cuando existen mapas de
+referencia runtime en `models/xgb_pace_v1.meta.json`.
 
 ## Estado actual
 

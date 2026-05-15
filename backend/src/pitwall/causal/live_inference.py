@@ -181,17 +181,17 @@ def _counterfactuals(
         estimated_gain_ms=base.estimated_gain_ms,
         has_projection=base.alert_type == "UNDERCUT_VIABLE",
     )
-    pit_next = _pit_next_lap_scenario(state, attacker, defender, predictor, pit_loss_ms)
+    next_lap = _next_lap_scenario(state, attacker, defender, predictor, pit_loss_ms)
     scenarios = [
         _scenario_from_metrics("base_case", base_metrics),
-        _scenario_from_metrics("pit_now", base_metrics),
-        pit_next,
+        _scenario_from_metrics("current_lap", base_metrics),
+        next_lap,
         _scenario_from_metrics(
-            "pit_now_high_traffic",
+            "current_lap_high_traffic",
             _intervene_projected_gain(base_metrics, -TRAFFIC_PENALTY_MS),
         ),
         _scenario_from_metrics(
-            "pit_now_low_traffic",
+            "current_lap_low_traffic",
             _intervene_projected_gain(base_metrics, TRAFFIC_BONUS_MS),
         ),
         _scenario_from_metrics(
@@ -214,7 +214,7 @@ def _counterfactuals(
     return tuple(scenarios)
 
 
-def _pit_next_lap_scenario(
+def _next_lap_scenario(
     state: RaceState,
     attacker: DriverState,
     defender: DriverState,
@@ -242,7 +242,7 @@ def _pit_next_lap_scenario(
         pit_loss_ms,
     )
     return _scenario_from_metrics(
-        "pit_next_lap",
+        "next_lap",
         _metrics_from_decision(
             gap_to_rival_ms=next_attacker.gap_to_ahead_ms,
             pit_loss_ms=pit_loss_ms,

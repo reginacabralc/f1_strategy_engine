@@ -54,7 +54,7 @@ def build_disagreement_table(data: Any) -> Any:
     frame["scipy_engine_decision"] = frame.apply(_scipy_engine_decision, axis=1)
     if "xgb_engine_decision" not in frame.columns:
         frame["xgb_engine_decision"] = None
-        frame["xgb_status"] = "unavailable_feature_pipeline"
+        frame["xgb_status"] = "not_evaluated_in_dataset"
     else:
         frame["xgb_engine_decision"] = frame["xgb_engine_decision"].map(_bool_or_none)
         frame["xgb_status"] = "available"
@@ -117,7 +117,7 @@ def summarize_disagreements(table: Any) -> ComparisonSummary:
             if xgb_available
             else None
         ),
-        xgb_status="available" if xgb_available else "unavailable_feature_pipeline",
+        xgb_status="available" if xgb_available else "not_evaluated_in_dataset",
     )
 
 

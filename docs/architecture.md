@@ -111,6 +111,30 @@ WebSocket subscribers reciben `alert` y `snapshot`
 React UI actualiza tabla y feed en < 200 ms
 ```
 
+### Causal viability boundary
+
+The causal module answers only:
+
+```text
+Given the current pre-pit race state, is an undercut viable right now?
+```
+
+Its target is `undercut_viable`. The main DAG ends at that node and excludes
+`pit_decision`, `pit_now`, and `undercut_success`, because those are downstream
+team-action and post-pit outcome variables. Historical pit-cycle outcomes may
+still be retained for evaluation/backtest, but they are not parents, children,
+or features of the main viability graph.
+
+The final comparison before the target uses:
+
+```text
+projected_gap_after_pit_ms =
+  required_gain_to_clear_rival_ms - projected_gain_if_pit_now_ms
+```
+
+`projected_gap_after_pit_ms <= 0` means the modeled undercut clears the rival
+after the safety margin; positive values mean the attacker has not gained enough.
+
 ## 4. Estado in-memory: `RaceState`
 
 Reconstruible desde el feed (no es source of truth, no se persiste):
@@ -194,6 +218,12 @@ encoded with `UNKNOWN` for missing/unseen values. Numeric missing values are
 left as `NaN` for XGBoost. `session_id` remains a fold/split identifier and is
 not a training feature. Pit loss is intentionally excluded from this lap-level
 pace model; it belongs to Day 9 undercut/backtest decision features.
+
+Runtime XGBoost prediction reconstructs the saved feature schema from
+`models/xgb_pace_v1.meta.json`. Because the model predicts
+`lap_time_delta_ms`, the metadata now carries runtime reference-pace maps used
+to convert the predicted delta back into an absolute lap-time estimate for the
+shared `PacePredictor` interface.
 
 Current 3-race metrics are functional but weak. Day 8.1 diagnostics show
 sub-second training error (MAE 294.7 ms, R² 0.943) but poor holdout error

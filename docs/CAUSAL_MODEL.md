@@ -1,13 +1,15 @@
 # Causal Undercut Viability Model
 
-> Status: Phase 1-10 complete for the independent `causal_scipy` MVP. This
-> document freezes the repo/data audit, variable inventory, leakage rules,
-> causal dataset, labels, DAG, DoWhy/refuter prototype, live inference,
+> Status: Phase 1-10 complete for the independent `causal_scipy` MVP, with
+> post-MVP viability corrections applied. This document freezes the repo/data
+> audit, variable inventory, leakage rules, causal dataset, labels, main
+> undercut-viability DAG, DoWhy/refuter prototype, live inference,
 > counterfactual simulation, and explanation behavior.
 
 ## Decision
 
-The causal module is an independent, explainable decision path for:
+The causal module is an independent, explainable decision path for the pre-pit
+question:
 
 ```text
 undercut_viable = yes/no
@@ -31,6 +33,16 @@ causal_scipy
 using transparent inputs: degradation coefficients, `ScipyPredictor`,
 pit-loss estimates, reconstructed gaps, tyre deltas, race phase, weather, and
 traffic proxies.
+
+The main viability DAG intentionally excludes and does not model:
+
+- `pit_decision`
+- `pit_now`
+- `undercut_success`
+
+Those variables are downstream decision/outcome context. They can be kept in
+separate evaluation/backtest artifacts, but they are not parents, children, or
+targets in the main undercut viability DAG.
 
 ## Phase 1 Repo/Data Audit
 
@@ -230,13 +242,38 @@ degradation curves.
 Phase 4 creates:
 
 - `undercut_viable`: proxy-modeled with `causal_scipy` structural equations,
-  overridden by observed auto-derived pit-cycle success when an observed label
-  exists for the same `(session, attacker, defender, lap)`.
-- `undercut_success`: observed only when `known_undercuts` has a matching
-  pit-cycle label; otherwise left censored/`NULL`.
+  optionally overridden only by human-reviewed pre-pit viability labels from
+  `data/curation/undercut_viability_curated.csv`.
+- `pit_now` and `undercut_success`: evaluation context only. They are retained
+  in the historical dataset when available so backtests can compare decisions
+  against executed pit-cycle outcomes, but they never override
+  `undercut_viable` and are not part of the main viability feature set.
 
 The metadata leakage policy explicitly states that XGBoost features,
 predictions, and importances are not used.
+
+The main viability feature set is:
+
+- Raw pre-pit inputs: `circuit_id`, `track_temp_c`, `air_temp_c`, `rainfall`,
+  `track_status`, attacker/defender compound and tyre age, `gap_to_rival_ms`,
+  positions, `laps_remaining`, and `race_phase`.
+- Engineered strategy estimates: `pace_delta_to_rival_ms`,
+  `fresh_tyre_advantage_ms`, `pit_loss_estimate_ms`, `pit_lane_congestion`,
+  `traffic_after_pit`, `clean_air_potential`, `defender_likely_to_cover`,
+  `pit_window_open`, `safety_car_or_vsc_risk`,
+  `projected_gain_if_pit_now_ms`, `required_gain_to_clear_rival_ms`, and
+  `projected_gap_after_pit_ms`.
+
+The sign convention is:
+
+```text
+projected_gap_after_pit_ms =
+  required_gain_to_clear_rival_ms - projected_gain_if_pit_now_ms
+```
+
+`projected_gap_after_pit_ms <= 0` means the modeled undercut clears the rival
+after the configured safety margin. Positive values mean the attacker has not
+found enough gain.
 
 The dataset now includes a stronger pit-exit traffic reconstruction:
 
@@ -274,16 +311,14 @@ Exports:
 Available treatment candidates:
 
 - `fresh_tyre_advantage_ms`
+- `pace_delta_to_rival_ms`
 - `gap_to_rival_ms`
 - `traffic_after_pit`
 - `tyre_age_delta`
-- `pit_now`
 
 Available outcome candidates:
 
 - `undercut_viable`
-- `undercut_success`
-- `projected_gap_after_pit_ms`
 
 Key confounders:
 
@@ -292,53 +327,62 @@ Key confounders:
 - `current_position`, `rival_position`, `gap_to_rival_ms`
 - attacker/defender compounds and tyre ages
 - `tyre_age_delta`, `pit_loss_estimate_ms`, `traffic_after_pit`
+- `pit_lane_congestion`, `pace_delta_to_rival_ms`,
+  `safety_car_or_vsc_risk`
 
-Initial DOT graph:
+Current DOT graph excerpt:
 
 ```dot
 digraph causal_undercut_viability {
   "circuit_id" -> "pit_loss_estimate_ms";
-  "circuit_id" -> "attacker_degradation_estimate";
-  "circuit_id" -> "defender_degradation_estimate";
-  "track_temp_c" -> "attacker_degradation_estimate";
-  "track_temp_c" -> "defender_degradation_estimate";
-  "air_temp_c" -> "attacker_degradation_estimate";
-  "air_temp_c" -> "defender_degradation_estimate";
+  "circuit_id" -> "pace_delta_to_rival_ms";
+  "track_temp_c" -> "pace_delta_to_rival_ms";
+  "air_temp_c" -> "pace_delta_to_rival_ms";
   "rainfall" -> "track_status";
+  "rainfall" -> "pace_delta_to_rival_ms";
+  "rainfall" -> "fresh_tyre_advantage_ms";
+  "rainfall" -> "safety_car_or_vsc_risk";
   "track_status" -> "undercut_viable";
-  "attacker_compound" -> "attacker_degradation_estimate";
-  "defender_compound" -> "defender_degradation_estimate";
-  "attacker_tyre_age" -> "attacker_degradation_estimate";
-  "defender_tyre_age" -> "defender_degradation_estimate";
+  "track_status" -> "pit_loss_estimate_ms";
+  "track_status" -> "traffic_after_pit";
+  "track_status" -> "safety_car_or_vsc_risk";
+  "attacker_compound" -> "pace_delta_to_rival_ms";
+  "defender_compound" -> "pace_delta_to_rival_ms";
+  "attacker_tyre_age" -> "pace_delta_to_rival_ms";
+  "defender_tyre_age" -> "pace_delta_to_rival_ms";
   "tyre_age_delta" -> "fresh_tyre_advantage_ms";
-  "attacker_degradation_estimate" -> "attacker_expected_pace";
-  "defender_degradation_estimate" -> "defender_expected_pace";
-  "attacker_expected_pace" -> "fresh_tyre_advantage_ms";
-  "defender_expected_pace" -> "fresh_tyre_advantage_ms";
+  "pace_delta_to_rival_ms" -> "fresh_tyre_advantage_ms";
+  "pace_delta_to_rival_ms" -> "projected_gain_if_pit_now_ms";
   "fresh_tyre_advantage_ms" -> "projected_gain_if_pit_now_ms";
   "traffic_after_pit" -> "projected_gain_if_pit_now_ms";
   "clean_air_potential" -> "projected_gain_if_pit_now_ms";
+  "laps_remaining" -> "projected_gain_if_pit_now_ms";
+  "race_phase" -> "projected_gain_if_pit_now_ms";
   "gap_to_rival_ms" -> "required_gain_to_clear_rival_ms";
   "pit_loss_estimate_ms" -> "required_gain_to_clear_rival_ms";
+  "traffic_after_pit" -> "required_gain_to_clear_rival_ms";
+  "clean_air_potential" -> "required_gain_to_clear_rival_ms";
   "required_gain_to_clear_rival_ms" -> "projected_gap_after_pit_ms";
   "projected_gain_if_pit_now_ms" -> "projected_gap_after_pit_ms";
   "projected_gap_after_pit_ms" -> "undercut_viable";
-  "required_gain_to_clear_rival_ms" -> "undercut_viable";
-  "projected_gain_if_pit_now_ms" -> "undercut_viable";
+  "defender_likely_to_cover" -> "undercut_viable";
+  "pit_window_open" -> "undercut_viable";
+  "safety_car_or_vsc_risk" -> "undercut_viable";
   "laps_remaining" -> "undercut_viable";
   "race_phase" -> "undercut_viable";
   "current_position" -> "traffic_after_pit";
   "rival_position" -> "traffic_after_pit";
   "gap_to_rival_ms" -> "traffic_after_pit";
-  "undercut_viable" -> "pit_decision";
-  "pit_decision" -> "pit_now";
-  "pit_now" -> "undercut_success";
+  "pit_lane_congestion" -> "pit_loss_estimate_ms";
 }
 ```
 
 Speculative/future nodes remain out of the MVP graph and are documented as
 future-only: overtake difficulty, remaining tyre sets, team strategy context,
 real DRS/train context, dirty-air telemetry, and learned rival pit windows.
+
+There are no arrows leaving `undercut_viable`. Downstream team action and
+post-pit success analysis are intentionally separate questions.
 
 ## Phase 6 DoWhy Prototype
 
@@ -438,9 +482,9 @@ Current live flow:
 3. Derive DAG-facing metrics:
    `required_gain_ms`, `projected_gain_ms`, `projected_gap_after_pit_ms`,
    `traffic_after_pit`, `support_level`, and `top_factors`.
-4. Produce counterfactual scenarios:
-   `base_case`, `pit_now`, `pit_next_lap`, `pit_now_high_traffic`,
-   `pit_now_low_traffic`, `pit_loss_minus_1000_ms`, and
+4. Produce viability sensitivity scenarios:
+   `base_case`, `current_lap`, `next_lap`, `current_lap_high_traffic`,
+   `current_lap_low_traffic`, `pit_loss_minus_1000_ms`, and
    `pit_loss_plus_1000_ms`.
 5. Emit compact explanations for the base result and each scenario.
 
@@ -510,8 +554,8 @@ scripts/prepare_causal_extended_data.py
 Default race list:
 
 ```text
-2023:1, 2023:6, 2023:12, 2023:19,
-2024:1, 2024:8, 2024:13, 2024:20
+2023:1, 2023:6, 2023:10, 2023:12, 2023:19,
+2024:1, 2024:3, 2024:4, 2024:8, 2024:13, 2024:20
 ```
 
 The local verified run added `mexico_city_2024_R`, then rebuilt gaps,
@@ -531,6 +575,7 @@ Input file:
 
 ```text
 data/curation/known_undercuts_curated.csv
+data/curation/undercut_viability_curated.csv
 ```
 
 Rows inserted through this path use:
@@ -541,6 +586,10 @@ notes LIKE 'curated_manual_v1%'
 
 Auto-derived rows are preserved. The current repository CSV is intentionally
 empty except for the header; no human-reviewed truth labels were invented.
+The `undercut_viability_curated.csv` file is the preferred manual-label source
+for the current objective because it labels the pre-pit target
+`undercut_viable` directly. It is intentionally file-backed for now so the
+team can review evidence before adding any DB schema.
 
 ### Engine Disagreement Table
 
@@ -563,16 +612,18 @@ Latest local result:
 | rows | 4,654 |
 | causal vs scipy comparable rows | 4,586 |
 | causal vs scipy disagreements | 1,022 |
-| xgb status | `unavailable_feature_pipeline` |
+| xgb status | `not_evaluated_in_dataset` |
 | causal vs xgb comparable rows | 0 |
 
 Interpretation: `causal_scipy` currently labels break-even viability, while
 `scipy_engine` represents stricter alert semantics (`score > 0.4` and
 `confidence > 0.5`). The 1,022 disagreements are therefore expected and useful:
 they identify opportunities that clear the causal break-even definition but do
-not meet the live alert threshold. XGBoost is reported as unavailable because
-`XGBoostPredictor.predict()` still raises `UnsupportedContextError` until Stream
-A wires runtime feature construction.
+not meet the live alert threshold. XGBoost is reported as not evaluated in the
+disagreement table until a backtest run writes `xgb_engine_decision` into the
+comparison dataset. The runtime `XGBoostPredictor` now reconstructs the saved
+feature schema and returns lap-time predictions when the model metadata contains
+runtime reference-pace maps.
 
 ## Phase 2 Variable Inventory
 
@@ -617,7 +668,7 @@ A wires runtime feature construction.
 | `clean_air_potential` | inverse of traffic proxy | conditional | conditional | Proxy. |
 | `field_spread` | spread of reconstructed gaps | conditional | conditional | Proxy. |
 | `number_of_pit_stops_already` | `stint_number - 1` | yes | yes | Safe. |
-| `pit_now` | pit flags at current lap | yes | yes | Treatment only for success analysis, not viability input. |
+| `pit_now` | pit flags at current lap | yes | yes | Evaluation context only; excluded from the main viability DAG and feature set. |
 
 ### Ideal Future
 
@@ -636,7 +687,7 @@ A wires runtime feature construction.
 | Variable | Reason |
 |----------|--------|
 | `pit_decision` as input | It is the system recommendation, downstream of viability. |
-| `pit_now` as input to `undercut_viable` | Team action is downstream/confounded; use it only as treatment for observed success. |
+| `pit_now` as input to `undercut_viable` | Team action is downstream/confounded; keep it outside the main viability DAG. |
 | `undercut_success` as input | Future outcome. |
 | Future pit laps | Post-decision leakage. |
 | Final classification / final gaps | Post-race leakage. |

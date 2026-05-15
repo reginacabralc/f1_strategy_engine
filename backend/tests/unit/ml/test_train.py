@@ -232,6 +232,8 @@ def test_training_metadata_contains_required_keys() -> None:
     assert metadata["diagnosis"] == DIAGNOSIS
     assert metadata["target_distribution_by_fold"][0]["holdout_session"] == "a"
     assert metadata["top_feature_importances"][0]["feature"] == "fuel_proxy"
+    assert "runtime_reference_pace" in metadata
+    assert "runtime_driver_offsets" in metadata
 
 
 def test_validation_rejects_pit_loss_feature_leakage() -> None:

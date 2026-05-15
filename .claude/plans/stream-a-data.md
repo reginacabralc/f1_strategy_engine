@@ -215,6 +215,13 @@ docs/adr/0009-xgboost-vs-scipy-resultados.md
   - `scripts/validate_xgb_model.py` / `make validate-xgb-model`.
   - La validación carga el Booster, carga `XGBoostPredictor.from_file()`,
     predice valores finitos sobre una muestra y rechaza features de pit loss.
+- [x] Runtime feature pipeline wired.
+  - `XGBoostPredictor.predict()` reconstructs the saved feature schema from
+    `models/xgb_pace_v1.meta.json`.
+  - New training metadata includes runtime reference-pace and driver-offset maps
+    so the model can convert `lap_time_delta_ms` back to absolute lap time.
+  - Old artifacts without `feature_schema` or runtime reference maps still load
+    but report unavailable for prediction until retrained.
 - [x] Reporte `notebooks/06_xgb_training.md`.
   - Última métrica real con 3 demos: XGB MAE 7,396.0 ms, RMSE 9,209.6 ms,
     R² -0.080 vs zero-delta MAE 7,432.5 ms.

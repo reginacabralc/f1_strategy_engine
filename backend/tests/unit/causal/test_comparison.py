@@ -7,7 +7,7 @@ import pandas as pd
 from pitwall.causal.comparison import build_disagreement_table, summarize_disagreements
 
 
-def test_build_disagreement_table_marks_xgb_unavailable() -> None:
+def test_build_disagreement_table_marks_xgb_not_evaluated_without_column() -> None:
     data = pd.DataFrame(
         {
             "session_id": ["monaco_2024_R", "monaco_2024_R"],
@@ -25,11 +25,11 @@ def test_build_disagreement_table_marks_xgb_unavailable() -> None:
     table = build_disagreement_table(data)
     summary = summarize_disagreements(table)
 
-    assert table["xgb_status"].unique().tolist() == ["unavailable_feature_pipeline"]
+    assert table["xgb_status"].unique().tolist() == ["not_evaluated_in_dataset"]
     assert summary.row_count == 2
     assert summary.comparable_scipy_rows == 2
     assert summary.causal_vs_scipy_disagreements == 0
-    assert summary.xgb_status == "unavailable_feature_pipeline"
+    assert summary.xgb_status == "not_evaluated_in_dataset"
     assert summary.causal_vs_xgb_disagreements is None
 
 

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib import import_module
 from pathlib import Path
+from statistics import median
 from typing import Any
 
 import numpy as np
@@ -100,6 +101,8 @@ class FinalModelResult:
     model: Any
     schema: FeatureSchema
     train_rows: int
+    runtime_reference_pace: dict[str, Any]
+    runtime_driver_offsets: dict[str, Any]
     top_feature_importances: list[dict[str, Any]]
 
 
@@ -418,6 +421,8 @@ def train_final_model(
         model=model,
         schema=schema,
         train_rows=usable_frame.height,
+        runtime_reference_pace=_runtime_reference_pace(usable_frame),
+        runtime_driver_offsets=_runtime_driver_offsets(usable_frame),
         top_feature_importances=extract_feature_importances(
             model,
             feature_names=schema.feature_names,
@@ -461,6 +466,8 @@ def train_xgb_model(
         hyperparameters=params,
         num_boost_round=num_boost_round,
         top_feature_importances=final_result.top_feature_importances,
+        runtime_reference_pace=final_result.runtime_reference_pace,
+        runtime_driver_offsets=final_result.runtime_driver_offsets,
     )
     save_training_outputs(
         model=final_result.model,
@@ -487,6 +494,8 @@ def build_training_metadata(
     hyperparameters: dict[str, Any],
     num_boost_round: int,
     top_feature_importances: Sequence[Mapping[str, Any]],
+    runtime_reference_pace: Mapping[str, Any] | None = None,
+    runtime_driver_offsets: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the model sidecar metadata consumed by validation and reporting."""
 
@@ -517,6 +526,8 @@ def build_training_metadata(
         "aggregate_metrics": aggregate,
         "baseline_metrics": fold_result.baseline_metrics,
         "top_feature_importances": [dict(row) for row in top_feature_importances],
+        "runtime_reference_pace": dict(runtime_reference_pace or {}),
+        "runtime_driver_offsets": dict(runtime_driver_offsets or {}),
         "hyperparameters": hyperparameters,
         "num_boost_round": num_boost_round,
         "training_sessions": list(dataset_metadata.get("sessions_included", [])),
@@ -606,6 +617,61 @@ def validate_model_metadata(metadata: Mapping[str, Any]) -> None:
         _validate_metric_values(metric)
     _validate_metric_values(metadata.get("aggregate_metrics", {}))
     _validate_metric_values(metadata.get("baseline_metrics", {}))
+
+
+def _runtime_reference_pace(frame: pl.DataFrame) -> dict[str, Any]:
+    rows = frame.to_dicts()
+    by_circuit_compound: dict[str, list[float]] = {}
+    by_compound: dict[str, list[float]] = {}
+    for row in rows:
+        reference = _numeric_or_none(row.get("reference_lap_time_ms"))
+        circuit_id = _text_or_none(row.get("circuit_id"))
+        compound = _text_or_none(row.get("compound"))
+        if reference is None or circuit_id is None or compound is None:
+            continue
+        by_circuit_compound.setdefault(_compound_key(circuit_id, compound), []).append(reference)
+        by_compound.setdefault(compound, []).append(reference)
+    return {
+        "by_circuit_compound": {
+            key: float(median(values))
+            for key, values in sorted(by_circuit_compound.items())
+            if values
+        },
+        "by_compound": {
+            key: float(median(values))
+            for key, values in sorted(by_compound.items())
+            if values
+        },
+        "method": "median reference_lap_time_ms from final usable training rows",
+    }
+
+
+def _runtime_driver_offsets(frame: pl.DataFrame) -> dict[str, Any]:
+    rows = frame.to_dicts()
+    exact: dict[str, list[float]] = {}
+    by_driver_compound: dict[str, list[float]] = {}
+    for row in rows:
+        offset = _numeric_or_none(row.get("driver_pace_offset_ms"))
+        driver_code = _text_or_none(row.get("driver_code"))
+        circuit_id = _text_or_none(row.get("circuit_id"))
+        compound = _text_or_none(row.get("compound"))
+        if offset is None or driver_code is None or circuit_id is None or compound is None:
+            continue
+        exact.setdefault(_driver_offset_key(driver_code, circuit_id, compound), []).append(offset)
+        by_driver_compound.setdefault(f"{driver_code}|{compound}", []).append(offset)
+    return {
+        "exact": {
+            key: float(median(values))
+            for key, values in sorted(exact.items())
+            if values
+        },
+        "by_driver_compound": {
+            key: float(median(values))
+            for key, values in sorted(by_driver_compound.items())
+            if values
+        },
+        "method": "median driver_pace_offset_ms from final usable training rows",
+    }
 
 
 def validate_model_artifacts(
@@ -818,6 +884,26 @@ def _normalise_category(value: Any) -> str:
         return "UNKNOWN"
     text = str(value).strip()
     return text if text else "UNKNOWN"
+
+
+def _text_or_none(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text if text else None
+
+
+def _compound_key(circuit_id: str, compound: str) -> str:
+    return f"{circuit_id}|{compound.upper()}"
+
+
+def _driver_offset_key(driver_code: str, circuit_id: str, compound: str) -> str:
+    return f"{driver_code}|{circuit_id}|{compound.upper()}"
+
+
+def _numeric_or_none(value: Any) -> float | None:
+    numeric = _numeric_value(value)
+    return None if math.isnan(numeric) else numeric
 
 
 def _numeric_value(value: Any) -> float:

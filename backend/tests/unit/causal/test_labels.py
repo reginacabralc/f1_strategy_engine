@@ -36,8 +36,11 @@ def test_viability_label_true_when_projected_gain_clears_required_gain() -> None
     assert label.undercut_viable is True
     assert label.undercut_window_open is True
     assert label.next_compound == "HARD"
+    assert label.pace_delta_to_rival_ms == 3_000
     assert label.required_gain_to_clear_rival_ms == 12_500
     assert label.projected_gain_if_pit_now_ms is not None
+    assert label.projected_gap_after_pit_ms is not None
+    assert label.projected_gap_after_pit_ms <= 0
 
 
 def test_viability_label_false_when_required_gain_is_too_large() -> None:

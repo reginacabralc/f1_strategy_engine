@@ -50,44 +50,44 @@ ps:
 	docker compose ps
 
 migrate: install db-wait
-	cd backend && ../$(PYTHON) -m alembic -c alembic.ini upgrade head
+	cd backend && PYTHONPATH=src ../$(PYTHON) -m alembic -c alembic.ini upgrade head
 
 ingest-monaco: install db-wait
-	$(PYTHON) scripts/ingest_season.py --year 2024 --round 8 --session R --write-db
+	PYTHONPATH=backend/src $(PYTHON) scripts/ingest_season.py --year 2024 --round 8 --session R --write-db
 
 ## YEAR ?= 2024  ROUND ?= 8  SESSION_CODE ?= R
 ingest: install db-wait
-	$(PYTHON) scripts/ingest_season.py --year $(or $(YEAR),2024) --round $(or $(ROUND),8) --session $(or $(SESSION_CODE),R) --write-db
+	PYTHONPATH=backend/src $(PYTHON) scripts/ingest_season.py --year $(or $(YEAR),2024) --round $(or $(ROUND),8) --session $(or $(SESSION_CODE),R) --write-db
 
 ingest-demo: install db-wait
-	$(PYTHON) scripts/ingest_season.py --year 2024 --round 1 --session R --write-db
-	$(PYTHON) scripts/ingest_season.py --year 2024 --round 8 --session R --write-db
-	$(PYTHON) scripts/ingest_season.py --year 2024 --round 13 --session R --write-db
+	PYTHONPATH=backend/src $(PYTHON) scripts/ingest_season.py --year 2024 --round 1 --session R --write-db
+	PYTHONPATH=backend/src $(PYTHON) scripts/ingest_season.py --year 2024 --round 8 --session R --write-db
+	PYTHONPATH=backend/src $(PYTHON) scripts/ingest_season.py --year 2024 --round 13 --session R --write-db
 
 validate-demo: install db-wait
-	$(PYTHON) scripts/validate_demo_ingest.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/validate_demo_ingest.py
 
 seed: ingest-demo
 
 fit-degradation: install db-wait
-	$(PYTHON) scripts/fit_degradation.py --all-demo
+	PYTHONPATH=backend/src $(PYTHON) scripts/fit_degradation.py --all-demo
 
 validate-degradation: install db-wait
-	$(PYTHON) scripts/validate_degradation.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/validate_degradation.py
 
 report-degradation: validate-degradation
 
 fit-pit-loss: install db-wait
-	$(PYTHON) scripts/fit_pit_loss.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/fit_pit_loss.py
 
 validate-pit-loss: install db-wait
-	$(PYTHON) scripts/validate_pit_loss.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/validate_pit_loss.py
 
 fit-driver-offsets: install db-wait
-	$(PYTHON) scripts/fit_driver_offsets.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/fit_driver_offsets.py
 
 validate-driver-offsets: install db-wait
-	$(PYTHON) scripts/validate_driver_offsets.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/validate_driver_offsets.py
 
 audit-causal-inputs: install
 	PYTHONPATH=backend/src $(PYTHON) scripts/audit_causal_inputs.py
@@ -114,16 +114,16 @@ prepare-causal-extended-data: install
 	PYTHONPATH=backend/src $(PYTHON) scripts/prepare_causal_extended_data.py
 
 build-xgb-dataset: install db-wait
-	$(PYTHON) scripts/build_xgb_dataset.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/build_xgb_dataset.py
 
 validate-xgb-dataset: install
-	$(PYTHON) scripts/validate_xgb_dataset.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/validate_xgb_dataset.py
 
 train-xgb: install
-	$(PYTHON) scripts/train_xgb.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/train_xgb.py
 
 validate-xgb-model: install
-	$(PYTHON) scripts/validate_xgb_model.py
+	PYTHONPATH=backend/src $(PYTHON) scripts/validate_xgb_model.py
 
 test: install
 	cd backend && ../$(PYTHON) -m pytest tests/unit -q
@@ -135,12 +135,12 @@ lint: install
 	cd backend && ../$(PYTHON) -m mypy src tests
 
 serve-api: install
-	$(PYTHON) -m uvicorn pitwall.api.main:app --reload --port 8000
+	PYTHONPATH=backend/src $(PYTHON) -m uvicorn pitwall.api.main:app --reload --port 8000
 
 ## SPEED ?= 30  (replay speed multiplier)
 ## SESSION ?= monaco_2024_R
 replay: install db-wait
-	$(PYTHON) scripts/ingest_season.py --year 2024 --round 8 --session R --write-db
+	PYTHONPATH=backend/src $(PYTHON) scripts/ingest_season.py --year 2024 --round 8 --session R --write-db
 	@echo "Replay via API: POST /api/v1/replay/start  (Stream B Day 3 target)"
 
 ## demo: DB up (Docker), migrations and seed via local venv.

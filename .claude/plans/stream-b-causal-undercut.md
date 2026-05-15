@@ -1,7 +1,8 @@
 # Stream B — Causal undercut viability module
 
 > Owner: Stream B. Inputs: Stream A data/ML artifacts. Consumers: engine/API/WS and later Stream C explanations.
-> Status: Phase 1-10 implemented for the independent `causal_scipy` MVP.
+> Status: Phase 1-10 implemented for the independent `causal_scipy` MVP, with
+> post-MVP viability-boundary corrections applied.
 > API/WS wiring remains intentionally deferred until the output shape is accepted.
 
 ## Goal
@@ -171,23 +172,20 @@ interval telemetry.
   opportunity to gain the pit cycle before the rival stops or within a short
   window `N` laps, after pit loss, current gap, cold-tyre penalty, traffic proxy,
   track status, and confidence gates.
-- Recommendation output: `pit_decision`, derived after viability and other
-  strategy constraints; never the causal target.
+- Recommendation output such as `pit_decision` is downstream of viability and
+  stays outside the main causal DAG.
 
 Treatment candidates:
 
 - `fresh_tyre_advantage`
+- `pace_delta_to_rival`
 - `gap_to_rival`
 - `traffic_after_pit`
 - `tyre_age_delta`
-- `pit_now`, only for observed historical effect on `undercut_success`
 
 Outcome candidates:
 
 - `undercut_viable` for explaining modeled viability.
-- `undercut_success_within_n_laps` for executed stops.
-- `position_gain_after_pit_window`.
-- `gap_delta_to_rival_after_pit_window`.
 
 Confounders:
 
@@ -198,51 +196,42 @@ Confounders:
 - current position, gap, field spread, traffic proxy
 - pit loss estimate
 
-## Initial DAG
+## Main Viability DAG
 
 ```text
 circuit_id -> pit_loss_estimate
-circuit_id -> overtake_difficulty_proxy
-circuit_id -> degradation_estimate
+circuit_id -> pace_delta_to_rival
 
-track_temp_c -> degradation_estimate
-air_temp_c -> degradation_estimate
+track_temp_c -> pace_delta_to_rival
+air_temp_c -> pace_delta_to_rival
 rainfall -> track_status
 track_status -> undercut_viable
 
-tyre_compound -> degradation_estimate
-tyre_age -> degradation_estimate
-degradation_estimate -> current_pace
+tyre_compound -> pace_delta_to_rival
+tyre_age -> pace_delta_to_rival
 
-rival_tyre_compound -> rival_degradation_estimate
-rival_tyre_age -> rival_degradation_estimate
-rival_degradation_estimate -> rival_expected_pace
-
-current_pace -> fresh_tyre_advantage
-rival_expected_pace -> fresh_tyre_advantage
+pace_delta_to_rival -> fresh_tyre_advantage
 tyre_age_delta -> fresh_tyre_advantage
 
-gap_to_rival -> projected_gap_after_pit
-pit_loss_estimate -> projected_gap_after_pit
+gap_to_rival -> required_gain_to_clear_rival
+pit_loss_estimate -> required_gain_to_clear_rival
 traffic_after_pit -> projected_gain_if_pit_now
 fresh_tyre_advantage -> projected_gain_if_pit_now
 
+required_gain_to_clear_rival -> projected_gap_after_pit
+projected_gain_if_pit_now -> projected_gap_after_pit
 projected_gap_after_pit -> undercut_viable
-projected_gain_if_pit_now -> undercut_viable
-required_gain_to_clear_rival -> undercut_viable
-laps_until_rival_expected_pit -> undercut_viable
+defender_likely_to_cover -> undercut_viable
+pit_window_open -> undercut_viable
+safety_car_or_vsc_risk -> undercut_viable
 laps_remaining -> undercut_viable
 race_phase -> undercut_viable
-
-undercut_viable -> pit_decision
-pit_decision -> pit_now
-pit_now -> undercut_success
 ```
 
 Modeling caveat: when `undercut_viable` is a proxy produced by the existing
 projector, causal estimates into that label explain the projectors assumptions,
-not objective F1 truth. For observed causal effect of actually pitting, use
-`pit_now -> undercut_success` with confounder adjustment.
+not objective F1 truth. Observed pit-cycle success is evaluation/backtest
+context only and is not modeled in the main viability DAG.
 
 ## Historical Label Design
 
@@ -264,20 +253,9 @@ projected_gain_if_pit_now >= pit_loss + gap_to_rival + safety_margin
    confidence gates.
 7. Mark this label as `proxy_modeled`, not observed causal truth.
 
-For laps where the attacker actually pitted:
-
-1. `pit_now = 1`.
-2. Observe `undercut_success` over the next `N` laps or until both cars complete
-   the pit cycle.
-3. Success if the attacker exits ahead of the rival, gains net position versus
-   the rival after the exchange, or improves gap by a documented threshold.
-
-For laps where the attacker did not pit:
-
-- `pit_now = 0`.
-- `undercut_success` is unobserved/censored.
-- `undercut_viable_label` can still be computed as a proxy with the projector,
-  but must not be treated as observed causal success.
+For executed stops, `pit_now` and `undercut_success` may be retained in
+evaluation/backtest artifacts. They do not override `undercut_viable` and must
+not enter the main viability feature set.
 
 ## DoWhy Use
 
@@ -289,13 +267,10 @@ MVP analyses:
 - `treatment='fresh_tyre_advantage'`, `outcome='undercut_viable'`
 - `treatment='gap_to_rival'`, `outcome='undercut_viable'`
 - `treatment='traffic_after_pit'`, `outcome='undercut_viable'`
-- `treatment='pit_now'`, `outcome='undercut_success'` only on executed/censored
-  historical pit opportunities
 
 Methods:
 
 - `backdoor.linear_regression` for continuous treatment prototypes.
-- Propensity score matching/stratification for binary `pit_now`.
 - For binary outcomes, document the limitation of linear probability estimates
   or use compatible logistic/statistical estimators where supported.
 
@@ -372,8 +347,8 @@ The module should be able to run "what-if" scenarios by intervening on selected
 variables while holding the rest of the observation fixed. Examples:
 
 ```text
-do(pit_now = true)
-do(pit_lap = current_lap + 1)
+evaluate(current_lap)
+evaluate(next_lap)
 do(traffic_after_pit = low)
 do(pit_loss_estimate = pit_loss_estimate + 1000)
 do(fresh_tyre_advantage = fresh_tyre_advantage + 500)
@@ -382,10 +357,10 @@ do(fresh_tyre_advantage = fresh_tyre_advantage + 500)
 MVP scenarios:
 
 - base case: evaluate current lap as observed,
-- pit now,
-- pit next lap,
-- pit now with high pit-exit traffic,
-- pit now with low pit-exit traffic,
+- current lap viability,
+- next lap viability,
+- current lap with high pit-exit traffic,
+- current lap with low pit-exit traffic,
 - pit loss sensitivity `±1000 ms`.
 
 Expected output shape:
@@ -559,7 +534,7 @@ Do not add these files until the conceptual gate is accepted.
 - [x] Keep causal live inference behind a separate module/output so it can be
   compared against XGBoost instead of depending on it.
 - [x] Produce current-lap `undercut_viable` prediction from structural equations.
-- [x] Produce counterfactual scenario results for pit-now, pit-next-lap,
+- [x] Produce viability sensitivity results for current lap, next lap,
   traffic-high/low, and pit-loss sensitivity.
 - [x] Return explainability metadata without changing alert semantics first.
 
@@ -596,10 +571,20 @@ Do not add these files until the conceptual gate is accepted.
   field-aware projected pit-exit reconstruction.
 - [x] Add engine disagreement reporting:
   `make compare-causal-engines`.
-- [x] Report XGBoost comparison as unavailable until `XGBoostPredictor.predict()`
-  has a runtime feature pipeline.
+- [x] Report XGBoost comparison as not evaluated until a backtest run writes
+  `xgb_engine_decision`; `XGBoostPredictor.predict()` now has a runtime feature
+  pipeline when trained metadata includes reference-pace maps.
 - [x] Verify one additional race ingestion locally:
   `mexico_city_2024_R`.
+- [x] Remove downstream nodes from the main viability DAG:
+  `pit_decision`, `pit_now`, and `undercut_success`.
+- [x] Stop observed pit-cycle success from overriding the `undercut_viable`
+  target; success remains evaluation context only.
+- [x] Add pre-pit viability curation template:
+  `data/curation/undercut_viability_curated.csv`.
+- [x] Add DAG/feature coverage for `pace_delta_to_rival_ms`,
+  `pit_window_open`, `defender_likely_to_cover`, `safety_car_or_vsc_risk`,
+  and `pit_lane_congestion`.
 
 ## MVP In 2 Days
 
@@ -611,8 +596,8 @@ Do not add these files until the conceptual gate is accepted.
    `fresh_tyre_advantage -> undercut_viable`.
 6. Produce the independent `causal_scipy` baseline for comparison against the
    existing XGBoost path.
-7. Add deterministic simulation outputs for base case, pit-now,
-   pit-next-lap, traffic-high/low, and pit-loss sensitivity.
+7. Add deterministic simulation outputs for base case, current lap,
+   next lap, traffic-high/low, and pit-loss sensitivity.
 8. Add explanations for prediction and simulations.
 9. Add `docs/CAUSAL_MODEL.md` explaining limitations.
 10. Do not wire live API/WS until the offline labels pass sanity checks.
@@ -642,7 +627,7 @@ Do not add these files until the conceptual gate is accepted.
   labeled honestly.
 - If `undercut_viable` is generated by the same heuristic used in live scoring,
   causal analysis explains the heuristic, not necessarily real race outcomes.
-- `pit_now` is confounded by team strategy, position, tyres, traffic, and safety
-  car context; naive estimates will be biased.
+- Observed pit-cycle outcomes are confounded by team strategy, position, tyres,
+  traffic, and safety-car context; they must stay out of the main viability DAG.
 - Small data volume (three demo races) makes DoWhy estimates unstable. The MVP
   should emphasize assumptions, labels, and refuters over numeric certainty.

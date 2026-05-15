@@ -16,7 +16,14 @@ El profesor exige un componente de ML real. Pero "usar ML" no es virtud por sí 
 lap_time(t) = a + b·t + c·t²
 ```
 
-Por (circuito × compuesto). Parámetros ajustados con `scipy.optimize.curve_fit` sobre vueltas válidas.
+Por (circuito × compuesto). Parámetros ajustados con `scipy.optimize.curve_fit`
+sobre vueltas válidas; si SciPy no puede importarse en el entorno local, el
+script usa un fallback cuadrático equivalente con NumPy para mantener la
+reproducibilidad.
+
+Antes del ajuste, la vuelta se normaliza con proxies disponibles pre-pit:
+offset mediano de piloto dentro del grupo, combustible por vuelta de carrera y
+penalización de tráfico por `gap_to_ahead_ms`.
 
 ### Pros
 
@@ -28,16 +35,18 @@ Por (circuito × compuesto). Parámetros ajustados con `scipy.optimize.curve_fit
 ### Cons
 
 - Lineal-cuadrático no captura el cliff. Si la degradación es exponencial al final, el modelo se queda corto.
-- Una sola curva por compuesto/circuito no captura diferencias de piloto, equipo, condiciones.
+- Una sola curva por compuesto/circuito solo neutraliza diferencias de piloto,
+  combustible y tráfico mediante proxies; no mide esas variables directamente.
 - `track_temp` no entra como feature.
 
 ## XGBoostPredictor (entregable de ML)
 
 ### Modelo
 
-`xgboost.XGBRegressor` con:
+`xgboost.Booster` nativo con:
 
-- `max_depth=5`, `n_estimators=400`, `learning_rate=0.05`, `early_stopping_rounds=20`
+- `max_depth=4`, `eta=0.08`, `subsample=0.9`, `colsample_bytree=0.9`
+- `num_boost_round=250`
 - Sin tuning extenso (timebox).
 
 ### Features
@@ -62,7 +71,10 @@ Por (circuito × compuesto). Parámetros ajustados con `scipy.optimize.curve_fit
 delta_to_reference = lap_time_ms - p20_of(compound, circuit)
 ```
 
-Donde `p20` es el percentil 20 (vueltas más rápidas) de ese (compuesto, circuito) en train fold.
+La referencia actual es la mediana fold-safe de vueltas limpias por
+`(compound, circuit)` con fallback por compuesto. En runtime, el metadata del
+modelo guarda mapas de referencia para convertir el delta predicho de vuelta a
+lap time absoluto.
 
 ### Split
 

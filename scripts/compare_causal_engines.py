@@ -38,7 +38,7 @@ def main() -> int:
     print(f"scipy_vs_xgb_disagreements | {summary.scipy_vs_xgb_disagreements}")
     print()
     print("Notes")
-    print("- XGBoost is reported as unavailable until its runtime feature pipeline exists.")
+    print("- XGBoost is reported as not evaluated when the dataset has no xgb_engine_decision.")
     print("- This command reads causal dataset outputs and does not modify XGBoost files.")
     return 0
 

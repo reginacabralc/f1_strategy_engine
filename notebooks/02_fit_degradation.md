@@ -138,10 +138,15 @@ clean-air rows are extracted, coefficients are persisted idempotently, and the
 engine can consume the `PacePredictor` shape. It is not acceptable to present
 these curves as high-quality tyre models yet.
 
-The main limitation is that the current per-circuit/per-compound quadratic still
-mixes driver skill, team pace, fuel load, traffic, and race phase effects. Those
-factors inflate residual variance even after pit laps, deleted laps, invalid lap
-times, and non-green track-status rows are excluded.
+Post-correction, the fit uses a neutralized lap-time proxy before fitting:
+
+- driver median offsets are removed within each `(circuit_id, compound)` group,
+- later race laps are adjusted with a transparent fuel-burn proxy,
+- close-car traffic is adjusted with a `gap_to_ahead_ms` dirty-air penalty.
+
+This improves the input hygiene without changing the quadratic model shape or
+the persisted coefficient schema. The remaining limitation is that these are
+still proxies, not direct fuel load, aero wake, or driver-performance telemetry.
 
 After the predictor addition, rerun this DB smoke:
 

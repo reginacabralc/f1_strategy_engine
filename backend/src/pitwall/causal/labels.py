@@ -50,6 +50,7 @@ class ViabilityInputs:
 class ViabilityLabel:
     undercut_viable: bool | None
     undercut_window_open: bool
+    pace_delta_to_rival_ms: int | None
     projected_gain_if_pit_now_ms: int | None
     fresh_tyre_advantage_ms: int | None
     required_gain_to_clear_rival_ms: int | None
@@ -119,6 +120,7 @@ def compute_undercut_viability_label(
         return _unusable("missing_next_compound")
 
     defender_curve = _curve_for(degradation_lookup, inputs.circuit_id, defender_compound)
+    attacker_current_curve = _curve_for(degradation_lookup, inputs.circuit_id, attacker_compound)
     attacker_curve = _curve_for(degradation_lookup, inputs.circuit_id, next_compound)
     if defender_curve is None:
         return _unusable("missing_defender_degradation_curve")
@@ -126,8 +128,16 @@ def compute_undercut_viability_label(
         return _unusable("missing_attacker_fresh_degradation_curve")
 
     assert inputs.defender_tyre_age is not None
+    assert inputs.attacker_tyre_age is not None
     assert inputs.gap_to_rival_ms is not None
     assert inputs.pit_loss_estimate_ms is not None
+
+    pace_delta_to_rival_ms = None
+    if attacker_current_curve is not None:
+        pace_delta_to_rival_ms = (
+            defender_curve.predict_ms(inputs.defender_tyre_age + 1)
+            - attacker_current_curve.predict_ms(inputs.attacker_tyre_age + 1)
+        )
 
     defender_laps = [
         defender_curve.predict_ms(inputs.defender_tyre_age + lap_offset)
@@ -151,6 +161,7 @@ def compute_undercut_viability_label(
     return ViabilityLabel(
         undercut_viable=undercut_viable,
         undercut_window_open=undercut_viable,
+        pace_delta_to_rival_ms=pace_delta_to_rival_ms,
         projected_gain_if_pit_now_ms=projected_gain_ms,
         fresh_tyre_advantage_ms=fresh_tyre_advantage_ms,
         required_gain_to_clear_rival_ms=required_gain_ms,
@@ -205,6 +216,7 @@ def _unusable(reason: str) -> ViabilityLabel:
     return ViabilityLabel(
         undercut_viable=None,
         undercut_window_open=False,
+        pace_delta_to_rival_ms=None,
         projected_gain_if_pit_now_ms=None,
         fresh_tyre_advantage_ms=None,
         required_gain_to_clear_rival_ms=None,

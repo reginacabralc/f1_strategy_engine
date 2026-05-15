@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from importlib import import_module
 from math import isfinite, sqrt
-from statistics import fmean
+from statistics import fmean, median
 from typing import Any, cast
 
 import numpy as np
@@ -22,6 +22,9 @@ from pitwall.ingest.normalize import to_int
 MIN_LAPS = 8
 MIN_UNIQUE_TYRE_AGES = 3
 R2_WARN_THRESHOLD = 0.6
+FUEL_BURN_MS_PER_LAP = 35
+DIRTY_AIR_GAP_THRESHOLD_MS = 1_500
+DIRTY_AIR_MAX_PENALTY_MS = 400
 
 
 def quadratic(age: float, a: float, b: float, c: float) -> float:
@@ -74,6 +77,7 @@ def fit_quadratic_group(
         coerced = _coerce_fit_row(row)
         if coerced is not None:
             eligible_rows.append(coerced)
+    eligible_rows = _normalise_fit_rows(eligible_rows)
 
     circuit_id = (
         _group_value(eligible_rows, "circuit_id")
@@ -101,7 +105,13 @@ def fit_quadratic_group(
     x = cast(NDArray[np.float64], np.asarray(tyre_ages, dtype=np.float64))
     y = cast(
         NDArray[np.float64],
-        np.asarray([float(row["lap_time_ms"]) for row in eligible_rows], dtype=np.float64),
+        np.asarray(
+            [
+                float(row.get("normalized_lap_time_ms", row["lap_time_ms"]))
+                for row in eligible_rows
+            ],
+            dtype=np.float64,
+        ),
     )
     try:
         a_coef, b_coef, c_coef = _curve_fit_quadratic(x, y)
@@ -155,11 +165,72 @@ def fit_degradation(rows: Iterable[Mapping[str, Any]]) -> list[DegradationFitRes
     return sorted(results, key=lambda result: (result.circuit_id, result.compound))
 
 
+def _normalise_fit_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Return rows with driver, fuel, and traffic effects neutralised for fitting.
+
+    ``normalized_lap_time_ms`` is a neutral-driver, full-fuel-equivalent,
+    low-traffic proxy.  It is only used to fit the circuit/compound degradation
+    curve; the raw lap time remains available for diagnostics.
+    """
+
+    prepared: list[dict[str, Any]] = []
+    driver_values: dict[str, list[float]] = defaultdict(list)
+    for row in rows:
+        lap_time_ms = float(row["lap_time_ms"])
+        fuel_adjustment_ms = _fuel_adjustment_ms(row)
+        traffic_adjustment_ms = _traffic_adjustment_ms(row)
+        pre_driver_ms = lap_time_ms + fuel_adjustment_ms - traffic_adjustment_ms
+        prepared_row = dict(row)
+        prepared_row["fuel_adjustment_ms"] = fuel_adjustment_ms
+        prepared_row["traffic_adjustment_ms"] = traffic_adjustment_ms
+        prepared_row["pre_driver_normalized_lap_time_ms"] = pre_driver_ms
+        prepared.append(prepared_row)
+        driver_values[str(row.get("driver_code") or "__unknown__")].append(pre_driver_ms)
+
+    if not prepared:
+        return []
+
+    group_median = float(median(row["pre_driver_normalized_lap_time_ms"] for row in prepared))
+    driver_offsets = {
+        driver_code: float(median(values)) - group_median
+        for driver_code, values in driver_values.items()
+        if values
+    }
+
+    for row in prepared:
+        driver_code = str(row.get("driver_code") or "__unknown__")
+        driver_offset_ms = driver_offsets.get(driver_code, 0.0)
+        row["driver_offset_ms"] = driver_offset_ms
+        row["normalized_lap_time_ms"] = (
+            float(row["pre_driver_normalized_lap_time_ms"]) - driver_offset_ms
+        )
+    return prepared
+
+
+def _fuel_adjustment_ms(row: Mapping[str, Any]) -> float:
+    lap_number = to_int(row.get("lap_number"))
+    if lap_number is None:
+        return 0.0
+    return float(max(0, lap_number - 1) * FUEL_BURN_MS_PER_LAP)
+
+
+def _traffic_adjustment_ms(row: Mapping[str, Any]) -> float:
+    gap_to_ahead_ms = to_int(row.get("gap_to_ahead_ms"))
+    if gap_to_ahead_ms is None or gap_to_ahead_ms >= DIRTY_AIR_GAP_THRESHOLD_MS:
+        return 0.0
+    ratio = (DIRTY_AIR_GAP_THRESHOLD_MS - max(0, gap_to_ahead_ms)) / DIRTY_AIR_GAP_THRESHOLD_MS
+    return float(DIRTY_AIR_MAX_PENALTY_MS * ratio)
+
+
 def _curve_fit_quadratic(
     x: NDArray[np.float64],
     y: NDArray[np.float64],
 ) -> tuple[float, float, float]:
-    optimize = import_module("scipy.optimize")
+    try:
+        optimize = import_module("scipy.optimize")
+    except ImportError:
+        c_coef, b_coef, a_coef = np.polyfit(x, y, deg=2)
+        return float(a_coef), float(b_coef), float(c_coef)
     coefficients, _ = optimize.curve_fit(quadratic, x, y, maxfev=10_000)
     return float(coefficients[0]), float(coefficients[1]), float(coefficients[2])
 

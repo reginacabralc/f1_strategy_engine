@@ -99,10 +99,10 @@ def test_evaluate_causal_live_predicts_simulates_and_explains() -> None:
     assert result.top_factors
     assert {scenario.scenario_name for scenario in result.counterfactuals} == {
         "base_case",
-        "pit_now",
-        "pit_next_lap",
-        "pit_now_high_traffic",
-        "pit_now_low_traffic",
+        "current_lap",
+        "next_lap",
+        "current_lap_high_traffic",
+        "current_lap_low_traffic",
         "pit_loss_minus_1000_ms",
         "pit_loss_plus_1000_ms",
     }

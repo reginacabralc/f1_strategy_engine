@@ -393,7 +393,7 @@
   `data_subset_refuter`) to `make run-causal-dowhy`, plus stability reporting for
   unsupported effects. Added `pitwall.causal.live_inference` and
   `pitwall.causal.explain` for current-lap `undercut_viable`, support level,
-  counterfactual scenarios (`base_case`, `pit_now`, `pit_next_lap`,
+  counterfactual scenarios (`base_case`, `current_lap`, `next_lap`,
   traffic high/low, pit-loss ±1000 ms), top factors, and human-readable
   explanations. No API/WS shape changed; interface docs do not need updates yet.
   Latest refuter read on the original demo dataset: `fresh_tyre_advantage_ms`
@@ -411,8 +411,21 @@
   `mexico_city_2024_R`: causal dataset now has 4,654 rows, 4,586 usable rows,
   1,022 viable rows, and 19 observed success rows. DoWhy refuters are stable for
   all three default treatments on this four-race dataset. XGBoost comparison is
-  reported as `unavailable_feature_pipeline` until Stream A wires runtime XGB
-  prediction.
+  reported as `not_evaluated_in_dataset` until a backtest run writes
+  `xgb_engine_decision`.
+- [x] **Stream A+B**: viability-target correction pass.
+  Main causal DAG now ends at `undercut_viable`; `pit_decision`, `pit_now`, and
+  `undercut_success` are excluded from the main DAG and viability feature set.
+  Observed pit-cycle success no longer overrides `undercut_viable`; it remains
+  evaluation context only. Added `pace_delta_to_rival_ms`, `pit_window_open`,
+  `defender_likely_to_cover`, `safety_car_or_vsc_risk`, and
+  `pit_lane_congestion` proxies. Added
+  `data/curation/undercut_viability_curated.csv` for human-reviewed pre-pit
+  viability labels. Scipy degradation fitting now neutralizes driver median
+  offsets, fuel-burn proxy, and dirty-air gap penalty before fitting. The
+  XGBoost runtime predictor now reconstructs its saved feature schema and can
+  predict when model metadata includes runtime reference-pace maps. Extended
+  causal prep defaults now cover 11 races.
 - [ ] Stream C: copy y branding mínimo, demo polish.
 - [x] **Stream D**: quickstart/runbook corrected to match current implementation.
   README, walkthrough, infra README, runbook, and docker-compose architecture now state

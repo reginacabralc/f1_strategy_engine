@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -23,6 +24,53 @@ from pitwall.ingest.normalize import clean_nulls, to_bool, to_float, to_int
 DATASET_VERSION = "causal_driver_rival_lap_v1"
 GAP_SOURCE = "reconstructed_fastf1_time"
 PACE_SOURCE = "causal_scipy"
+CURATED_VIABILITY_NOTES_PREFIX = "curated_manual_viability_v1"
+DEFAULT_CURATED_VIABILITY_PATH = Path("data/curation/undercut_viability_curated.csv")
+
+RAW_PRE_PIT_FEATURE_COLUMNS = [
+    "circuit_id",
+    "track_temp_c",
+    "air_temp_c",
+    "rainfall",
+    "track_status",
+    "attacker_compound",
+    "defender_compound",
+    "attacker_tyre_age",
+    "defender_tyre_age",
+    "gap_to_rival_ms",
+    "current_position",
+    "rival_position",
+    "laps_remaining",
+    "race_phase",
+]
+
+ENGINEERED_STRATEGY_FEATURE_COLUMNS = [
+    "pace_delta_to_rival_ms",
+    "fresh_tyre_advantage_ms",
+    "pit_loss_estimate_ms",
+    "pit_lane_congestion",
+    "traffic_after_pit",
+    "clean_air_potential",
+    "defender_likely_to_cover",
+    "pit_window_open",
+    "safety_car_or_vsc_risk",
+    "projected_gain_if_pit_now_ms",
+    "required_gain_to_clear_rival_ms",
+    "projected_gap_after_pit_ms",
+]
+
+DOWNSTREAM_DECISION_OUTCOME_COLUMNS = frozenset(
+    {
+        "pit_decision",
+        "pit_now",
+        "undercut_success",
+    }
+)
+
+VIABILITY_FEATURE_COLUMNS = [
+    *RAW_PRE_PIT_FEATURE_COLUMNS,
+    *ENGINEERED_STRATEGY_FEATURE_COLUMNS,
+]
 
 CAUSAL_DATASET_COLUMNS = [
     "session_id",
@@ -59,10 +107,13 @@ CAUSAL_DATASET_COLUMNS = [
     "air_temp_c",
     "rainfall",
     "pit_loss_estimate_ms",
+    "recent_pit_stops",
+    "pit_lane_congestion",
     "projected_pit_exit_gap_to_leader_ms",
     "projected_pit_exit_position",
     "traffic_after_pit_cars",
     "nearest_traffic_gap_ms",
+    "pace_delta_to_rival_ms",
     "fresh_tyre_advantage_ms",
     "projected_gain_if_pit_now_ms",
     "required_gain_to_clear_rival_ms",
@@ -70,6 +121,9 @@ CAUSAL_DATASET_COLUMNS = [
     "pace_confidence",
     "traffic_after_pit",
     "clean_air_potential",
+    "defender_likely_to_cover",
+    "pit_window_open",
+    "safety_car_or_vsc_risk",
     "undercut_window_open",
     "undercut_viable",
     "undercut_viable_label_source",
@@ -134,6 +188,12 @@ PAIR_LAP_QUERY = text(
         a.is_pit_in AS pit_now,
         COALESCE(ple_team.pit_loss_ms, ple_circuit.pit_loss_ms, ple_global.pit_loss_ms)
             AS pit_loss_estimate_ms,
+        (
+            SELECT COUNT(*)
+            FROM pit_stops ps
+            WHERE ps.session_id = a.session_id
+              AND ps.lap_number BETWEEN GREATEST(1, a.lap_number - 2) AND a.lap_number - 1
+        ) AS recent_pit_stops,
         CASE
             WHEN a.gap_to_leader_ms IS NULL THEN NULL
             ELSE a.gap_to_leader_ms + COALESCE(
@@ -305,19 +365,48 @@ def load_known_undercut_rows(
     return [dict(row._mapping) for row in rows]
 
 
+def load_curated_viability_labels_csv(path: Path) -> list[dict[str, object]]:
+    """Load human-reviewed pre-pit ``undercut_viable`` labels from CSV.
+
+    The CSV is intentionally separate from ``known_undercuts`` because a
+    successful executed undercut is not the same target as pre-pit viability.
+    """
+
+    if not path.exists():
+        return []
+    labels: list[dict[str, object]] = []
+    with path.open(newline="") as handle:
+        reader = csv.DictReader(handle)
+        missing = _missing_curated_viability_columns(reader.fieldnames or [])
+        if missing:
+            raise ValueError(f"curated viability CSV missing column(s): {missing}")
+        for line_number, row in enumerate(reader, start=2):
+            if _blank_csv_row(row):
+                continue
+            labels.append(_curated_viability_row_from_csv(row, line_number=line_number))
+    return labels
+
+
 def build_causal_dataset(
     pair_rows: Iterable[Mapping[str, Any]],
     degradation_rows: list[dict[str, object]],
     known_undercuts: Iterable[Mapping[str, object]],
     *,
+    curated_viability_labels: Iterable[Mapping[str, object]] = (),
     generated_at: datetime | None = None,
 ) -> CausalDatasetBuildResult:
     """Build Phase 3/4 causal dataset rows from pair-lap observations."""
 
     degradation_lookup = build_degradation_lookup(degradation_rows)
     known_lookup = _known_undercut_lookup(known_undercuts)
+    curated_viability_lookup = _curated_viability_lookup(curated_viability_labels)
     rows = [
-        _build_dataset_row(dict(clean_nulls(dict(row))), degradation_lookup, known_lookup)
+        _build_dataset_row(
+            dict(clean_nulls(dict(row))),
+            degradation_lookup,
+            known_lookup,
+            curated_viability_lookup,
+        )
         for row in pair_rows
     ]
     timestamp = generated_at or datetime.now(UTC)
@@ -339,6 +428,9 @@ def validate_causal_dataset_rows(
     missing = [column for column in CAUSAL_DATASET_COLUMNS if column not in columns]
     if missing:
         raise ValueError(f"missing causal dataset column(s): {missing}")
+    leaked_features = sorted(DOWNSTREAM_DECISION_OUTCOME_COLUMNS & set(VIABILITY_FEATURE_COLUMNS))
+    if leaked_features:
+        raise ValueError(f"downstream columns leaked into viability features: {leaked_features}")
     usable_rows = [row for row in rows if row.get("row_usable") is True]
     if not usable_rows:
         raise ValueError("causal undercut dataset has zero usable rows")
@@ -379,6 +471,7 @@ def build_causal_dataset_from_db(
     connection: QueryConnection,
     *,
     session_ids: tuple[str, ...] = (),
+    curated_viability_labels: Iterable[Mapping[str, object]] = (),
 ) -> CausalDatasetBuildResult:
     """Load DB inputs and build the Phase 3/4 causal dataset."""
 
@@ -386,6 +479,7 @@ def build_causal_dataset_from_db(
         load_pair_lap_rows(connection, session_ids=session_ids),
         load_degradation_rows(connection),
         load_known_undercut_rows(connection, session_ids=session_ids),
+        curated_viability_labels=curated_viability_labels,
     )
 
 
@@ -393,6 +487,7 @@ def _build_dataset_row(
     row: Mapping[str, Any],
     degradation_lookup: dict[tuple[str, str], Any],
     known_lookup: dict[tuple[str, str, str, int], tuple[bool, str]],
+    curated_viability_lookup: dict[tuple[str, str, str, int], tuple[bool, str]],
 ) -> dict[str, Any]:
     lap_number = to_int(row.get("lap_number"))
     total_laps = to_int(row.get("total_laps"))
@@ -431,20 +526,41 @@ def _build_dataset_row(
     success = known_lookup.get(known_key)
     success_value = success[0] if success is not None else None
     success_source = success[1] if success is not None else None
+    curated_viability = curated_viability_lookup.get(known_key)
     undercut_viable = label.undercut_viable
     undercut_viable_source = label.label_source
     undercut_window_open = label.undercut_window_open
     row_usable = label.row_usable
     missing_reason = label.missing_reason
-    if success_value is not None:
-        undercut_viable = success_value or bool(label.undercut_viable)
+    if curated_viability is not None:
+        undercut_viable = curated_viability[0]
         undercut_window_open = bool(undercut_viable)
-        undercut_viable_source = f"observed_{success_source}"
+        undercut_viable_source = curated_viability[1]
         row_usable = True
         missing_reason = None
     projected_gap = label.projected_gap_after_pit_ms
     traffic_cars = to_int(row.get("traffic_after_pit_cars"))
     nearest_traffic_gap_ms = to_int(row.get("nearest_traffic_gap_ms"))
+    track_status = _text(row.get("track_status")) or "GREEN"
+    recent_pit_stops = to_int(row.get("recent_pit_stops"))
+    pit_lane_congestion = _pit_lane_congestion(recent_pit_stops, track_status)
+    rainfall = to_bool(row.get("rainfall"))
+    pit_window_open = _pit_window_open(
+        laps_remaining=laps_remaining,
+        attacker_tyre_age=attacker_tyre_age,
+        attacker_compound=_text(row.get("attacker_compound")),
+        track_status=track_status,
+        rainfall=rainfall,
+    )
+    defender_likely_to_cover = _defender_likely_to_cover(
+        gap_to_rival_ms=gap_to_rival_ms,
+        defender_tyre_age=defender_tyre_age,
+        defender_compound=_text(row.get("defender_compound")),
+        laps_remaining=laps_remaining,
+        race_phase=race_phase,
+        track_status=track_status,
+    )
+    safety_car_or_vsc_risk = _safety_car_or_vsc_risk(track_status, rainfall)
 
     return {
         "session_id": row.get("session_id"),
@@ -480,17 +596,20 @@ def _build_dataset_row(
         "defender_stint_number": to_int(row.get("defender_stint_number")),
         "attacker_laps_in_stint": to_int(row.get("attacker_laps_in_stint")),
         "defender_laps_in_stint": to_int(row.get("defender_laps_in_stint")),
-        "track_status": _text(row.get("track_status")) or "GREEN",
+        "track_status": track_status,
         "track_temp_c": to_float(row.get("track_temp_c")),
         "air_temp_c": to_float(row.get("air_temp_c")),
-        "rainfall": to_bool(row.get("rainfall")),
+        "rainfall": rainfall,
         "pit_loss_estimate_ms": pit_loss_estimate_ms,
+        "recent_pit_stops": recent_pit_stops,
+        "pit_lane_congestion": pit_lane_congestion,
         "projected_pit_exit_gap_to_leader_ms": to_int(
             row.get("projected_pit_exit_gap_to_leader_ms")
         ),
         "projected_pit_exit_position": to_int(row.get("projected_pit_exit_position")),
         "traffic_after_pit_cars": traffic_cars,
         "nearest_traffic_gap_ms": nearest_traffic_gap_ms,
+        "pace_delta_to_rival_ms": label.pace_delta_to_rival_ms,
         "fresh_tyre_advantage_ms": label.fresh_tyre_advantage_ms,
         "projected_gain_if_pit_now_ms": label.projected_gain_if_pit_now_ms,
         "required_gain_to_clear_rival_ms": label.required_gain_to_clear_rival_ms,
@@ -498,6 +617,9 @@ def _build_dataset_row(
         "pace_confidence": label.pace_confidence,
         "traffic_after_pit": _traffic_bucket(traffic_cars, nearest_traffic_gap_ms),
         "clean_air_potential": _clean_air_potential(traffic_cars, nearest_traffic_gap_ms),
+        "defender_likely_to_cover": defender_likely_to_cover,
+        "pit_window_open": pit_window_open,
+        "safety_car_or_vsc_risk": safety_car_or_vsc_risk,
         "undercut_window_open": undercut_window_open,
         "undercut_viable": undercut_viable,
         "undercut_viable_label_source": undercut_viable_source,
@@ -533,25 +655,98 @@ def _known_undercut_lookup(
     return lookup
 
 
+def _curated_viability_lookup(
+    rows: Iterable[Mapping[str, object]],
+) -> dict[tuple[str, str, str, int], tuple[bool, str]]:
+    lookup: dict[tuple[str, str, str, int], tuple[bool, str]] = {}
+    for row in rows:
+        lap = to_int(row.get("lap_number"))
+        if lap is None:
+            continue
+        lookup[
+            (
+                str(row.get("session_id")),
+                str(row.get("attacker_code")),
+                str(row.get("defender_code")),
+                lap,
+            )
+        ] = (
+            to_bool(row.get("undercut_viable")),
+            str(row.get("label_source") or CURATED_VIABILITY_NOTES_PREFIX),
+        )
+    return lookup
+
+
+def _curated_viability_row_from_csv(
+    row: Mapping[str, str],
+    *,
+    line_number: int,
+) -> dict[str, object]:
+    lap_number = to_int(row.get("lap_number"))
+    if lap_number is None:
+        raise ValueError(f"lap_number is required on curated viability CSV line {line_number}")
+    reviewer = (row.get("reviewer") or "unknown").strip() or "unknown"
+    evidence = (row.get("evidence") or "manual_review").strip() or "manual_review"
+    note = (row.get("notes") or "").strip()
+    label_source = f"{CURATED_VIABILITY_NOTES_PREFIX};reviewer={reviewer};evidence={evidence}"
+    if note:
+        label_source = f"{label_source};notes={note}"
+    return {
+        "session_id": _required_csv_text(row, "session_id", line_number=line_number),
+        "attacker_code": _required_csv_text(row, "attacker_code", line_number=line_number),
+        "defender_code": _required_csv_text(row, "defender_code", line_number=line_number),
+        "lap_number": lap_number,
+        "undercut_viable": _parse_bool(row.get("undercut_viable"), line_number=line_number),
+        "label_source": label_source,
+    }
+
+
+def _missing_curated_viability_columns(fieldnames: Iterable[str]) -> list[str]:
+    required = {
+        "session_id",
+        "attacker_code",
+        "defender_code",
+        "lap_number",
+        "undercut_viable",
+        "reviewer",
+        "evidence",
+        "notes",
+    }
+    return sorted(required - set(fieldnames))
+
+
 def _build_metadata(rows: Sequence[Mapping[str, Any]], generated_at: datetime) -> dict[str, Any]:
     usable_rows = [row for row in rows if row.get("row_usable") is True]
     viable_rows = [row for row in usable_rows if row.get("undercut_viable") is True]
     observed_success_rows = [row for row in rows if row.get("undercut_success") is not None]
+    curated_viability_rows = [
+        row
+        for row in rows
+        if str(row.get("undercut_viable_label_source") or "").startswith(
+            CURATED_VIABILITY_NOTES_PREFIX
+        )
+    ]
     return {
         "dataset_version": DATASET_VERSION,
         "row_count": len(rows),
         "usable_row_count": len(usable_rows),
         "undercut_viable_rows": len(viable_rows),
         "observed_success_rows": len(observed_success_rows),
+        "curated_viability_rows": len(curated_viability_rows),
         "feature_source": "driver-rival-lap consecutive race order pairs",
         "pace_source": PACE_SOURCE,
         "gap_source": GAP_SOURCE,
-        "target_columns": ["undercut_viable", "undercut_success"],
+        "target_columns": ["undercut_viable"],
+        "evaluation_columns": ["pit_now", "undercut_success", "undercut_success_label_source"],
+        "viability_feature_columns": VIABILITY_FEATURE_COLUMNS,
         "generated_at": generated_at.isoformat(),
         "leakage_policy": [
             "features use lap-t observations only",
-            "pit_now is treatment/outcome context, not a viability input",
-            "known_undercuts joins only into undercut_success outcome labels",
+            "pit_decision, pit_now, and undercut_success are excluded from viability features",
+            "pit_now is evaluation context, not a viability input",
+            "known_undercuts joins only into evaluation/outcome context",
+            "observed pit-cycle success never overrides undercut_viable",
+            "curated viability CSV may override undercut_viable only with human pre-pit review",
             "XGBoost features, predictions, and importances are not used",
         ],
     }
@@ -597,6 +792,81 @@ def _clean_air_potential(
     if traffic == "medium":
         return "medium"
     return "low"
+
+
+def _pit_lane_congestion(recent_pit_stops: int | None, track_status: str) -> str:
+    status = track_status.upper()
+    if status in {"SC", "VSC", "RED"}:
+        return "high"
+    if recent_pit_stops is None:
+        return "unknown"
+    if recent_pit_stops >= 3:
+        return "high"
+    if recent_pit_stops >= 1 or status == "YELLOW":
+        return "medium"
+    return "low"
+
+
+def _pit_window_open(
+    *,
+    laps_remaining: int | None,
+    attacker_tyre_age: int | None,
+    attacker_compound: str | None,
+    track_status: str,
+    rainfall: bool,
+) -> bool:
+    if rainfall or track_status.upper() != "GREEN":
+        return False
+    if attacker_compound not in {"SOFT", "MEDIUM", "HARD"}:
+        return False
+    if laps_remaining is None or laps_remaining < 3:
+        return False
+    return attacker_tyre_age is not None and attacker_tyre_age >= 3
+
+
+def _defender_likely_to_cover(
+    *,
+    gap_to_rival_ms: int | None,
+    defender_tyre_age: int | None,
+    defender_compound: str | None,
+    laps_remaining: int | None,
+    race_phase: str | None,
+    track_status: str,
+) -> bool:
+    if track_status.upper() != "GREEN":
+        return True
+    if defender_compound not in {"SOFT", "MEDIUM", "HARD"}:
+        return False
+    if gap_to_rival_ms is None or defender_tyre_age is None or laps_remaining is None:
+        return False
+    if laps_remaining < 3:
+        return False
+    age_threshold = 8 if race_phase == "late" else 12
+    return gap_to_rival_ms <= 3_000 and defender_tyre_age >= age_threshold
+
+
+def _safety_car_or_vsc_risk(track_status: str, rainfall: bool) -> bool:
+    return rainfall or track_status.upper() in {"SC", "VSC", "YELLOW", "RED"}
+
+
+def _blank_csv_row(row: Mapping[str, str]) -> bool:
+    return not any((value or "").strip() for value in row.values())
+
+
+def _required_csv_text(row: Mapping[str, str], column: str, *, line_number: int) -> str:
+    value = (row.get(column) or "").strip()
+    if not value:
+        raise ValueError(f"{column} is required on curated viability CSV line {line_number}")
+    return value
+
+
+def _parse_bool(value: str | None, *, line_number: int) -> bool:
+    normalized = (value or "").strip().lower()
+    if normalized in {"1", "true", "yes", "y"}:
+        return True
+    if normalized in {"0", "false", "no", "n"}:
+        return False
+    raise ValueError(f"undercut_viable must be boolean on curated CSV line {line_number}")
 
 
 def _text(value: object) -> str | None:

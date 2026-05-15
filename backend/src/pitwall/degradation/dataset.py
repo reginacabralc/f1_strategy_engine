@@ -78,33 +78,42 @@ def read_clean_lap_dataset(
     params: dict[str, object] = {}
     where = ""
     if session_id is not None:
-        where = "WHERE session_id = :session_id"
+        where = "WHERE c.session_id = :session_id"
         params["session_id"] = session_id
     elif session_ids:
-        where = "WHERE session_id = ANY(:session_ids)"
+        where = "WHERE c.session_id = ANY(:session_ids)"
         params["session_ids"] = list(session_ids)
 
     statement = _sql_text(
         f"""
         SELECT
-            session_id,
-            circuit_id,
-            driver_code,
-            team_code,
-            compound,
-            tyre_age,
-            lap_number,
-            stint_number,
-            lap_time_ms,
-            track_status,
-            is_pit_in_lap,
-            is_pit_out_lap,
-            is_deleted,
-            fitting_eligible,
-            exclusion_reason
-        FROM clean_air_lap_times
+            c.session_id,
+            c.circuit_id,
+            c.driver_code,
+            c.team_code,
+            c.compound,
+            c.tyre_age,
+            c.lap_number,
+            c.stint_number,
+            c.lap_time_ms,
+            c.track_status,
+            c.is_pit_in_lap,
+            c.is_pit_out_lap,
+            c.is_deleted,
+            c.fitting_eligible,
+            c.exclusion_reason,
+            s.total_laps,
+            l.position,
+            l.gap_to_ahead_ms,
+            l.gap_to_leader_ms
+        FROM clean_air_lap_times c
+        JOIN sessions s ON s.session_id = c.session_id
+        LEFT JOIN laps l
+          ON l.session_id = c.session_id
+         AND l.driver_code = c.driver_code
+         AND l.lap_number = c.lap_number
         {where}
-        ORDER BY session_id, compound, driver_code, lap_number
+        ORDER BY c.session_id, c.compound, c.driver_code, c.lap_number
         """
     )
     rows = connection.execute(statement, params)
