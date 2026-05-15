@@ -86,11 +86,17 @@ frontend/
 - [x] Responsive: tabla scroll horizontal en móvil.
 
 ### Día 9 — Backtest view + tests
-- [ ] Component `<BacktestView>` que muestra resultados de `/api/v1/backtest/{session}`.
+- [x] Component `<BacktestView>` que muestra resultados de `/api/v1/backtest/{session}`.
   - Tabla de TP, FP, FN.
   - Comparación scipy vs xgboost lado a lado.
-- [ ] Vitest tests para componentes (snapshot básico).
-- [ ] 1 happy-path Playwright: cargar app, seleccionar sesión, play, ver alertas.
+  - Added `src/hooks/useBacktest.ts` (TanStack Query, disabled when no session, predictor in key).
+  - Added `src/components/BacktestView.tsx` — two-panel grid, per-predictor metrics + TP/FP/FN tables,
+    graceful empty/loading/unavailable states. One failing predictor does not hide the other.
+  - Integrated into `App.tsx` below the Degradation + TrackMap row.
+  - 15 Vitest tests in `src/components/BacktestView.test.tsx` — all passing.
+  - `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm test` 58/58 ✅ · `pnpm build` ✅.
+- [x] Vitest tests para componentes (snapshot básico).
+- [ ] 1 happy-path Playwright: cargar app, seleccionar sesión, play, ver alertas. Playwright deferred to Day 10.
 
 ### Día 10 — Demo polish
 - [ ] Copy y mensajes de error en español o inglés (consistente).

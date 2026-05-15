@@ -8,6 +8,7 @@ import { DegradationChart } from "./components/DegradationChart";
 import { TrackMapPanel } from "./components/TrackMapPanel";
 import { ReplayControls } from "./components/ReplayControls";
 import { PredictorToggle } from "./components/PredictorToggle";
+import { BacktestView } from "./components/BacktestView";
 import { useSessions } from "./hooks/useSessions";
 import { useRaceFeed } from "./hooks/useRaceFeed";
 
@@ -72,6 +73,8 @@ export function App() {
               <DegradationChart circuit={circuit} />
               <TrackMapPanel />
             </div>
+
+            <BacktestView sessionId={selectedSession} />
           </main>
 
           {/* Right column: alerts + predictor toggle + metrics */}

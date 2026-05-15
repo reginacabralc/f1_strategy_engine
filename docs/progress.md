@@ -331,6 +331,18 @@
 - [ ] Stream D: test suite verde, ADRs revisados.
 
 ### Día 9
+- [x] **Stream C: BacktestView frontend completado.**
+  `src/hooks/useBacktest.ts` — TanStack Query hook wrapping `getBacktestResult()`, disabled when
+  `sessionId` is falsy, `predictor` included in query key, `retry: false`, `staleTime: 5 min`.
+  `src/components/BacktestView.tsx` — two-column panel (scipy | xgboost) inside `App.tsx`
+  center column, below DegradationChart + TrackMapPanel grid. Each panel shows precision/recall/f1
+  as percentages, optional lead-time and MAE k1/k3/k5 metrics, and TP/FP/FN match tables
+  (attacker, defender, lap alerted, lap actual). Empty state when no session selected; per-predictor
+  loading/unavailable states; one erroring predictor does not hide the other.
+  15 new Vitest tests — all passing. Total: 58 tests.
+  `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm test` 58/58 ✅ · `pnpm build` ✅.
+  Day 6 WS, Day 7 PredictorToggle, Day 8 visual polish untouched.
+  **Frontend view complete; actual backtest data depends on backend/Stream A+B data availability.**
 - [ ] **Stream A+B: backtest comparativo scipy vs XGBoost completo.**
 - [x] **Stream B**: confidence final, `data_quality_factor`, calibratable cold-tyre penalties,
   hypothesis property tests, and `/api/v1/backtest/{session_id}` endpoint.
