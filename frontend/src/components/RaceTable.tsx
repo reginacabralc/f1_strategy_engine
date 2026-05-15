@@ -129,7 +129,7 @@ export function RaceTable({ drivers = MOCK_DRIVERS, isLive, connectionStatus, ac
           className="px-3 py-8 text-[11px] text-pitwall-muted text-center"
           data-testid="race-table-empty"
         >
-          Waiting for race data…
+          No race data — start a replay to see live timing
         </p>
       ) : (
       <table className="min-w-[760px] w-full text-xs">
