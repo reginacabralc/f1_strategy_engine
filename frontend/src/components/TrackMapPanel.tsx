@@ -1,6 +1,3 @@
-// Monaco-inspired track map — visual base only.
-// Live driver positions wire in after Stream C Day 4 (useRaceFeed).
-
 export interface TrackMapDriver {
   number: string;
   code: string;
@@ -308,7 +305,7 @@ export function TrackMapPanel({ drivers = MOCK_DRIVERS }: Props) {
 
       {/* Footer */}
       <p className="px-3 py-1.5 text-[10px] text-pitwall-muted border-t border-pitwall-border text-center shrink-0">
-        Static preview — live positions via race feed
+        Monaco 2024 preview · positions update when replay is active
       </p>
     </section>
   );

@@ -34,6 +34,10 @@ export function App() {
       "monaco"
     );
   }, [selectedSession, sessions]);
+  const totalLaps = useMemo(() => {
+    if (!selectedSession || !sessions) return undefined;
+    return sessions.find((s) => s.session_id === selectedSession)?.total_laps ?? undefined;
+  }, [selectedSession, sessions]);
 
   return (
     <div className="h-full flex flex-col bg-pitwall-bg overflow-hidden">
@@ -42,6 +46,8 @@ export function App() {
         onSelectSession={setSelectedSession}
         connectionStatus={status}
         activePredictor={snapshot?.active_predictor}
+        currentLap={snapshot?.current_lap}
+        totalLaps={totalLaps}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -51,6 +57,19 @@ export function App() {
         <div className="flex flex-1 overflow-hidden gap-0">
           {/* Centre: table + degradation */}
           <main className="flex-1 flex flex-col gap-3 p-3 overflow-y-auto min-w-0">
+            {/* No-session hint */}
+            {!selectedSession && (
+              <div
+                className="flex items-center gap-2 px-3 py-2 rounded-md bg-pitwall-panel border border-pitwall-border"
+                data-testid="no-session-hint"
+              >
+                <span className="text-base leading-none" aria-hidden="true">👆</span>
+                <span className="text-[11px] text-pitwall-muted">
+                  Select a session from the dropdown above, then use Replay Controls to start playback.
+                </span>
+              </div>
+            )}
+
             {/* Section label */}
             <div className="flex items-center gap-2">
               <span className="label-caps">Race Order</span>

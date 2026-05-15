@@ -23,7 +23,7 @@ describe("AlertPanel", () => {
   it("shows empty state when no alerts", () => {
     render(<AlertPanel alerts={[]} />);
     expect(screen.getByTestId("alert-empty")).toBeInTheDocument();
-    expect(screen.getByText("No alerts yet")).toBeInTheDocument();
+    expect(screen.getByText(/No alerts/)).toBeInTheDocument();
   });
 
   it("shows empty state with default prop (no alerts passed)", () => {

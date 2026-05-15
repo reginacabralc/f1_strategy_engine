@@ -26,7 +26,8 @@ export function SessionPicker({ selected, onSelect }: Props) {
   if (sessions.length === 0) {
     return (
       <span className="text-pitwall-muted text-sm">
-        No sessions in DB — run <code>make seed</code>
+        No sessions available — run{" "}
+        <code className="font-mono text-pitwall-text/80">make ingest-demo</code>
       </span>
     );
   }
