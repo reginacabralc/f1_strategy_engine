@@ -27,6 +27,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), vers
 - Contrato OpenAPI v1 actualizado con `GET /api/v1/causal/prediction` y sus
   esquemas de validación/respuesta para evitar drift entre FastAPI y
   `docs/interfaces/openapi_v1.yaml`.
+- Playwright e2e agregado al workflow de tests con instalación explícita de
+  Firefox, más targets `make test-e2e-install` y `make test-e2e`.
+- Higiene de contribución Stream D: pre-commit local, templates de issue/PR y
+  `.env.example` documentado.
+- ADR numbering/status corregido: ADR 0010 es DoWhy causal, ADR 0011 es
+  validación temporal XGBoost, y ADR 0009 sigue abierto hasta el backtest
+  comparativo real.
 
 ### Pendiente para v0.1.0 (entrega MVP)
 

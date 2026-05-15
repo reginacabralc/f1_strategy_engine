@@ -155,7 +155,8 @@ class RaceState:
 | Asyncio sin broker | [ADR 0007](adr/0007-asyncio-sin-broker.md) | `asyncio.Queue` in-process suficiente |
 | OpenAPI como fuente de verdad | [ADR 0008](adr/0008-openapi-como-fuente-verdad.md) | Generado por FastAPI; cliente TS lo consume |
 | Resultado XGBoost vs scipy | [ADR 0009](adr/0009-xgboost-vs-scipy-resultados.md) | Por escribir tras E10 |
-| Validación temporal XGBoost | [ADR 0010](adr/0010-temporal-expanding-xgboost-validation.md) | 2024/2025 + expanding-window CV para evitar leakage |
+| DoWhy para causal undercut | [ADR 0010](adr/0010-dowhy-for-causal-undercut.md) | Causal offline/refuters sin reemplazar XGBoost |
+| Validación temporal XGBoost | [ADR 0011](adr/0011-temporal-expanding-xgboost-validation.md) | 2024/2025 + expanding-window CV para evitar leakage |
 
 ## 6. Boundaries y dependencias entre módulos
 

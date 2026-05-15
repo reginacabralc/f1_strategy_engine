@@ -1,0 +1,25 @@
+minimum_pre_commit_version: "3.5.0"
+
+repos:
+  - repo: local
+    hooks:
+      - id: backend-lint
+        name: backend ruff + mypy
+        entry: bash -lc 'make lint-backend'
+        language: system
+        pass_filenames: false
+        files: ^backend/(src|tests)/.*\.py$
+
+      - id: frontend-eslint
+        name: frontend eslint
+        entry: bash -lc 'make lint-frontend'
+        language: system
+        pass_filenames: false
+        files: ^frontend/src/.*\.(ts|tsx)$
+
+      - id: frontend-prettier
+        name: frontend prettier check
+        entry: bash -lc 'cd frontend && npx -y prettier@3.4.2 --check "src/**/*.{ts,tsx,css}" "tests/**/*.{ts,tsx}"'
+        language: system
+        pass_filenames: false
+        files: ^frontend/(src|tests)/.*\.(ts|tsx|css)$

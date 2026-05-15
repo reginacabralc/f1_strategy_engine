@@ -223,6 +223,25 @@ docker compose logs backend | jq 'select(.level=="ERROR")'
 docker compose logs backend | jq 'select(.component=="engine")'
 ```
 
+## Playwright e2e
+
+```bash
+make test-e2e-install
+make test-e2e
+```
+
+Problemas comunes:
+
+- `pnpm: command not found`: usa `make test-e2e`, que cae a `npx -y pnpm@9.15.9`
+  cuando `pnpm` no está instalado globalmente.
+- `Executable doesn't exist ... firefox`: falta el browser de Playwright; corre
+  `make test-e2e-install`.
+- `Host system is missing dependencies`: en Linux/CI instala con
+  `pnpm exec playwright install --with-deps firefox`.
+- `listen EPERM` o `connect EPERM` en el sandbox de Codex: limitación local de
+  permisos de red del sandbox. Verifica fuera del sandbox o deja que CI ejecute
+  el job Playwright.
+
 ---
 
 ## Cuándo escalar a un humano

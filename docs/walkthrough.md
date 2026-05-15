@@ -158,11 +158,15 @@ FastF1 y llena `data/cache/`.
 make test           # backend unit tests + frontend vitest
 make test-backend   # pytest backend
 make test-frontend  # vitest frontend
+make test-e2e-install  # installs the Playwright Firefox browser locally
+make test-e2e      # mocked Playwright happy path
 make lint           # ruff + mypy + eslint
 ```
 
-Playwright e2e existe como target de frontend, pero requiere instalar los
-browsers de Playwright antes de correrlo localmente o en CI.
+Playwright e2e corre un happy path mockeado del dashboard. No requiere backend
+vivo porque intercepta las llamadas API, pero sí requiere el browser de
+Playwright. En CI se instala con `playwright install --with-deps firefox`; en
+local usa `make test-e2e-install` una vez antes de `make test-e2e`.
 
 ## 10. Apagar
 
@@ -218,5 +222,7 @@ Ver [`infra/runbook.md`](../infra/runbook.md) para diagnóstico de problemas com
 - "Cannot connect to db" — espera healthcheck.
 - "FastF1 cache permission denied" — chmod del volumen.
 - "WebSocket disconnects" — prueba primero `.venv/bin/python scripts/ws_demo_client.py`.
+- "Playwright browser missing" — corre `make test-e2e-install` y repite
+  `make test-e2e`.
 - "XGBoost model not found" — usa `PACE_PREDICTOR=scipy` o genera el artifact con los targets `build-xgb-dataset`, `train-xgb` y `validate-xgb-model`.
 - "Backtest sale precision = 0" — revisa que cargaste la lista curada de undercuts.

@@ -81,11 +81,11 @@ docs/walkthrough.md (mantenimiento)
 - [x] **Hito S1 contribución**: `make demo` arranca todo el stack local.
 
 ### Día 6 — Pre-commit + badges + README polish
-- [ ] `.pre-commit-config.yaml` con ruff, prettier, eslint.
+- [x] `.pre-commit-config.yaml` con ruff/mypy, eslint y prettier check.
 - [x] Badges de CI en README.
-- [ ] `.env.example` documentado.
-- [ ] Issue templates en `.github/ISSUE_TEMPLATE/`.
-- [ ] PR template `.github/pull_request_template.md`.
+- [x] `.env.example` documentado.
+- [x] Issue templates en `.github/ISSUE_TEMPLATE/`.
+- [x] PR template `.github/pull_request_template.md`.
 
 ### Día 7 — Frontend prod + nginx
 - [x] `docker/frontend.Dockerfile` con stage `prod` que sirve `dist/` por nginx.
@@ -94,10 +94,15 @@ docs/walkthrough.md (mantenimiento)
 - [ ] Agregar/validar un profile compose `prod` si la demo necesita servir nginx localmente.
 
 ### Día 8 — Test suite verde + ADRs revisados
-- [ ] `backend/tests/conftest.py` con fixtures de DB (testcontainers).
+- [x] CI backend corre pytest contra servicio TimescaleDB; no se agregó
+      `testcontainers` porque el workflow ya valida migraciones y tests con
+      Postgres real.
 - [x] CI corre tests en cada PR.
-- [ ] ADRs 0005-0008 escritos.
-- [ ] Validador `openapi-spec-validator` en CI.
+- [x] Playwright e2e agregado a CI con browser Firefox instalado por el workflow.
+- [x] ADRs 0005-0008 escritos.
+- [x] Validador `openapi-spec-validator` en CI.
+- [x] ADR numbering/status reviewed: 0010 = DoWhy causal, 0011 = temporal
+      XGBoost validation, 0009 remains open until comparative backtest.
 
 ### Día 9 — `make demo` end-to-end probado
 - [ ] Probar `make demo` en máquina limpia (segundo dev sin cache local).

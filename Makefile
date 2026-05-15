@@ -15,7 +15,8 @@ PNPM ?= $(shell if command -v pnpm >/dev/null 2>&1; then echo pnpm; elif command
         audit-causal-inputs reconstruct-race-gaps derive-known-undercuts \
         import-curated-known-undercuts build-causal-dataset run-causal-dowhy \
         compare-causal-engines prepare-causal-extended-data \
-        replay test test-backend test-frontend lint lint-backend lint-frontend \
+        replay test test-backend test-frontend test-e2e test-e2e-install \
+        lint lint-backend lint-frontend \
         demo demo-api serve-api api-wait
 
 install: .venv/.installed
@@ -165,6 +166,20 @@ test-frontend:
 		./node_modules/.bin/vitest run; \
 	else \
 		$(PNPM) install --frozen-lockfile && $(PNPM) test; \
+	fi
+
+test-e2e-install:
+	cd frontend && if [ -x ./node_modules/.bin/playwright ]; then \
+		./node_modules/.bin/playwright install firefox; \
+	else \
+		$(PNPM) install --frozen-lockfile && $(PNPM) exec playwright install firefox; \
+	fi
+
+test-e2e:
+	cd frontend && if [ -x ./node_modules/.bin/playwright ]; then \
+		./node_modules/.bin/playwright test; \
+	else \
+		$(PNPM) install --frozen-lockfile && $(PNPM) exec playwright test; \
 	fi
 
 lint: lint-backend lint-frontend

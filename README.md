@@ -66,7 +66,7 @@ Demo race round numbers for 2024: **Bahrain = 1**, **Monaco = 8**, **Hungary = 1
 - **DB**: PostgreSQL 15 + TimescaleDB
 - **Frontend**: React + Vite + TypeScript + TanStack Query + Tailwind + Recharts
 - **Infra**: docker-compose
-- **CI**: GitHub Actions (`lint`, `test`, `build`)
+- **CI**: GitHub Actions (`lint`, `test` including Vitest + Playwright, `build`)
 - **Datos abiertos**: [FastF1](https://docs.fastf1.dev/), [OpenF1](https://openf1.org), [Jolpica](https://github.com/jolpica/jolpica-f1) (sucesor de Ergast)
 
 ## ML

@@ -16,7 +16,7 @@
 | Motor undercut V1 con `ScipyPredictor` | ⏳ | Día 5 | Stream B |
 | Pipeline end-to-end con datos reales | ⏳ | Día 7 | Todos |
 | **XGBoost entrenado y serializado** | ✅ | Día 8 | Stream A — native Booster trained, serialized, and validated; weak 3-race holdout metrics documented |
-| **XGBoost temporal multi-season preparado** | ✅ | Día 8.5 | Stream A — manifest 2024/2025, temporal CV, tuning, plots, ADR 0010; full ingestion run pending |
+| **XGBoost temporal multi-season preparado** | ✅ | Día 8.5 | Stream A — manifest 2024/2025, temporal CV, tuning, plots, ADR 0011; full ingestion run pending |
 | **Backtest comparativo scipy vs XGBoost** | ⏳ | Día 9 | Stream A+B |
 | Demo end-to-end probada en limpio | ⏳ | Día 10 | Todos |
 
@@ -60,8 +60,12 @@
       returns JSON 500 responses.
 - [x] Stream D docs: README, walkthrough, infra README, runbook, changelog,
       and `stream-d-platform.md` were aligned with the current repo truth.
-- [ ] Remaining Stream D polish: decide whether Playwright browsers should be
-      installed in CI for e2e.
+- [x] Stream D Day 6-8 continuation: Playwright browser setup is explicit in
+      CI and local commands (`make test-e2e-install`, `make test-e2e`), Day 6
+      contribution hygiene files exist (`.pre-commit-config.yaml`, issue
+      templates, PR template), `.env.example` documents host-vs-Docker DB URLs,
+      and ADR numbering/status drift was corrected (`0010` DoWhy, `0011`
+      temporal XGBoost validation).
 
 ## Semana 1
 
@@ -408,7 +412,7 @@
   12-candidate XGBoost search, and `scripts/plot_xgb_diagnostics.py` writes 7
   matplotlib diagnostics under `reports/figures/`.
 - [x] **Stream A: docs pivot recorded.**
-  Added ADR 0010, `docs/ml_temporal_modeling_plan.md`, and
+  Added ADR 0011, `docs/ml_temporal_modeling_plan.md`, and
   `notebooks/07_augmented_temporal_model.md`; updated architecture, quanta 06,
   and training report. Day 9 backtest remains out of scope until model quality
   is assessed on the full temporal dataset.
@@ -563,5 +567,6 @@ _(ninguno por ahora)_
 | 2026-05-09 | Polars sobre pandas | 0006 |
 | 2026-05-09 | asyncio in-process, sin broker | 0007 |
 | 2026-05-09 | OpenAPI auto-generado como fuente de verdad | 0008 |
-| 2026-05-?? | Resultado XGBoost vs scipy | 0009 (post-E10) |
+| 2026-05-13 | Validación temporal XGBoost sin leakage | 0011 |
 | 2026-05-14 | DoWhy para causal undercut offline/refuters | 0010 |
+| 2026-05-?? | Resultado XGBoost vs scipy | 0009 (post-E10) |
