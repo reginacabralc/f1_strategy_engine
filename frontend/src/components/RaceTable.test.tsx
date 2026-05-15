@@ -71,4 +71,21 @@ describe("RaceTable", () => {
     render(<RaceTable drivers={[]} />);
     expect(screen.getByTestId("race-table-empty")).toBeInTheDocument();
   });
+
+  it("shows predictor badge when activePredictor prop is provided", () => {
+    render(<RaceTable activePredictor="scipy" />);
+    expect(screen.getByTestId("predictor-badge")).toBeInTheDocument();
+    expect(screen.getByText("scipy")).toBeInTheDocument();
+  });
+
+  it("shows xgboost predictor badge correctly", () => {
+    render(<RaceTable activePredictor="xgboost" />);
+    expect(screen.getByTestId("predictor-badge")).toBeInTheDocument();
+    expect(screen.getByText("xgboost")).toBeInTheDocument();
+  });
+
+  it("does not show predictor badge when activePredictor is not provided", () => {
+    render(<RaceTable />);
+    expect(screen.queryByTestId("predictor-badge")).not.toBeInTheDocument();
+  });
 });

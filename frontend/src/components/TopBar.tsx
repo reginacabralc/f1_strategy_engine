@@ -1,10 +1,12 @@
 import { SessionPicker } from "./SessionPicker";
 import type { ConnectionStatus } from "../hooks/useRaceFeed";
+import type { PredictorName } from "../api/types";
 
 interface Props {
   selectedSession: string | null;
   onSelectSession: (id: string) => void;
   connectionStatus?: ConnectionStatus;
+  activePredictor?: PredictorName;
 }
 
 function StatusDot({ color }: { color: "green" | "yellow" | "red" | "white" }) {
@@ -26,7 +28,7 @@ function connectionDotColor(
   return "white";
 }
 
-export function TopBar({ selectedSession, onSelectSession, connectionStatus }: Props) {
+export function TopBar({ selectedSession, onSelectSession, connectionStatus, activePredictor }: Props) {
   return (
     <header className="h-11 shrink-0 flex items-center gap-0 border-b border-pitwall-border bg-pitwall-surface px-3">
       {/* Brand */}
@@ -71,7 +73,7 @@ export function TopBar({ selectedSession, onSelectSession, connectionStatus }: P
           Predictor
         </span>
         <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-pitwall-accent/10 text-pitwall-accent border border-pitwall-accent/30 uppercase tracking-wide">
-          scipy
+          {activePredictor ?? "scipy"}
         </span>
       </div>
 

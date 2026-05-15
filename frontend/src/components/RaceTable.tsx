@@ -1,4 +1,4 @@
-import type { DriverState } from "../api/types";
+import type { DriverState, PredictorName } from "../api/types";
 import mockRaceOrder from "../data/mockRaceOrder.json";
 
 const MOCK_DRIVERS = mockRaceOrder as DriverState[];
@@ -80,31 +80,46 @@ interface Props {
   drivers?: DriverState[];
   isLive?: boolean;
   connectionStatus?: string;
+  activePredictor?: PredictorName;
 }
 
-export function RaceTable({ drivers = MOCK_DRIVERS, isLive, connectionStatus }: Props) {
+export function RaceTable({ drivers = MOCK_DRIVERS, isLive, connectionStatus, activePredictor }: Props) {
   const showEmpty = drivers.length === 0;
+  const showInfoBar = isLive != null || activePredictor != null;
 
   return (
     <div
       className="overflow-x-auto rounded-lg border border-pitwall-border bg-pitwall-surface"
       data-testid="race-table-scroll"
     >
-      {isLive != null && (
+      {showInfoBar && (
         <div className="px-3 py-1.5 border-b border-pitwall-border flex items-center gap-2">
-          <span
-            className={[
-              "inline-block w-1.5 h-1.5 rounded-full shrink-0",
-              connectionStatus === "open"
-                ? "bg-pitwall-green shadow-[0_0_6px_#22c55e]"
-                : connectionStatus === "connecting" || connectionStatus === "reconnecting"
-                  ? "bg-pitwall-yellow"
-                  : "bg-pitwall-muted",
-            ].join(" ")}
-          />
-          <span className="text-[10px] text-pitwall-muted uppercase tracking-wider">
-            {isLive ? "Live" : "Demo"}
-          </span>
+          {isLive != null && (
+            <>
+              <span
+                className={[
+                  "inline-block w-1.5 h-1.5 rounded-full shrink-0",
+                  connectionStatus === "open"
+                    ? "bg-pitwall-green shadow-[0_0_6px_#22c55e]"
+                    : connectionStatus === "connecting" || connectionStatus === "reconnecting"
+                      ? "bg-pitwall-yellow"
+                      : "bg-pitwall-muted",
+                ].join(" ")}
+              />
+              <span className="text-[10px] text-pitwall-muted uppercase tracking-wider">
+                {isLive ? "Live" : "Demo"}
+              </span>
+            </>
+          )}
+          {activePredictor != null && (
+            <span
+              className="ml-auto text-[10px] font-mono text-pitwall-muted"
+              data-testid="predictor-badge"
+            >
+              predictor:{" "}
+              <span className="font-semibold text-pitwall-accent">{activePredictor}</span>
+            </span>
+          )}
         </div>
       )}
       {showEmpty ? (
