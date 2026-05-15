@@ -287,6 +287,17 @@
 - [ ] Stream D: Dockerfile frontend + nginx prod.
 
 ### Día 8
+- [x] Stream C: pulido visual mínimo completado.
+      All four Day 8 tasks were addressed. Responsive horizontal scroll (`overflow-x-auto` +
+      `min-w-[760px]`) and CSS-only alert flash animation (`@keyframes alert-flash`) were
+      already in place from Days 3 and 6 respectively. New work this session: `ScoreBar` in
+      `RaceTable.tsx` now clamps score to [0,1] and uses threshold 0.65 (was 0.6) for
+      red/accent; palette consistency pass replaced `text-red-400` in `SessionPicker` error
+      state with `text-pitwall-accent`; stale dev-day copy strings removed from
+      `ReplayControls` and `TrackMapPanel`. Six new Vitest tests cover low/mid/high score
+      colour classes, null score dash, and over-1 clamping; total 43 tests passing.
+      `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm test` 43/43 ✅ · `pnpm build` ✅.
+      Day 9 BacktestView not started.
 - [x] **Stream A: XGBoost entrenado, serializado, métricas reportadas.**
   Added `backend/src/pitwall/ml/train.py`, `scripts/train_xgb.py`,
   `scripts/validate_xgb_model.py`, `make train-xgb`, and

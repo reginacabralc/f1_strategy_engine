@@ -118,7 +118,7 @@ export function ReplayControls() {
       </div>
 
       <span className="text-[10px] text-pitwall-muted ml-1">
-        Replay — Day 4
+        Replay controls
       </span>
     </footer>
   );

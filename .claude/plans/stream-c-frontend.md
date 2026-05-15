@@ -80,10 +80,10 @@ frontend/
 - [x] Loading states + error states limpios.
 
 ### Día 8 — Pulido visual mínimo
-- [ ] Tailwind: paleta consistente (3 colores + grises).
-- [ ] Score: barra de color verde→rojo según score 0..1.
-- [ ] Animación sutil cuando llega alerta (CSS only, no JS).
-- [ ] Responsive: tabla scroll horizontal en móvil.
+- [x] Tailwind: paleta consistente (3 colores + grises).
+- [x] Score: barra de color verde→rojo según score 0..1.
+- [x] Animación sutil cuando llega alerta (CSS only, no JS).
+- [x] Responsive: tabla scroll horizontal en móvil.
 
 ### Día 9 — Backtest view + tests
 - [ ] Component `<BacktestView>` que muestra resultados de `/api/v1/backtest/{session}`.

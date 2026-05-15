@@ -20,7 +20,7 @@ export function SessionPicker({ selected, onSelect }: Props) {
   }
   if (isError || !sessions) {
     return (
-      <span className="text-red-400 text-sm">Failed to load sessions</span>
+      <span className="text-pitwall-accent text-sm">Failed to load sessions</span>
     );
   }
   if (sessions.length === 0) {
