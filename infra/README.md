@@ -21,13 +21,8 @@ Estado actual de `docker-compose.yaml`:
 docker-compose
 ├── db          (timescale/timescaledb:2.17.2-pg15)   :5432
 ├── migrate     (one-shot, alembic upgrade head)
-└── backend     (Python + FastAPI)                     :8000
-```
-
-Servicio pendiente:
-
-```text
-frontend    (React + Vite/nginx)                       :5173
+├── backend     (Python + FastAPI)                     :8000
+└── frontend    (React + Vite dev server)              :5173
 ```
 
 ## Variables de entorno
@@ -42,8 +37,8 @@ Ver `.env.example` en raíz. Las críticas:
 | `REPLAY_DEFAULT_SESSION` | `monaco_2024_R` | backend |
 | `REPLAY_DEFAULT_SPEED` | `30` | backend |
 | `FASTF1_CACHE_DIR` | `data/cache` | scripts ingesta |
-| `VITE_API_URL` | `http://localhost:8000` | frontend futuro |
-| `VITE_WS_URL` | `ws://localhost:8000/ws/v1/live` | frontend futuro |
+| `VITE_API_URL` | `http://localhost:8000` | frontend |
+| `VITE_WS_URL` | `ws://localhost:8000/ws/v1/live` | frontend |
 
 ## Persistencia
 

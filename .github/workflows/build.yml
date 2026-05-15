@@ -1,0 +1,19 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  docker-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build compose images
+        run: docker compose build
+
+      - name: Build frontend prod image
+        run: docker build -f docker/frontend.Dockerfile --target prod -t pitwall-frontend-prod .

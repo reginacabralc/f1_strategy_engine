@@ -98,6 +98,13 @@ def test_ws_live_endpoint_accepts_connection() -> None:
         pass  # __exit__ sends close frame
 
 
+def test_ws_live_endpoint_accepts_text_client_frames() -> None:
+    """Frontend pong/text frames must not crash the heartbeat loop."""
+    app = create_app()
+    with TestClient(app) as client, client.websocket_connect("/ws/v1/live") as ws:
+        ws.send_text('{"type":"pong"}')
+
+
 def test_ws_live_endpoint_is_in_openapi_paths() -> None:
     """The WS path must NOT appear in the OpenAPI HTTP spec."""
     app = create_app()

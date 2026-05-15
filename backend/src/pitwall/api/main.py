@@ -25,7 +25,9 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from pitwall import __version__
 from pitwall.api.connections import ConnectionManager
@@ -68,6 +70,16 @@ def _build_pit_loss_table() -> PitLossTable:
 
 
 _log = get_logger(__name__)
+
+
+def _database_is_ready() -> bool:
+    """Return whether the configured DB accepts a simple query."""
+    try:
+        with create_db_engine().connect() as connection:
+            connection.execute(text("SELECT 1"))
+    except Exception:
+        return False
+    return True
 
 
 def create_app() -> FastAPI:
@@ -156,7 +168,9 @@ def create_app() -> FastAPI:
         response_model=Health,
     )
     async def ready() -> Health:
-        """V1: process-up is ready. Stream A wires DB/model checks here."""
+        """Return 200 only when the DB-backed runtime can serve demo data."""
+        if not _database_is_ready():
+            raise HTTPException(status_code=503, detail="Database is not ready.")
         return Health(status="ok", version=__version__)
 
     app.include_router(sessions_routes.router)
@@ -166,6 +180,11 @@ def create_app() -> FastAPI:
     app.include_router(backtest_routes.router)
     app.include_router(causal_routes.router)
     app.include_router(ws_router)
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        _log.exception("unhandled_exception", path=request.url.path, exc_info=exc)
+        return JSONResponse(status_code=500, content={"detail": "Internal server error."})
 
     return app
 

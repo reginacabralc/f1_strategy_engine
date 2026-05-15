@@ -1,4 +1,16 @@
-const SPEEDS = ["×1", "×10", "×30", "×100"] as const;
+import { useState } from "react";
+import { startReplay, stopReplay } from "../api/client";
+
+const SPEEDS = [1, 10, 30, 100, 1000] as const;
+
+type ReplayState = "started" | "stopped" | "finished" | null | undefined;
+
+interface ReplayControlsProps {
+  selectedSession: string | null;
+  replayState?: ReplayState;
+  currentLap?: number;
+  totalLaps?: number;
+}
 
 function SkipBackIcon() {
   return (
@@ -26,6 +38,14 @@ function PlayIcon() {
   );
 }
 
+function StopIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+      <rect x="3" y="3" width="8" height="8" />
+    </svg>
+  );
+}
+
 function StepForwardIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
@@ -44,15 +64,57 @@ function SkipForwardIcon() {
   );
 }
 
-const CONTROL_BUTTONS = [
+const SIDE_BUTTONS = [
   { icon: <SkipBackIcon />, label: "Skip to start" },
   { icon: <StepBackIcon />, label: "Step back" },
-  { icon: <PlayIcon />, label: "Play / Pause" },
   { icon: <StepForwardIcon />, label: "Step forward" },
   { icon: <SkipForwardIcon />, label: "Skip to end" },
 ];
 
-export function ReplayControls() {
+export function ReplayControls({
+  selectedSession,
+  replayState,
+  currentLap,
+  totalLaps,
+}: ReplayControlsProps) {
+  const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(30);
+  const [isPending, setIsPending] = useState(false);
+
+  const isStarted = replayState === "started";
+  const safeCurrentLap = currentLap ?? 0;
+  const safeTotalLaps = totalLaps ?? 0;
+  const timelinePercent =
+    safeTotalLaps > 0
+      ? Math.min(100, Math.max(0, (safeCurrentLap / safeTotalLaps) * 100))
+      : 0;
+
+  async function handleStart() {
+    if (!selectedSession) return;
+    setIsPending(true);
+    try {
+      await startReplay(selectedSession, speed);
+    } finally {
+      setIsPending(false);
+    }
+  }
+
+  async function handleStop() {
+    setIsPending(true);
+    try {
+      await stopReplay();
+    } finally {
+      setIsPending(false);
+    }
+  }
+
+  const statusText = !selectedSession
+    ? "Select a session to enable replay"
+    : isPending
+      ? "Updating replay..."
+      : isStarted
+        ? "Replay running"
+        : "Ready to start replay";
+
   return (
     <footer
       aria-label="Replay controls"
@@ -60,7 +122,26 @@ export function ReplayControls() {
     >
       {/* Transport buttons */}
       <div className="flex items-center gap-1">
-        {CONTROL_BUTTONS.map((btn) => (
+        {SIDE_BUTTONS.slice(0, 2).map((btn) => (
+          <button
+            key={btn.label}
+            aria-label={btn.label}
+            disabled
+            className="w-8 h-8 rounded flex items-center justify-center text-pitwall-muted hover:text-pitwall-text hover:bg-pitwall-panel transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {btn.icon}
+          </button>
+        ))}
+        <button
+          type="button"
+          aria-label={isStarted ? "Stop replay" : "Start replay"}
+          disabled={isPending || (!isStarted && !selectedSession)}
+          onClick={isStarted ? handleStop : handleStart}
+          className="w-8 h-8 rounded flex items-center justify-center text-pitwall-text bg-pitwall-accent/15 hover:bg-pitwall-accent/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {isStarted ? <StopIcon /> : <PlayIcon />}
+        </button>
+        {SIDE_BUTTONS.slice(2).map((btn) => (
           <button
             key={btn.label}
             aria-label={btn.label}
@@ -80,16 +161,18 @@ export function ReplayControls() {
         {SPEEDS.map((s) => (
           <button
             key={s}
-            disabled
-            aria-label={`Set speed ${s}`}
+            type="button"
+            disabled={isPending}
+            onClick={() => setSpeed(s)}
+            aria-label={`Set speed x${s}`}
             className={[
               "h-6 px-2 rounded text-[10px] font-mono font-bold border transition-colors",
-              s === "×30"
+              s === speed
                 ? "bg-pitwall-accent/10 border-pitwall-accent/40 text-pitwall-accent"
-                : "border-pitwall-border text-pitwall-muted opacity-50 cursor-not-allowed",
+                : "border-pitwall-border text-pitwall-muted hover:text-pitwall-text hover:bg-pitwall-panel",
             ].join(" ")}
           >
-            {s}
+            ×{s}
           </button>
         ))}
       </div>
@@ -99,9 +182,13 @@ export function ReplayControls() {
       {/* Lap counter */}
       <div className="flex items-center gap-1.5 text-xs font-mono">
         <span className="text-pitwall-muted">LAP</span>
-        <span className="text-pitwall-text font-bold">—</span>
+        <span className="text-pitwall-text font-bold" data-testid="replay-current-lap">
+          {currentLap ?? "-"}
+        </span>
         <span className="text-pitwall-muted">/</span>
-        <span className="text-pitwall-muted">—</span>
+        <span className="text-pitwall-muted" data-testid="replay-total-laps">
+          {totalLaps ?? "-"}
+        </span>
       </div>
 
       {/* Timeline track */}
@@ -110,13 +197,19 @@ export function ReplayControls() {
           className="flex-1 h-1 bg-pitwall-border rounded-full relative cursor-not-allowed"
           aria-label="Replay timeline"
         >
-          <div className="absolute left-0 top-0 bottom-0 w-[35%] bg-pitwall-accent/60 rounded-full" />
-          <div className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-pitwall-accent border-2 border-pitwall-surface shadow left-[35%] -translate-x-1/2" />
+          <div
+            className="absolute left-0 top-0 bottom-0 bg-pitwall-accent/60 rounded-full"
+            style={{ width: `${timelinePercent}%` }}
+          />
+          <div
+            className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-pitwall-accent border-2 border-pitwall-surface shadow -translate-x-1/2"
+            style={{ left: `${timelinePercent}%` }}
+          />
         </div>
       </div>
 
       <span className="text-[10px] text-pitwall-muted ml-1 hidden sm:inline">
-        Select a session to enable replay
+        {statusText}
       </span>
     </footer>
   );

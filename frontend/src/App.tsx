@@ -26,7 +26,7 @@ const METRICS = [
 export function App() {
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
   const { data: sessions } = useSessions();
-  const { status, snapshot, alerts } = useRaceFeed();
+  const { status, snapshot, alerts, replayState } = useRaceFeed();
   const circuit = useMemo(() => {
     if (!selectedSession || !sessions) return "monaco";
     return (
@@ -114,7 +114,12 @@ export function App() {
         </div>
       </div>
 
-      <ReplayControls />
+      <ReplayControls
+        selectedSession={selectedSession}
+        replayState={replayState?.state}
+        currentLap={snapshot?.current_lap}
+        totalLaps={totalLaps}
+      />
     </div>
   );
 }
