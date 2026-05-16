@@ -576,6 +576,20 @@
 - [ ] Stream D: changelog v0.1.0, video demo enlazado.
 - [ ] **Tag `v0.1.0` y release notes.**
 
+### Phase 5B — Demo Gap Reconstruction Fix (branch: phase5b-demo-gap-reconstruction)
+- [x] Root cause confirmed: `gap_to_ahead_ms` NULL for all Monaco 2024 lap rows because
+      FastF1 does not provide this field natively and `reconstruct-race-gaps` was not wired
+      into the demo flow. A dry run showed 1,155 Monaco gap rows ready to be populated.
+- [x] **Makefile**: `reconstruct-race-gaps` now depends on `db-wait` (safe for standalone
+      use). `make demo` and `make demo-api` now run `reconstruct-race-gaps` after `seed`
+      and before `fit-degradation-demo`.
+- [x] **docs/walkthrough.md**: step 3 updated to list gap reconstruction as step 5 of
+      `make demo`; troubleshooting entry added for NULL gap / no alerts.
+- [x] **infra/runbook.md**: new cause #5 added to "el motor no emite alertas" — NULL
+      `gap_to_ahead_ms` with diagnosis query and `make reconstruct-race-gaps` fix.
+- [ ] Validate: run `make reconstruct-race-gaps` against demo DB and confirm Monaco rows
+      populated; start replay and verify alerts fire.
+
 ## Bloqueos activos
 
 _(ninguno por ahora)_

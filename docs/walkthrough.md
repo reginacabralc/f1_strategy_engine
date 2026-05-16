@@ -44,9 +44,13 @@ Esto:
 2. Crea `.venv` si no existe e instala el backend en modo editable.
 3. Corre migraciones (`alembic upgrade head`).
 4. Ingiere las 3 carreras demo de 2024: Bahrain, Monaco y Hungary.
-5. Ajusta coeficientes de degradación para las carreras demo.
-6. Arranca `backend` y `frontend` en Docker Compose.
-7. Espera a que `/health` responda y abre el dashboard React.
+5. Reconstruye `gap_to_ahead_ms` y `gap_to_leader_ms` para todos los laps demo
+   a partir de los timestamps de FastF1 (`make reconstruct-race-gaps`).
+   Sin este paso, el motor de undercut no puede evaluar el gap y las alertas
+   estratégicas no se emiten.
+6. Ajusta coeficientes de degradación para las carreras demo.
+7. Arranca `backend` y `frontend` en Docker Compose.
+8. Espera a que `/health` responda y abre el dashboard React.
 
 PostgreSQL se publica en `localhost:5433` para evitar conflictos con un
 Postgres local en `5432`; dentro de Docker sigue siendo `db:5432`.
@@ -254,3 +258,7 @@ Ver [`infra/runbook.md`](../infra/runbook.md) para diagnóstico de problemas com
 - "Backtest sale precision = 0" — revisa el reporte replay-derived en
   `reports/ml/scipy_xgboost_backtest_report.json`; con el umbral actual ambos
   predictores pueden tener F1=0 aunque las métricas MAE sí se calculen.
+- "El replay emite snapshots pero nunca aparecen alertas UNDERCUT_VIABLE" —
+  `gap_to_ahead_ms` puede ser NULL en la DB. Corre `make reconstruct-race-gaps`
+  y reinicia el replay. Desde Phase 5B, `make demo` incluye este paso
+  automáticamente.
