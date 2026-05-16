@@ -312,3 +312,19 @@ PYTHONPATH=backend/src python scripts/verify_alerts_phase5c.py  # in-process ver
 | `scripts/verify_alerts_phase5c.py` | New — in-process alert verification script |
 | `docs/stream-c-phase5c-live-alert-verification.md` | New — this document |
 | `docs/progress.md` | Updated with Phase 5C entry |
+
+---
+
+## Post-PR #55 integration scan
+
+After the initial Phase 5C validation, PR #55 (`integration: connect 4 streams into one runnable stack`) was merged into `main`.
+
+Relevant effects:
+- Added typed frontend client support for `/api/v1/causal/prediction`.
+- Added Docker fallback behavior for frontend test/lint commands.
+- Added rebuild targets for backend/frontend containers.
+- Updated README integration guidance.
+- Did not resolve the alert-firing blocker identified in Phase 5C.
+
+Conclusion:
+PR #55 helps future integration and panel design, especially for a future causal/counterfactual panel, but it does not change the Phase 5C result. Alerts still require a follow-up calibration/demo-scenario fix.
