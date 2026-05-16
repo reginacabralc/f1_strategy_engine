@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { applyLapUpdate, applyPitStop, applyTrackStatus } from "./useRaceFeed";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { renderHook, act } from "@testing-library/react";
+import { applyLapUpdate, applyPitStop, applyTrackStatus, useRaceFeed } from "./useRaceFeed";
 import type { RaceSnapshot } from "../api/types";
 import type { LapUpdatePayload, PitStopPayload, TrackStatusPayload } from "../api/ws";
 
@@ -163,5 +164,184 @@ describe("applyTrackStatus", () => {
     const next = applyTrackStatus(BASE_SNAPSHOT, payload);
     expect(next.track_status).toBe("SC");
     expect(next.current_lap).toBe(12);
+  });
+});
+
+// ─── V1 WebSocket contract — hook observable behaviour ────────────────────────
+//
+// Backend V1 emits:  snapshot | alert | replay_state | ping
+// Not emitted V1:    lap_update | pit_stop | track_status | error
+// (see docs/stream-c-phase0-contract-audit.md §2 and ws.ts WsMessageMap)
+
+type FakeWs = {
+  onopen: ((e: Event) => void) | null;
+  onmessage: ((e: MessageEvent) => void) | null;
+  onerror: ((e: Event) => void) | null;
+  onclose: ((e: CloseEvent) => void) | null;
+  send: ReturnType<typeof vi.fn>;
+  close: ReturnType<typeof vi.fn>;
+};
+
+describe("useRaceFeed — V1 WebSocket contract", () => {
+  let fakeWs: FakeWs | null = null;
+
+  beforeEach(() => {
+    fakeWs = null;
+    vi.stubGlobal(
+      "WebSocket",
+      vi.fn().mockImplementation(() => {
+        fakeWs = {
+          onopen: null,
+          onmessage: null,
+          onerror: null,
+          onclose: null,
+          send: vi.fn(),
+          close: vi.fn(),
+        };
+        return fakeWs;
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function open() {
+    act(() => {
+      fakeWs!.onopen?.(new Event("open"));
+    });
+  }
+
+  function push(msg: unknown) {
+    act(() => {
+      fakeWs!.onmessage?.(
+        new MessageEvent("message", { data: JSON.stringify(msg) }),
+      );
+    });
+  }
+
+  it("snapshot message replaces snapshot state", () => {
+    const { result } = renderHook(() => useRaceFeed());
+    open();
+
+    push({ type: "snapshot", ts: "2024-05-26T13:45:21Z", payload: BASE_SNAPSHOT });
+
+    expect(result.current.snapshot).toEqual(BASE_SNAPSHOT);
+    expect(result.current.alerts).toHaveLength(0);
+    expect(result.current.replayState).toBeNull();
+  });
+
+  it("alert message is normalized via normalizeAlertPayload and prepended to alerts", () => {
+    const { result } = renderHook(() => useRaceFeed());
+    open();
+
+    push({
+      type: "alert",
+      ts: "2024-05-26T13:46:10Z",
+      payload: {
+        alert_type: "UNDERCUT_VIABLE",
+        attacker: "NOR",
+        defender: "VER",
+        score: 0.72,
+        confidence: 0.61,
+        estimated_gain_ms: 1800,
+        pit_loss_ms: 22000,
+        gap_actual_ms: 2500,
+        session_id: "monaco_2024_R",
+        current_lap: 23,
+      },
+    });
+
+    expect(result.current.alerts).toHaveLength(1);
+    const alert = result.current.alerts[0];
+    expect(alert.attacker_code).toBe("NOR");
+    expect(alert.defender_code).toBe("VER");
+    expect(alert.lap_number).toBe(23);
+    expect(result.current.snapshot).toBeNull();
+  });
+
+  it("second alert is prepended so newest alert is first", () => {
+    const { result } = renderHook(() => useRaceFeed());
+    open();
+
+    const base = {
+      alert_type: "UNDERCUT_VIABLE" as const,
+      score: 0.7,
+      confidence: 0.6,
+      estimated_gain_ms: 1800,
+      pit_loss_ms: 22000,
+      gap_actual_ms: 2500,
+      session_id: "monaco_2024_R",
+    };
+
+    push({ type: "alert", ts: "T1", payload: { ...base, attacker: "NOR", defender: "VER", current_lap: 10 } });
+    push({ type: "alert", ts: "T2", payload: { ...base, attacker: "LEC", defender: "HAM", current_lap: 11 } });
+
+    expect(result.current.alerts).toHaveLength(2);
+    expect(result.current.alerts[0].attacker_code).toBe("LEC");
+    expect(result.current.alerts[1].attacker_code).toBe("NOR");
+  });
+
+  it("replay_state message updates replayState", () => {
+    const { result } = renderHook(() => useRaceFeed());
+    open();
+
+    push({
+      type: "replay_state",
+      ts: "2024-05-26T13:00:00Z",
+      payload: {
+        run_id: "run-abc",
+        session_id: "monaco_2024_R",
+        state: "started",
+        speed_factor: 30,
+        pace_predictor: "scipy",
+      },
+    });
+
+    expect(result.current.replayState?.state).toBe("started");
+    expect(result.current.replayState?.speed_factor).toBe(30);
+    expect(result.current.replayState?.run_id).toBe("run-abc");
+    expect(result.current.snapshot).toBeNull();
+    expect(result.current.alerts).toHaveLength(0);
+  });
+
+  it("ping message sends pong without mutating snapshot or alerts", () => {
+    const { result } = renderHook(() => useRaceFeed());
+    open();
+
+    push({ type: "snapshot", ts: "2024-05-26T13:45:21Z", payload: BASE_SNAPSHOT });
+    const snapBefore = result.current.snapshot;
+
+    push({ type: "ping", ts: "2024-05-26T13:45:36Z" });
+
+    expect(result.current.snapshot).toBe(snapBefore);
+    expect(result.current.alerts).toHaveLength(0);
+    expect(fakeWs!.send).toHaveBeenCalledOnce();
+    const sent = JSON.parse(fakeWs!.send.mock.calls[0][0] as string) as { type: string };
+    expect(sent.type).toBe("pong");
+  });
+
+  it("unknown message type is silently ignored", () => {
+    const { result } = renderHook(() => useRaceFeed());
+    open();
+
+    push({ type: "future_unknown_type", ts: "2024-05-26T13:00:00Z", payload: {} });
+
+    expect(result.current.snapshot).toBeNull();
+    expect(result.current.alerts).toHaveLength(0);
+    expect(result.current.replayState).toBeNull();
+  });
+
+  it("malformed JSON is silently ignored", () => {
+    const { result } = renderHook(() => useRaceFeed());
+    open();
+
+    act(() => {
+      fakeWs!.onmessage?.(new MessageEvent("message", { data: "not-json{{" }));
+    });
+
+    expect(result.current.snapshot).toBeNull();
+    expect(result.current.alerts).toHaveLength(0);
   });
 });
