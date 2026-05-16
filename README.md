@@ -76,9 +76,16 @@ Demo race round numbers for 2024: **Bahrain = 1**, **Monaco = 8**, **Hungary = 1
 PitWall integra dos predictores de pace intercambiables detrás de la interfaz `PacePredictor`:
 
 1. **`ScipyPredictor`** — baseline paramétrico (cuadrática por circuito × compuesto).
-2. **`XGBoostPredictor`** — modelo entrenado con features: tyre_age, compound, circuit, track_temp, lap_in_stint_ratio, driver/team, fuel_proxy.
+2. **`XGBoostPredictor`** — modelo entrenado y serializado en `models/xgb_pace_v1.json`, con metadata sidecar `models/xgb_pace_v1.meta.json` para construir features en el mismo orden del entrenamiento. Predice delta contra una referencia live-safe de la sesión y devuelve lap time absoluto al motor.
 
-Switch en runtime con `PACE_PREDICTOR=scipy|xgb`. Resultados del experimento en [`docs/adr/0009-xgboost-vs-scipy-resultados.md`](docs/adr/0009-xgboost-vs-scipy-resultados.md) y [`docs/quanta/06-curva-fit-vs-xgboost.md`](docs/quanta/06-curva-fit-vs-xgboost.md).
+Switch en runtime con `PACE_PREDICTOR=scipy|xgb` o `POST /api/v1/config/predictor`. El default de producto queda en `scipy`: en el backtest demo XGBoost mejora MAE@k3 ~8.5%, pero no supera el umbral ADR 0009 de 10% sin pérdida de calidad de alertas. Para validar el artifact y regenerar la comparación:
+
+```bash
+make validate-xgb-model
+make compare-predictors
+```
+
+Resultados del experimento en [`docs/adr/0009-xgboost-vs-scipy-resultados.md`](docs/adr/0009-xgboost-vs-scipy-resultados.md), [`docs/quanta/06-curva-fit-vs-xgboost.md`](docs/quanta/06-curva-fit-vs-xgboost.md) y `reports/ml/scipy_xgboost_backtest_report.json`.
 
 ## Estado actual
 

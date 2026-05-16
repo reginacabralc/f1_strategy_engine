@@ -76,6 +76,7 @@ class EngineLoop:
         self._predictor_name = predictor_name
         self._state = RaceState()
         self._task: asyncio.Task[None] | None = None
+        self._last_snapshot_lap: int | None = None
 
     # ------------------------------------------------------------------
     # Public interface
@@ -151,7 +152,7 @@ class EngineLoop:
             # Broadcast one session-level alert so the frontend can show the flag.
             alert_type = "SUSPENDED_SC" if track_status == "SC" else "SUSPENDED_VSC"
             await self._broadcaster.broadcast_json(
-                _suspension_message(alert_type, self._state)
+                _suspension_message(alert_type, self._state, self._predictor_name)
             )
         else:
             # Normal racing conditions: evaluate every relevant pair.
@@ -162,10 +163,17 @@ class EngineLoop:
                 self._state.drivers[atk.driver_code].undercut_score = decision.score
 
                 if decision.should_alert:
-                    await self._broadcaster.broadcast_json(_alert_message(decision, self._state))
+                    await self._broadcaster.broadcast_json(
+                        _alert_message(decision, self._state, self._predictor_name)
+                    )
 
-        # Always broadcast the snapshot so clients stay in sync.
-        await self._broadcaster.broadcast_json(_snapshot_message(self._state, self._predictor_name))
+        # Broadcast at most one snapshot per lap number so high-speed replay
+        # does not flood clients with one snapshot per driver lap event.
+        if self._state.current_lap != self._last_snapshot_lap:
+            await self._broadcaster.broadcast_json(
+                _snapshot_message(self._state, self._predictor_name)
+            )
+            self._last_snapshot_lap = self._state.current_lap
 
 
 # ---------------------------------------------------------------------------
@@ -217,14 +225,25 @@ def _snapshot_message(state: RaceState, predictor_name: str) -> dict[str, Any]:
     }
 
 
-def _suspension_message(alert_type: str, state: RaceState) -> dict[str, Any]:
+def _suspension_message(
+    alert_type: str,
+    state: RaceState,
+    predictor_name: str,
+) -> dict[str, Any]:
     """Session-level suspension alert (SC or VSC active)."""
+    alert_id = f"{state.session_id}:{state.current_lap}:{alert_type}:session"
     return {
         "v": 1,
         "type": "alert",
         "ts": _now_iso(),
         "payload": {
+            "alert_id": alert_id,
             "alert_type": alert_type,
+            "lap_number": state.current_lap,
+            "attacker_code": None,
+            "defender_code": None,
+            "ventana_laps": 0,
+            "predictor_used": predictor_name,
             "attacker": None,
             "defender": None,
             "score": 0.0,
@@ -238,13 +257,28 @@ def _suspension_message(alert_type: str, state: RaceState) -> dict[str, Any]:
     }
 
 
-def _alert_message(decision: UndercutDecision, state: RaceState) -> dict[str, Any]:
+def _alert_message(
+    decision: UndercutDecision,
+    state: RaceState,
+    predictor_name: str,
+) -> dict[str, Any]:
+    alert_id = (
+        f"{state.session_id}:{state.current_lap}:"
+        f"{decision.attacker_code}:{decision.defender_code}:{decision.alert_type}"
+    )
     return {
         "v": 1,
         "type": "alert",
         "ts": _now_iso(),
         "payload": {
+            "alert_id": alert_id,
             "alert_type": decision.alert_type,
+            "lap_number": state.current_lap,
+            "attacker_code": decision.attacker_code,
+            "defender_code": decision.defender_code,
+            "ventana_laps": 5,
+            "predictor_used": predictor_name,
+            # Legacy aliases retained for the current frontend normalizer.
             "attacker": decision.attacker_code,
             "defender": decision.defender_code,
             "score": round(decision.score, 4),

@@ -235,6 +235,31 @@ def test_apply_lap_complete_only_updates_last_lap_when_valid() -> None:
     assert state.drivers["VER"].last_lap_ms == 74_000  # invalid lap not applied
 
 
+def test_reference_lap_time_uses_prior_clean_dry_session_compound_laps() -> None:
+    state = RaceState()
+    state.apply(_session_start())
+
+    assert state.reference_lap_time_ms("MEDIUM") is None
+
+    state.apply(_lap_complete("VER", lap_time_ms=80_000, compound="MEDIUM", is_valid=True))
+    state.apply(_lap_complete("LEC", lap_time_ms=82_000, compound="MEDIUM", is_valid=True))
+    state.apply(_lap_complete("NOR", lap_time_ms=70_000, compound="HARD", is_valid=True))
+
+    assert state.reference_lap_time_ms("MEDIUM") == 81_000
+    assert state.reference_lap_time_ms("HARD") == 70_000
+
+
+def test_reference_lap_time_excludes_invalid_pit_and_non_green_laps() -> None:
+    state = RaceState()
+    state.apply(_session_start())
+    state.apply(_lap_complete("VER", lap_time_ms=80_000, compound="MEDIUM", is_valid=True))
+    state.apply(_lap_complete("LEC", lap_time_ms=95_000, compound="MEDIUM", is_valid=False))
+    state.apply(_lap_complete("NOR", lap_time_ms=96_000, compound="MEDIUM", is_pit_in=True))
+    state.apply(_lap_complete("PIA", lap_time_ms=97_000, compound="MEDIUM", track_status="SC"))
+
+    assert state.reference_lap_time_ms("MEDIUM") == 80_000
+
+
 def test_apply_lap_complete_updates_track_status() -> None:
     state = RaceState()
     state.apply(_session_start())

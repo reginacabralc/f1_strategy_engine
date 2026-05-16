@@ -112,8 +112,16 @@ curl -X POST http://localhost:8000/api/v1/config/predictor \
   -d '{"predictor": "xgboost"}'
 ```
 
-`xgboost` responde 409 si no existe `models/xgb_pace_v1.json`. Genera el
-artifact con `make train-xgb` después de construir el dataset.
+`xgboost` responde 409 si no existe `models/xgb_pace_v1.json`. Cuando el
+artifact existe, el backend construye features desde
+`models/xgb_pace_v1.meta.json` y usa referencias live-safe de la sesión; si una
+referencia todavía no existe para un compuesto, el motor devuelve
+`INSUFFICIENT_DATA` para ese par en lugar de inventar pace.
+
+En Docker Compose, `./models` se monta read-only en `/app/backend/models` y
+`XGB_MODEL_PATH=models/xgb_pace_v1.json` queda explícito. Para mostrar un modelo
+futuro, guarda el nuevo artifact + metadata sidecar en `models/`, cambia
+`XGB_MODEL_PATH` y repite `make validate-xgb-model` + `make compare-predictors`.
 
 ## 7. Cargar otra carrera
 
@@ -148,6 +156,16 @@ make train-xgb
 make validate-xgb-model
 make plot-xgb-diagnostics
 ```
+
+Comparar el predictor scipy contra el artifact XGBoost actual:
+
+```bash
+make compare-predictors
+```
+
+El reporte queda en `reports/ml/scipy_xgboost_backtest_report.json`. El default
+del MVP permanece `PACE_PREDICTOR=scipy` porque XGBoost mejora MAE@k=3 en el
+backtest demo, pero no alcanza el umbral de 10% definido en ADR 0009.
 
 Para el run completo de Stream A, primero carga el manifiesto 2024/2025:
 
@@ -218,9 +236,10 @@ Si llueve, se emite `UNDERCUT_DISABLED_RAIN` en su lugar.
 
 ### Agregar una métrica de backtest
 
-El panel de backtest ya existe en el frontend y consume la API cuando hay
-resultados disponibles. El comparativo final scipy vs XGBoost sigue pendiente
-de cierre y debe documentarse en `docs/quanta/07-backtest-leakage.md`.
+El panel de backtest ya consume `GET /api/v1/backtest/{session_id}` para scipy
+y XGBoost. La lógica fuente vive en `backend/src/pitwall/engine/backtest.py`;
+si agregas una métrica, actualiza `BacktestResult` en OpenAPI/Pydantic, el
+panel frontend y `scripts/compare_predictors.py`.
 
 ## 13. Troubleshooting
 
@@ -232,4 +251,6 @@ Ver [`infra/runbook.md`](../infra/runbook.md) para diagnóstico de problemas com
 - "Playwright browser missing" — corre `make test-e2e-install` y repite
   `make test-e2e`.
 - "XGBoost model not found" — usa `PACE_PREDICTOR=scipy` o genera el artifact con los targets `build-xgb-dataset`, `train-xgb` y `validate-xgb-model`.
-- "Backtest sale precision = 0" — revisa que cargaste la lista curada de undercuts.
+- "Backtest sale precision = 0" — revisa el reporte replay-derived en
+  `reports/ml/scipy_xgboost_backtest_report.json`; con el umbral actual ambos
+  predictores pueden tener F1=0 aunque las métricas MAE sí se calculen.

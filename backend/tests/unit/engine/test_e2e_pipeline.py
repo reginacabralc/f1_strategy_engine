@@ -3,8 +3,8 @@
 Exercises the complete pipeline:
   session_start → lap_complete events → EngineLoop → CaptureBroadcaster
 
-Tests use real ScipyPredictor and XGBoostPredictor (stub) to verify the
-pipeline behaves correctly with both predictors and on predictor switch.
+Tests use real ScipyPredictor and an unsupported predictor double to verify the
+pipeline behaves correctly with predictor errors and runtime switching.
 
 No HTTP layer, no DB, no real WS connections — purely in-process asyncio.
 """
@@ -93,10 +93,10 @@ def _scipy_pred() -> ScipyPredictor:
 
 
 class _UnsupportedPredictor:
-    """Always raises UnsupportedContextError — simulates XGBoostPredictor before E10."""
+    """Always raises UnsupportedContextError to exercise graceful degradation."""
 
     def predict(self, ctx: PaceContext) -> PacePrediction:
-        raise UnsupportedContextError("feature pipeline not yet implemented")
+        raise UnsupportedContextError("feature pipeline unavailable in this test")
 
     def is_available(self, circuit_id: str, compound: str) -> bool:
         return False
@@ -132,8 +132,8 @@ async def _run(
 # ---------------------------------------------------------------------------
 
 
-async def test_one_snapshot_per_lap_complete() -> None:
-    """Exactly one snapshot broadcast per lap_complete event."""
+async def test_snapshots_are_coalesced_by_lap_number() -> None:
+    """High-speed replay should not emit one snapshot per driver lap event."""
     n_laps = 10
     events = [
         _session_start(),
@@ -141,7 +141,7 @@ async def test_one_snapshot_per_lap_complete() -> None:
         *[_lap("LEC", 2, 5_000, i) for i in range(1, n_laps + 1)],
     ]
     broadcaster, _ = await _run(events)
-    assert len(broadcaster.of_type("snapshot")) == n_laps * 2
+    assert len(broadcaster.of_type("snapshot")) == n_laps
 
 
 async def test_snapshot_contains_active_predictor_scipy() -> None:
@@ -246,7 +246,7 @@ async def test_set_predictor_name_reflected_on_get_snapshot() -> None:
 
 
 # ---------------------------------------------------------------------------
-# XGBoostPredictor (stub) — no crash, graceful degradation
+# Unsupported predictor — no crash, graceful degradation
 # ---------------------------------------------------------------------------
 
 
@@ -260,13 +260,13 @@ async def test_unsupported_predictor_does_not_crash_loop() -> None:
     broadcaster, _ = await _run(events, predictor=_UnsupportedPredictor())
     # Loop must still be functional after the run — all laps processed
     snapshots = broadcaster.of_type("snapshot")
-    assert len(snapshots) == 22  # 11 VER + 11 LEC
+    assert len(snapshots) == 11
     # No UNDERCUT_VIABLE because predictor always raises
     assert "UNDERCUT_VIABLE" not in broadcaster.alert_types()
 
 
-async def test_xgboost_stub_satisfies_protocol() -> None:
-    """XGBoostPredictor (stub, no model file) satisfies the PacePredictor Protocol."""
+async def test_xgboost_predictor_satisfies_protocol() -> None:
+    """XGBoostPredictor satisfies the PacePredictor Protocol."""
     from pitwall.engine.projection import PacePredictor
 
     pred = XGBoostPredictor.__new__(XGBoostPredictor)
@@ -275,8 +275,8 @@ async def test_xgboost_stub_satisfies_protocol() -> None:
     assert isinstance(pred, PacePredictor)
 
 
-async def test_xgboost_stub_predict_raises_unsupported() -> None:
-    """XGBoostPredictor.predict() raises UnsupportedContextError until E10."""
+async def test_xgboost_predictor_without_feature_schema_raises_unsupported() -> None:
+    """XGBoostPredictor needs metadata feature schema to predict."""
     pred = XGBoostPredictor.__new__(XGBoostPredictor)
     pred._model = None
     pred._metadata = {}
@@ -319,7 +319,7 @@ async def test_viable_undercut_alert_emitted_with_scipy() -> None:
     # With tyre_age=28 on MEDIUM and fresh HARD for attacker, the score may or may not
     # cross threshold depending on exact math — assert no crash and snapshots are right shape.
     snapshots = broadcaster.of_type("snapshot")
-    assert len(snapshots) == 18  # 9 LEC + 9 VER
+    assert len(snapshots) == 9
     for snap in snapshots:
         p = snap["payload"]
         assert "drivers" in p
@@ -359,6 +359,12 @@ async def test_alert_payload_has_required_fields() -> None:
     for a in viable:
         p = a["payload"]
         assert "alert_type" in p
+        assert "alert_id" in p
+        assert "lap_number" in p
+        assert "attacker_code" in p
+        assert "defender_code" in p
+        assert "ventana_laps" in p
+        assert "predictor_used" in p
         assert "attacker" in p
         assert "defender" in p
         assert "score" in p
@@ -367,6 +373,10 @@ async def test_alert_payload_has_required_fields() -> None:
         assert "pit_loss_ms" in p
         assert "session_id" in p
         assert "current_lap" in p
+        assert p["attacker_code"] == p["attacker"]
+        assert p["defender_code"] == p["defender"]
+        assert p["lap_number"] == p["current_lap"]
+        assert p["predictor_used"] == "scipy"
         assert 0.0 <= p["score"] <= 1.0
         assert 0.0 <= p["confidence"] <= 1.0
 

@@ -44,6 +44,9 @@ services:
       DATABASE_URL: postgresql+psycopg://pitwall:pitwall@db:5432/pitwall
       LOG_LEVEL: INFO
       PACE_PREDICTOR: scipy
+      XGB_MODEL_PATH: models/xgb_pace_v1.json
+    volumes:
+      - ./models:/app/backend/models:ro
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
       interval: 10s

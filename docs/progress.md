@@ -17,7 +17,7 @@
 | Pipeline end-to-end con datos reales | ⏳ | Día 7 | Todos |
 | **XGBoost entrenado y serializado** | ✅ | Día 8 | Stream A — native Booster trained, serialized, and validated; weak 3-race holdout metrics documented |
 | **XGBoost temporal multi-season preparado** | ✅ | Día 8.5 | Stream A — manifest 2024/2025, temporal CV, tuning, plots, ADR 0011; full ingestion run pending |
-| **Backtest comparativo scipy vs XGBoost** | ⏳ | Día 9 | Stream A+B |
+| **Backtest comparativo scipy vs XGBoost** | ✅ | Día 9 | Stream A+B — runtime XGBoost + replay-derived comparison; default remains scipy |
 | Demo end-to-end probada en limpio | ✅ | Día 9 | Stream D — clean clone + fresh DB volume validated in 481.10s |
 
 ### Fix — demo API localhost
@@ -390,15 +390,15 @@
   holdout generalization on a 3-race split that is effectively
   leave-one-circuit-out. No evidence of a training/serialization bug; the
   limitation is data/reference coverage. Scipy comparison is deferred to Day 9.
-- [x] **Stream B**: edge cases (SC/VSC/rain), `XGBoostPredictor` cargable.
+- [x] **Stream B**: edge cases (SC/VSC/rain), `XGBoostPredictor` runtime.
   SC/VSC: `_on_lap_complete()` checks `track_status` — SC/VSC broadcasts
   `SUSPENDED_SC`/`SUSPENDED_VSC` and skips pair evaluation; GREEN evaluates normally.
   Rain: `evaluate_undercut()` returns `UNDERCUT_DISABLED_RAIN` when attacker or
   defender is on INTER/WET (case-insensitive). Recent pit: `defender.laps_in_stint < 2`
-  returns `INSUFFICIENT_DATA`. `XGBoostPredictor` in `pitwall.ml.predictor`:
-  `from_file()` loads `xgb.Booster` (no sklearn), `predict()` raises
-  `UnsupportedContextError` (E10), `is_available()` returns `False`,
-  satisfies `PacePredictor` Protocol. Optional `.meta.json` sidecar support.
+  returns `INSUFFICIENT_DATA`. `XGBoostPredictor` in `pitwall.ml.predictor`
+  now builds runtime features from `models/xgb_pace_v1.meta.json`, requires a
+  live-safe `reference_lap_time_ms` for the selected delta target, and returns
+  absolute lap-time predictions through the `PacePredictor` Protocol.
   **234 tests, ruff clean, mypy clean (85 files).** 3 smoke tests pass.
 - [ ] Stream C: pulido visual mínimo, responsive.
 - [x] Stream D: test suite verde for current local PR surface.
@@ -428,8 +428,8 @@
 - [x] **Stream A: docs pivot recorded.**
   Added ADR 0011, `docs/ml_temporal_modeling_plan.md`, and
   `notebooks/07_augmented_temporal_model.md`; updated architecture, quanta 06,
-  and training report. Day 9 backtest remains out of scope until model quality
-  is assessed on the full temporal dataset.
+  and training report. Day 9 backtest now consumes the artifact through the
+  runtime `XGBoostPredictor` and comparison report.
 
 ### Día 8.2 — Temporal model diagnostics and baselines
 - [x] **Stream A: target/reference shift diagnostics.**
@@ -469,31 +469,39 @@
   15 new Vitest tests — all passing. Total: 58 tests.
   `pnpm lint` ✅ · `pnpm typecheck` ✅ · `pnpm test` 58/58 ✅ · `pnpm build` ✅.
   Day 6 WS, Day 7 PredictorToggle, Day 8 visual polish untouched.
-  **Frontend view complete; actual backtest data depends on backend/Stream A+B data availability.**
-- [ ] **Stream A+B: backtest comparativo scipy vs XGBoost completo.**
+  **Frontend view complete; backend now returns replay-derived comparison data.**
+- [x] **Stream A+B: backtest comparativo scipy vs XGBoost completo.**
+  Added `backend/src/pitwall/engine/backtest.py`, real
+  `GET /api/v1/backtest/{session_id}?predictor=scipy|xgboost`, and
+  `make compare-predictors`. Current demo comparison over Bahrain, Monaco and
+  Hungary 2024: mean MAE@k3 scipy=1619 ms, XGBoost=1482 ms (~8.5% better),
+  but below ADR 0009's 10% threshold; both predictors had alert F1=0.0.
+  Recommended default remains `scipy`.
 - [x] **Stream B**: confidence final, `data_quality_factor`, calibratable cold-tyre penalties,
   hypothesis property tests, and `/api/v1/backtest/{session_id}` endpoint.
   `_data_quality_factor(atk)` reduces confidence for short stints (< 8 laps → linear ramp)
   and traffic (gap < 1500 ms → −0.2). `project_pace()` accepts optional `cold_tyre_penalties`
   tuple (defaults to `COLD_TYRE_PENALTIES_MS`). New `engine/calibration.py` with
   `calibrate_cold_tyre_penalties()`. 5 hypothesis invariant tests (1700 total examples).
-  Backtest endpoint returns 404 until Stream A populates curated list (E9-E10).
+  Backtest endpoint now runs replay-derived comparison and returns 404 only
+  when replay events for the requested session are unavailable.
   **265 tests (231 unit + 34 contract), ruff clean, mypy clean (89 files).**
-- [ ] Stream C: backtest view en UI.
+- [x] Stream C: backtest view en UI.
 - [x] Stream D: `make demo` end-to-end probado en clon limpio con volumen DB
       fresco. Measured 481.10s for migrate + FastF1 demo ingest + degradation
       fit + Docker backend/frontend startup; no DB dump was added because the
       source-of-truth bootstrap path met the <10 min target.
 
 ### Día 10 — Entrega
-- [ ] Stream A: quanta `06-curva-fit-vs-xgboost.md` escrita con números reales.
-- [ ] Stream A: ADR `0009-xgboost-vs-scipy-resultados.md` cerrado.
+- [x] Stream A: quanta `06-curva-fit-vs-xgboost.md` escrita con números reales.
+- [x] Stream A: ADR `0009-xgboost-vs-scipy-resultados.md` cerrado.
 - [x] **Stream B**: dry-run con ambos predictores, WS reconnect, `replay_state` broadcasts.
   `EngineLoop.get_snapshot()` method added. WS handler sends current snapshot on (re)connect.
   `POST /api/v1/replay/start` and `POST /api/v1/replay/stop` broadcast `replay_state`
   to all WS clients. 13 end-to-end in-process pipeline tests: full pipeline with
-  ScipyPredictor, predictor switching, XGBoostPredictor stub graceful handling, alert
-  payload shape, replay_state integration (HTTP + WS). 2 new WS reconnect tests.
+  ScipyPredictor, predictor switching, XGBoostPredictor runtime unavailable
+  contexts, spec-shaped alert payloads, replay_state integration (HTTP + WS).
+  2 new WS reconnect tests.
   **280 tests (246 unit + 34 contract), ruff clean, mypy clean (90 files).**
 - [x] **Stream B**: causal undercut Phase 1-2 verificada y pre-Phase 3 prep ejecutada.
   Added `make reconstruct-race-gaps` and `scripts/reconstruct_race_gaps.py` to populate
@@ -586,4 +594,4 @@ _(ninguno por ahora)_
 | 2026-05-09 | OpenAPI auto-generado como fuente de verdad | 0008 |
 | 2026-05-13 | Validación temporal XGBoost sin leakage | 0011 |
 | 2026-05-14 | DoWhy para causal undercut offline/refuters | 0010 |
-| 2026-05-?? | Resultado XGBoost vs scipy | 0009 (post-E10) |
+| 2026-05-16 | Resultado XGBoost vs scipy | 0009 |

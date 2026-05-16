@@ -22,7 +22,7 @@ Math (§6.4-6.7)
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import cast
+from typing import Any, cast
 
 from pitwall.engine.pit_loss import DEFAULT_PIT_LOSS_MS
 from pitwall.engine.projection import (
@@ -93,6 +93,72 @@ def _data_quality_factor(attacker: DriverState) -> float:
         factor -= _TRAFFIC_CONFIDENCE_PENALTY
 
     return max(0.0, min(1.0, factor))
+
+
+def _base_context_kwargs(
+    state: RaceState,
+    driver: DriverState,
+    compound: str,
+    *,
+    start_lap_in_stint: int | None = None,
+    stint_number: int | None = None,
+) -> dict[str, Any]:
+    current_lap = state.current_lap or None
+    total_laps = state.total_laps
+    laps_remaining = (
+        max(0, total_laps - state.current_lap)
+        if total_laps is not None and state.current_lap
+        else None
+    )
+    gap_to_ahead_ms = driver.gap_to_ahead_ms
+    return {
+        "team_code": driver.team_code,
+        "track_temp_c": state.track_temp_c,
+        "air_temp_c": state.air_temp_c,
+        "humidity_pct": state.humidity_pct,
+        "stint_position": stint_number or driver.stint_number,
+        "stint_number": stint_number or driver.stint_number,
+        "lap_in_stint": start_lap_in_stint
+        if start_lap_in_stint is not None
+        else driver.laps_in_stint,
+        "laps_remaining": laps_remaining,
+        "total_laps": total_laps,
+        "lap_number": current_lap,
+        "position": driver.position,
+        "gap_to_ahead_ms": gap_to_ahead_ms,
+        "gap_to_leader_ms": driver.gap_to_leader_ms,
+        "is_in_traffic": gap_to_ahead_ms is not None and gap_to_ahead_ms < _TRAFFIC_GAP_MS,
+        "dirty_air_proxy_ms": max(0, 2_000 - gap_to_ahead_ms)
+        if gap_to_ahead_ms is not None
+        else 0,
+        "reference_lap_time_ms": state.reference_lap_time_ms(compound),
+        "driver_pace_offset_ms": None,
+        "driver_pace_offset_missing": True,
+    }
+
+
+def _context_for_driver(
+    state: RaceState,
+    driver: DriverState,
+    compound: str,
+    tyre_age: int,
+    *,
+    start_lap_in_stint: int | None = None,
+    stint_number: int | None = None,
+) -> PaceContext:
+    return PaceContext(
+        driver_code=driver.driver_code,
+        circuit_id=state.circuit_id or "",
+        compound=cast(Compound, compound),
+        tyre_age=tyre_age,
+        **_base_context_kwargs(
+            state,
+            driver,
+            compound,
+            start_lap_in_stint=start_lap_in_stint,
+            stint_number=stint_number,
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -212,24 +278,29 @@ def evaluate_undercut(
         # window. (For ScipyPredictor R² is constant, but future predictors may
         # return tyre-age-dependent confidence.)
         conf_def = predictor.predict(
-            PaceContext(
-                driver_code=defender.driver_code,
-                circuit_id=circuit_id,
-                compound=cast(Compound, def_compound),
-                tyre_age=max(1, defender.tyre_age),
-            )
+            _context_for_driver(state, defender, def_compound, max(1, defender.tyre_age))
         ).confidence
         conf_atk = predictor.predict(
-            PaceContext(
-                driver_code=attacker.driver_code,
-                circuit_id=circuit_id,
-                compound=cast(Compound, next_compound),
-                tyre_age=1,
+            _context_for_driver(
+                state,
+                attacker,
+                next_compound,
+                1,
+                start_lap_in_stint=1,
+                stint_number=attacker.stint_number + 1,
             )
         ).confidence
         confidence = min(conf_def, conf_atk) * _data_quality_factor(attacker)
 
         # Pace projections (§6.4 defender, §6.5 attacker).
+        defender_kwargs = _base_context_kwargs(state, defender, def_compound)
+        attacker_kwargs = _base_context_kwargs(
+            state,
+            attacker,
+            next_compound,
+            start_lap_in_stint=0,
+            stint_number=attacker.stint_number + 1,
+        )
         defender_laps = project_pace(
             defender.driver_code,
             circuit_id,
@@ -238,6 +309,7 @@ def evaluate_undercut(
             K_MAX,
             predictor,
             apply_cold_tyre_penalty=False,
+            **defender_kwargs,
         )
         attacker_laps = project_pace(
             attacker.driver_code,
@@ -247,6 +319,7 @@ def evaluate_undercut(
             K_MAX,
             predictor,
             apply_cold_tyre_penalty=True,
+            **attacker_kwargs,
         )
     except UnsupportedContextError:
         return _insufficient()

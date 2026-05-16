@@ -49,9 +49,9 @@ in UTC ISO-8601 with millisecond precision. `payload` is type-specific.
 
 ### `snapshot`
 
-Emitted on connect, after every reconnect, and at most once per second
-during steady-state operation. Idempotent: receiving a newer snapshot
-fully overrides the client's local state.
+Emitted on connect, after every reconnect, and at most once per replay lap
+during steady-state operation. Idempotent: receiving a newer snapshot fully
+overrides the client's local state.
 
 ```json
 {
@@ -167,6 +167,10 @@ event — never dropped.
 ```
 
 `alert_type` ∈ `AlertType` enum from `openapi_v1.yaml`:
+
+For V1 frontend compatibility, the backend also includes legacy aliases
+`attacker`, `defender`, and `current_lap` with the same values as
+`attacker_code`, `defender_code`, and `lap_number`.
 
 | Value | Meaning |
 |---|---|

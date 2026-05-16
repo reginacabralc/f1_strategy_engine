@@ -17,7 +17,7 @@ indicator without polling REST.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -28,8 +28,7 @@ from pitwall.api.dependencies import (
     get_event_loader,
     get_replay_manager,
 )
-from pitwall.api.schemas import ReplayRun, ReplayStartRequest, ReplayStopResponse
-from pitwall.core.config import get_settings
+from pitwall.api.schemas import PredictorName, ReplayRun, ReplayStartRequest, ReplayStopResponse
 from pitwall.engine.loop import EngineLoop
 from pitwall.engine.replay_manager import ReplayManager
 from pitwall.repositories.events import SessionEventLoader
@@ -107,7 +106,7 @@ async def start_replay(
         session_id=body.session_id,
         speed_factor=body.speed_factor,
         started_at=replay_manager.started_at,  # type: ignore[arg-type]
-        pace_predictor=get_settings().pace_predictor,
+        pace_predictor=cast(PredictorName, engine_loop.predictor_name),
     )
 
     await cm.broadcast_json(
