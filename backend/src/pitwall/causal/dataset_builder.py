@@ -419,6 +419,10 @@ def _build_dataset_row(
             rainfall=to_bool(row.get("rainfall")),
             attacker_laps_in_stint=to_int(row.get("attacker_laps_in_stint")),
             defender_laps_in_stint=to_int(row.get("defender_laps_in_stint")),
+            traffic_after_pit=_traffic_bucket(
+                to_int(row.get("traffic_after_pit_cars")),
+                to_int(row.get("nearest_traffic_gap_ms")),
+            ),
         ),
         degradation_lookup,
     )
