@@ -28,6 +28,11 @@ export interface AlertPayload {
   confidence: number;
   ventana_laps: number;
   predictor_used: string;
+  // New optional fields populated when demo_mode is active.
+  demo_source?: string;
+  causal_support_level?: string;
+  causal_top_factors?: string[];
+  causal_explanations?: string[];
 }
 
 // Raw shape the backend currently emits (attacker/defender/current_lap).
@@ -51,6 +56,11 @@ export interface BackendAlertPayload {
   lap_number?: number;
   ventana_laps?: number;
   predictor_used?: string;
+  // New optional fields populated when demo_mode is active.
+  demo_source?: string;
+  causal_support_level?: string;
+  causal_top_factors?: string[];
+  causal_explanations?: string[];
 }
 
 // Accepts either backend-shaped or spec-shaped alert payloads and returns a
@@ -77,6 +87,10 @@ export function normalizeAlertPayload(raw: BackendAlertPayload): AlertPayload {
     confidence: raw.confidence,
     ventana_laps: raw.ventana_laps ?? 0,
     predictor_used: raw.predictor_used ?? "",
+    ...(raw.demo_source !== undefined ? { demo_source: raw.demo_source } : {}),
+    ...(raw.causal_support_level !== undefined ? { causal_support_level: raw.causal_support_level } : {}),
+    ...(raw.causal_top_factors !== undefined ? { causal_top_factors: raw.causal_top_factors } : {}),
+    ...(raw.causal_explanations !== undefined ? { causal_explanations: raw.causal_explanations } : {}),
   };
 }
 

@@ -41,6 +41,52 @@ ConnectionManagerDep = Annotated[ConnectionManager, Depends(get_connection_manag
 EngineLoopDep = Annotated[EngineLoop, Depends(get_engine_loop)]
 
 
+def _trim_pre_race_for_demo(events: list[Any]) -> list[Any]:
+    """Trim long pre-race weather period for class-demo replays.
+
+    Bahrain's event stream starts ~1 hour before the first lap_complete
+    (weather updates from the formation lap warmup). At demo speeds
+    (5-10x) this is 6-12 minutes of dead air. For the class demo we
+    re-anchor every kept event's ``ts`` to start ~10 seconds before the
+    first lap_complete so the replay engine's pacing kicks straight into
+    the race.
+
+    The set of kept events: session_start, first weather sample, all
+    events at or after the first lap_complete timestamp. The
+    session_start and weather sample are re-stamped to 10s before the
+    first lap_complete so the engine still receives them in order
+    without holding up the demo.
+    """
+    if not events:
+        return events
+    sorted_events = sorted(events, key=lambda e: e["ts"])
+    first_lap_idx = next(
+        (i for i, e in enumerate(sorted_events) if e.get("type") == "lap_complete"),
+        None,
+    )
+    if first_lap_idx is None:
+        # No lap_complete events at all — return original list unchanged.
+        return events
+    from datetime import timedelta
+
+    first_lap_ts = sorted_events[first_lap_idx]["ts"]
+    anchor_ts = first_lap_ts - timedelta(seconds=10)
+
+    # Keep one session_start (the latest one before first_lap, if any) and
+    # the most recent weather_update before first_lap. Re-stamp both to
+    # anchor_ts so the replay starts immediately.
+    pre_race = sorted_events[:first_lap_idx]
+    session_starts = [e for e in pre_race if e.get("type") == "session_start"]
+    weather_pre = [e for e in pre_race if e.get("type") == "weather_update"]
+    seed: list[Any] = []
+    if session_starts:
+        seed.append({**session_starts[-1], "ts": anchor_ts})
+    if weather_pre:
+        seed.append({**weather_pre[-1], "ts": anchor_ts})
+
+    return seed + sorted_events[first_lap_idx:]
+
+
 def _replay_state_message(
     state: str,
     run_id: str,
@@ -97,7 +143,16 @@ async def start_replay(
             detail=f"Session {body.session_id!r} not found or has no events.",
         )
 
+    # In demo_mode, trim pre-race events (long weather-only pre-race period
+    # contributes nothing visible). Keep session_start, then jump to the first
+    # lap_complete event so the audience sees laps within seconds, not minutes.
+    if body.demo_mode:
+        events = _trim_pre_race_for_demo(events)
+
     run_id = await replay_manager.start(body.session_id, body.speed_factor, events)
+
+    # Activate / deactivate demo mode on the engine loop based on the request.
+    engine_loop.set_demo_mode(body.demo_mode)
 
     # Build response before the next await: the replay task may finish (draining a
     # short fixture) and set is_running=False, which would make started_at return None.
@@ -142,6 +197,9 @@ async def stop_replay(
     speed_factor: float = replay_manager._speed_factor or 1.0
 
     run_id = await replay_manager.stop()
+
+    # Reset demo mode when the replay stops.
+    engine_loop.set_demo_mode(False)
 
     if run_id is not None and session_id is not None:
         await cm.broadcast_json(

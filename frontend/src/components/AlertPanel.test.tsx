@@ -126,3 +126,23 @@ describe("AlertPanel with backend-shaped payloads (via normalizeAlertPayload)", 
     expect(screen.getByText("SAI")).toBeInTheDocument();
   });
 });
+
+describe("AlertPanel predictor badges", () => {
+  it("renders a predictor badge for each predictor type", () => {
+    const alerts: AlertPayload[] = [
+      { ...MOCK_ALERT, alert_id: "id1", predictor_used: "scipy" },
+      { ...MOCK_ALERT, alert_id: "id2", predictor_used: "xgboost" },
+      { ...MOCK_ALERT, alert_id: "id3", predictor_used: "causal" },
+    ];
+    render(<AlertPanel alerts={alerts} />);
+    expect(screen.getByTestId("predictor-badge-scipy")).toBeInTheDocument();
+    expect(screen.getByTestId("predictor-badge-xgboost")).toBeInTheDocument();
+    expect(screen.getByTestId("predictor-badge-causal")).toBeInTheDocument();
+  });
+
+  it("does not render a predictor badge when predictor_used is empty string", () => {
+    const alert: AlertPayload = { ...MOCK_ALERT, alert_id: "id4", predictor_used: "" };
+    render(<AlertPanel alerts={[alert]} />);
+    expect(screen.queryByTestId("predictor-badge-")).not.toBeInTheDocument();
+  });
+});

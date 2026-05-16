@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { startReplay, stopReplay } from "../api/client";
 
-const SPEEDS = [1, 10, 30, 100, 1000] as const;
+// 6× plays a 90-minute race in ~15 minutes wall-clock — the class-demo default.
+// Other speeds remain available for quick tests / dev replays.
+const SPEEDS = [1, 6, 10, 30, 100, 1000] as const;
 
 type ReplayState = "started" | "stopped" | "finished" | null | undefined;
 
@@ -78,6 +80,13 @@ export function ReplayControls({
   totalLaps,
 }: ReplayControlsProps) {
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(30);
+  const [demoMode, setDemoMode] = useState(false);
+  // When Demo Mode is toggled on, switch to 6× so the race lasts ~15 min
+  // wall-clock (the class-demo target). Reset to 30× if Demo Mode is turned off.
+  function toggleDemoMode(active: boolean): void {
+    setDemoMode(active);
+    setSpeed(active ? 6 : 30);
+  }
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -94,7 +103,7 @@ export function ReplayControls({
     setIsPending(true);
     setError(null);
     try {
-      await startReplay(selectedSession, speed);
+      await startReplay(selectedSession, speed, demoMode);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start replay");
     } finally {
@@ -185,6 +194,24 @@ export function ReplayControls({
           </button>
         ))}
       </div>
+
+      <div className="w-px h-6 bg-pitwall-border" />
+
+      {/* Demo mode toggle */}
+      <label
+        className="flex items-center gap-1 text-[10px] text-pitwall-muted cursor-pointer select-none"
+        title="Class demo mode: relaxed thresholds + scripted alerts + causal observer"
+      >
+        <input
+          type="checkbox"
+          checked={demoMode}
+          onChange={(e) => toggleDemoMode(e.target.checked)}
+          disabled={isPending || !selectedSession}
+          className="w-3 h-3 accent-pitwall-accent"
+          data-testid="demo-mode-toggle"
+        />
+        Demo
+      </label>
 
       <div className="w-px h-6 bg-pitwall-border" />
 

@@ -37,7 +37,7 @@ describe("ReplayControls", () => {
     fireEvent.click(screen.getByLabelText("Start replay"));
 
     await waitFor(() => {
-      expect(mockStartReplay).toHaveBeenCalledWith("monaco_2024_R", 100);
+      expect(mockStartReplay).toHaveBeenCalledWith("monaco_2024_R", 100, false);
     });
   });
 
@@ -101,5 +101,33 @@ describe("ReplayControls", () => {
     await waitFor(() => {
       expect(screen.getByTestId("replay-error")).toHaveTextContent("Network error");
     });
+  });
+
+  it("sends demo_mode=true to startReplay when toggle is checked and auto-switches to 6× speed", async () => {
+    render(<ReplayControls selectedSession="monaco_2024_R" />);
+
+    // Checking Demo Mode auto-switches the speed to 6× (15-min class-demo target).
+    fireEvent.click(screen.getByTestId("demo-mode-toggle"));
+    fireEvent.click(screen.getByLabelText("Start replay"));
+
+    await waitFor(() => {
+      expect(mockStartReplay).toHaveBeenCalledWith("monaco_2024_R", 6, true);
+    });
+  });
+
+  it("sends demo_mode=false to startReplay when toggle is unchecked (default)", async () => {
+    render(<ReplayControls selectedSession="monaco_2024_R" />);
+
+    fireEvent.click(screen.getByLabelText("Start replay"));
+
+    await waitFor(() => {
+      expect(mockStartReplay).toHaveBeenCalledWith("monaco_2024_R", 30, false);
+    });
+  });
+
+  it("demo toggle is disabled when no session is selected", () => {
+    render(<ReplayControls selectedSession={null} />);
+
+    expect(screen.getByTestId("demo-mode-toggle")).toBeDisabled();
   });
 });

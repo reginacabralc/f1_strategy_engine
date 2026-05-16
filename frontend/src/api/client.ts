@@ -94,12 +94,14 @@ export function getDegradation(params: {
 export function startReplay(
   sessionId: string,
   speedFactor?: number,
+  demoMode?: boolean,
 ): Promise<ReplayRun> {
   return apiFetch<ReplayRun>("/api/v1/replay/start", {
     method: "POST",
     body: JSON.stringify({
       session_id: sessionId,
       ...(speedFactor !== undefined ? { speed_factor: speedFactor } : {}),
+      ...(demoMode !== undefined ? { demo_mode: demoMode } : {}),
     }),
   });
 }
