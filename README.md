@@ -27,7 +27,7 @@ Más detalle: [`docs/architecture.md`](docs/architecture.md).
 
 ## Quickstart
 
-Pre-requisitos: Docker Desktop, GNU Make, Python 3.12 recomendado, ~10 GB libres, internet para descargar datos de FastF1 la primera vez.
+Pre-requisitos: Docker Desktop, GNU Make, Python 3.12+, ~10 GB libres, internet para descargar datos de FastF1 la primera vez.
 
 ```bash
 git clone https://github.com/reginacabralc/f1_strategy_engine.git

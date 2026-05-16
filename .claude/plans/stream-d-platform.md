@@ -81,7 +81,9 @@ docs/walkthrough.md (mantenimiento)
 - [x] **Hito S1 contribución**: `make demo` arranca todo el stack local.
 
 ### Día 6 — Pre-commit + badges + README polish
-- [x] `.pre-commit-config.yaml` con ruff/mypy, eslint y prettier check.
+- [x] `.pre-commit-config.yaml` con ruff/mypy y eslint. Prettier no se agregó
+      porque el frontend no declara `prettier` como dependencia y no queremos
+      hooks que descarguen paquetes en cada commit.
 - [x] Badges de CI en README.
 - [x] `.env.example` documentado.
 - [x] Issue templates en `.github/ISSUE_TEMPLATE/`.

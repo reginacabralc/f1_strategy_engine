@@ -16,10 +16,3 @@ repos:
         language: system
         pass_filenames: false
         files: ^frontend/src/.*\.(ts|tsx)$
-
-      - id: frontend-prettier
-        name: frontend prettier check
-        entry: bash -lc 'cd frontend && npx -y prettier@3.4.2 --check "src/**/*.{ts,tsx,css}" "tests/**/*.{ts,tsx}"'
-        language: system
-        pass_filenames: false
-        files: ^frontend/(src|tests)/.*\.(ts|tsx|css)$

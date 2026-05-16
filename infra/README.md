@@ -31,7 +31,7 @@ Ver `.env.example` en raíz. Las críticas:
 
 | Var | Default | Quién la usa |
 |-----|---------|--------------|
-| `DATABASE_URL` | `postgresql+psycopg://pitwall:pitwall@localhost:5432/pitwall` local / `postgresql+psycopg://pitwall:pitwall@db:5432/pitwall` compose | backend, migrate, scripts |
+| `DATABASE_URL` | `postgresql+psycopg://pitwall:pitwall@localhost:5433/pitwall` local / `postgresql+psycopg://pitwall:pitwall@db:5432/pitwall` compose | backend, migrate, scripts |
 | `LOG_LEVEL` | `INFO` | backend |
 | `PACE_PREDICTOR` | `scipy` | backend |
 | `REPLAY_DEFAULT_SESSION` | `monaco_2024_R` | backend |

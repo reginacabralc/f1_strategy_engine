@@ -7,7 +7,8 @@
 - Docker Desktop >= 4.x (con Compose v2).
 - GNU Make.
 - Git.
-- Python 3.12 recomendado.
+- Python 3.12+. El Makefile prefiere `python3.12` al crear `.venv`; si no
+  existe, falla temprano con una instrucción explícita.
 - Internet para descargar datos de FastF1 la primera vez.
 - (Opcional) `uv` para desarrollo local.
 - (Opcional) `pnpm` para trabajar en `frontend/` fuera de Docker. Si no existe, el Makefile usa `npx -y pnpm@9.15.9`.
@@ -18,6 +19,7 @@ Verificación rápida:
 docker compose version
 make --version
 git --version
+python3.12 --version
 ```
 
 ## 2. Clonar y configurar

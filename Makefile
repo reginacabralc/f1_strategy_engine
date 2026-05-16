@@ -1,5 +1,6 @@
 PYTHON ?= .venv/bin/python
 PIP ?= $(PYTHON) -m pip
+PYTHON_BOOTSTRAP ?= $(shell if command -v python3.12 >/dev/null 2>&1; then echo python3.12; else echo python3; fi)
 PNPM ?= $(shell if command -v pnpm >/dev/null 2>&1; then echo pnpm; elif command -v corepack >/dev/null 2>&1; then echo "corepack pnpm"; else echo "npx -y pnpm@9.15.9"; fi)
 
 .PHONY: install db-up db-wait db-down up down down-v logs ps migrate \
@@ -22,7 +23,8 @@ PNPM ?= $(shell if command -v pnpm >/dev/null 2>&1; then echo pnpm; elif command
 install: .venv/.installed
 
 .venv/.installed: backend/pyproject.toml
-	python3 -m venv .venv
+	$(PYTHON_BOOTSTRAP) -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 'Python 3.12+ is required. Install python3.12 or run make with PYTHON_BOOTSTRAP=/path/to/python3.12')"
+	$(PYTHON_BOOTSTRAP) -m venv .venv
 	$(PIP) install -U pip
 	$(PIP) install -e 'backend[dev]'
 	touch .venv/.installed

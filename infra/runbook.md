@@ -242,6 +242,21 @@ Problemas comunes:
   permisos de red del sandbox. Verifica fuera del sandbox o deja que CI ejecute
   el job Playwright.
 
+## Python local incorrecto
+
+`make demo` crea `.venv` con `python3.12` cuando existe. Si una máquina solo
+tiene `python3` apuntando a 3.9/3.10, el Makefile falla antes de instalar
+dependencias:
+
+```text
+Python 3.12+ is required. Install python3.12 or run make with PYTHON_BOOTSTRAP=/path/to/python3.12
+```
+
+Soluciones:
+
+- Instalar Python 3.12 y repetir `make demo`.
+- O ejecutar `make demo PYTHON_BOOTSTRAP=/ruta/a/python3.12`.
+
 ---
 
 ## Cuándo escalar a un humano
