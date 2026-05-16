@@ -143,7 +143,10 @@ def test_estimate_stratified_effects_skips_small_circuits() -> None:
     """estimate_stratified_effects returns None for circuits with <200 rows."""
     import pandas as pd
 
-    from pitwall.causal.estimators import StratifiedEffectSpec, estimate_stratified_effects
+    from pitwall.causal.estimators import (
+        StratifiedEffectSpec,
+        estimate_stratified_effects,
+    )
 
     # Make a tiny dataframe that only has 10 rows for any circuit filter
     tiny_data = pd.DataFrame({
@@ -173,5 +176,5 @@ def test_estimate_stratified_effects_skips_small_circuits() -> None:
     ]
     results = estimate_stratified_effects(tiny_data, specs)
     assert len(results) == 1
-    _spec, estimate = results[0]
-    assert estimate is None  # < 200 rows -- skipped
+        _spec, estimate = results[0]
+    assert estimate is None  # < 200 rows → skipped

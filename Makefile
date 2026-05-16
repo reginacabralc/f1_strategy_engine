@@ -138,7 +138,7 @@ validate-driver-offsets: install db-wait
 audit-causal-inputs: install
 	PYTHONPATH=backend/src $(PYTHON) scripts/audit_causal_inputs.py
 
-reconstruct-race-gaps: install
+reconstruct-race-gaps: install db-wait
 	PYTHONPATH=backend/src $(PYTHON) scripts/reconstruct_race_gaps.py
 
 derive-known-undercuts: install
@@ -290,7 +290,7 @@ replay: install db-wait
 
 ## demo-api: DB up (Docker), migrations and seed via local venv, then API up.
 ## Opens Swagger automatically. Requires: cp .env.example .env first.
-demo-api: db-up migrate seed fit-degradation-demo
+demo-api: db-up migrate seed reconstruct-race-gaps fit-degradation-demo
 	docker compose up -d backend
 	@echo "Waiting for API to be ready..."
 	@until curl -fsS http://localhost:8000/health >/dev/null 2>&1; do sleep 1; done
@@ -300,7 +300,8 @@ demo-api: db-up migrate seed fit-degradation-demo
 
 ## demo: full local demo stack (DB + migrate + seeded data + backend + frontend).
 ## Opens the React dashboard and leaves Swagger available at :8000/docs.
-demo: db-up migrate seed fit-degradation-demo
+## Gap reconstruction runs after seed so undercut alerts have gap_to_ahead_ms.
+demo: db-up migrate seed reconstruct-race-gaps fit-degradation-demo
 	docker compose up -d backend frontend
 	@echo "Waiting for API to be ready..."
 	@until curl -fsS http://localhost:8000/health >/dev/null 2>&1; do sleep 1; done

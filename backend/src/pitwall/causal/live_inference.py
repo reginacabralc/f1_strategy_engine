@@ -356,14 +356,12 @@ def _scenario_from_metrics(
         ),
     )
 
-
 # Adaptive confidence thresholds calibrated for demo-race R² range (0.05-0.36).
-# "strong": R² >= 0.35 -- fit explains >=35% of variance, acceptable for advisory.
-# "weak":   R² >= 0.15 -- directionally useful, explicit caveat recommended.
+# "strong": R² ≥ 0.35 — fit explains ≥35% of variance, acceptable for advisory.
+# "weak":   R² ≥ 0.15 — directionally useful, explicit caveat recommended.
 # Below 0.15 is effectively noise on small F1 datasets.
 CONFIDENCE_STRONG_THRESHOLD: float = 0.35
 CONFIDENCE_WEAK_THRESHOLD: float = 0.15
-
 
 def _support_level(
     alert_type: str,
