@@ -76,6 +76,10 @@
       health, and `scripts/ws_demo_client.py` streaming live replay snapshots.
       Docker layer cache was not manually pruned, so this is a clean clone/DB
       timing pass rather than a fully no-cache image benchmark.
+- [x] Stream D CI follow-up: Playwright demo e2e now asserts the stable
+      dashboard race-table shell instead of requiring live timing rows when the
+      test does not control the WebSocket feed. Verified with
+      `CI=true make test-e2e`.
 
 ## Semana 1
 

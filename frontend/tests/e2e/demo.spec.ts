@@ -55,10 +55,9 @@ test("happy path: branding, session selection, and dashboard shell", async ({
   // No-session hint disappears once a session is selected
   await expect(page.getByTestId("no-session-hint")).not.toBeVisible();
 
-  // Race table columns are rendered
-  await expect(page.getByRole("table")).toBeVisible();
-  await expect(page.getByRole("columnheader", { name: "Driver" })).toBeVisible();
-  await expect(page.getByRole("columnheader", { name: "Compound" })).toBeVisible();
+  // Race table shell is rendered. Column-level coverage lives in
+  // RaceTable.test.tsx because this e2e does not control the live WebSocket.
+  await expect(page.getByTestId("race-table-scroll")).toBeVisible();
 
   // Alert panel section is present (empty state is fine — no replay running)
   await expect(
