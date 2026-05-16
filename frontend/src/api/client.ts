@@ -4,6 +4,7 @@
 
 import type {
   BacktestResult,
+  CausalPredictionOut,
   Compound,
   DegradationCurve,
   PredictorName,
@@ -129,5 +130,40 @@ export function getBacktestResult(
     buildUrl(`/api/v1/backtest/${encodeURIComponent(sessionId)}`, {
       predictor,
     }),
+  );
+}
+
+/** GET /api/v1/causal/prediction
+ *
+ * Returns the causal structural-equation viability prediction for one
+ * driver pair at one lap. Read-only — does not alter live engine state.
+ *
+ * All parameters are optional; the backend applies defaults (Bahrain lap 30,
+ * NOR vs VER, MEDIUM age 15 vs HARD age 25, gap 5000 ms, pit_loss 21000 ms).
+ */
+export function getCausalPrediction(params?: {
+  session_id?: string;
+  circuit_id?: string;
+  lap_number?: number;
+  total_laps?: number;
+  attacker?: string;
+  attacker_compound?: string;
+  attacker_tyre_age?: number;
+  defender?: string;
+  defender_compound?: string;
+  defender_tyre_age?: number;
+  gap_ms?: number;
+  pit_loss_ms?: number;
+  track_status?: string;
+  rainfall?: boolean;
+}): Promise<CausalPredictionOut> {
+  const stringParams: Record<string, string | undefined> = {};
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined) stringParams[k] = String(v);
+    }
+  }
+  return apiFetch<CausalPredictionOut>(
+    buildUrl("/api/v1/causal/prediction", stringParams),
   );
 }

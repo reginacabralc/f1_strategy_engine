@@ -31,3 +31,5 @@ export type SetPredictorRequest = components["schemas"]["SetPredictorRequest"];
 export type SetPredictorResponse = components["schemas"]["SetPredictorResponse"];
 export type UndercutMatch = components["schemas"]["UndercutMatch"];
 export type BacktestResult = components["schemas"]["BacktestResult"];
+export type CausalCounterfactualOut = components["schemas"]["CausalCounterfactualOut"];
+export type CausalPredictionOut = components["schemas"]["CausalPredictionOut"];

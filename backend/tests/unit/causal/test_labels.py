@@ -127,8 +127,10 @@ def test_traffic_penalty_reduces_projected_gain() -> None:
     )
 
     rows = [
-        {"circuit_id": "bahrain", "compound": "SOFT",   "a": 94_000.0, "b": 50.0, "c": 1.0, "r_squared": 0.5},
-        {"circuit_id": "bahrain", "compound": "MEDIUM",  "a": 94_500.0, "b": 30.0, "c": 0.5, "r_squared": 0.5},
+        {"circuit_id": "bahrain", "compound": "SOFT",
+         "a": 94_000.0, "b": 50.0, "c": 1.0, "r_squared": 0.5},
+        {"circuit_id": "bahrain", "compound": "MEDIUM",
+         "a": 94_500.0, "b": 30.0, "c": 0.5, "r_squared": 0.5},
     ]
     lookup = build_degradation_lookup(rows)
 

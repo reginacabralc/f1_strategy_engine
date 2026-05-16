@@ -1,13 +1,20 @@
 PYTHON ?= .venv/bin/python
 PIP ?= $(PYTHON) -m pip
 PYTHON_BOOTSTRAP ?= $(shell if command -v python3.12 >/dev/null 2>&1; then echo python3.12; else echo python3; fi)
-PNPM ?= $(shell if command -v pnpm >/dev/null 2>&1; then echo pnpm; elif command -v corepack >/dev/null 2>&1; then echo "corepack pnpm"; else echo "npx -y pnpm@9.15.9"; fi)
+PNPM ?= $(shell if command -v pnpm >/dev/null 2>&1; then echo pnpm; elif command -v corepack >/dev/null 2>&1; then echo "corepack pnpm"; elif command -v npx >/dev/null 2>&1; then echo "npx -y pnpm@9.15.9"; else echo ""; fi)
+# Frontend container service name (must match docker-compose.yaml).
+FRONTEND_SERVICE ?= frontend
+# True if Node tooling is available on the host (pnpm, corepack, or npx).
+HOST_HAS_NODE := $(shell if [ -n "$(PNPM)" ]; then echo 1; else echo 0; fi)
+# True if the frontend container is currently running.
+FRONTEND_CONTAINER_UP := $(shell docker compose ps --status running --services 2>/dev/null | grep -qx "$(FRONTEND_SERVICE)" && echo 1 || echo 0)
 
 .PHONY: install db-up db-wait db-down up down down-v logs ps migrate \
+        rebuild rebuild-backend rebuild-frontend \
         ingest ingest-monaco ingest-demo validate-demo seed \
         ingest-ml-races validate-ml-races \
         fit-degradation fit-degradation-demo validate-degradation report-degradation \
-        fit-pit-loss validate-pit-loss \
+        fit-pit-loss validate-pit-loss generate-api-types \
         fit-driver-offsets validate-driver-offsets \
         build-xgb-dataset validate-xgb-dataset diagnose-xgb-shift \
         evaluate-xgb-baselines run-xgb-ablations \
@@ -58,6 +65,26 @@ logs:
 
 ps:
 	docker compose ps
+
+## rebuild-backend: rebuild the backend image and restart the container.
+## Use after editing files under backend/src/ so the live API reflects the change.
+rebuild-backend:
+	docker compose build backend
+	docker compose up -d backend
+	@echo "Waiting for API to be ready..."
+	@until curl -fsS http://localhost:8000/health >/dev/null 2>&1; do sleep 1; done
+	@echo "API is ready."
+	@echo "Backend rebuilt and ready at http://localhost:8000"
+
+## rebuild-frontend: rebuild the frontend image and restart the container.
+## Use after editing files under frontend/src/ when running via Docker.
+rebuild-frontend:
+	docker compose build frontend
+	docker compose up -d frontend
+	@echo "Frontend rebuilt and ready at http://localhost:5173"
+
+## rebuild: rebuild both backend and frontend images.
+rebuild: rebuild-backend rebuild-frontend
 
 migrate: install db-wait
 	cd backend && PYTHONPATH=src ../$(PYTHON) -m alembic -c alembic.ini upgrade head
@@ -165,44 +192,85 @@ compare-predictors: install db-wait
 test: test-backend test-frontend
 
 test-backend: install
-	cd backend && ../$(PYTHON) -m pytest tests/unit -q
+	MPLCONFIGDIR=/tmp/pitwall-matplotlib PYTHONPATH=backend/src $(PYTHON) -m pytest backend/tests/unit -q
 
+## test-frontend: runs Vitest. Uses host Node if pnpm is on PATH;
+## otherwise runs inside the live `frontend` Docker container.
+## If neither is available, prints how to start the frontend container.
 test-frontend:
-	cd frontend && if [ -x ./node_modules/.bin/vitest ]; then \
-		./node_modules/.bin/vitest run; \
+	@if [ -x frontend/node_modules/.bin/vitest ]; then \
+		cd frontend && ./node_modules/.bin/vitest run; \
+	elif [ "$(HOST_HAS_NODE)" = "1" ]; then \
+		cd frontend && $(PNPM) install --frozen-lockfile && $(PNPM) test; \
+	elif [ "$(FRONTEND_CONTAINER_UP)" = "1" ]; then \
+		echo "Running Vitest inside frontend container..."; \
+		docker compose exec -T $(FRONTEND_SERVICE) pnpm test; \
 	else \
-		$(PNPM) install --frozen-lockfile && $(PNPM) test; \
+		echo "ERROR: no host Node and frontend container is not running."; \
+		echo "Fix: run 'make up' (starts the frontend container) and try again,"; \
+		echo "     or install Node 22 + pnpm and re-run 'make test-frontend'."; \
+		exit 1; \
 	fi
 
 test-e2e-install:
-	cd frontend && if [ -x ./node_modules/.bin/playwright ]; then \
-		./node_modules/.bin/playwright install firefox; \
+	@if [ -x frontend/node_modules/.bin/playwright ]; then \
+		cd frontend && ./node_modules/.bin/playwright install firefox; \
+	elif [ "$(HOST_HAS_NODE)" = "1" ]; then \
+		cd frontend && $(PNPM) install --frozen-lockfile && $(PNPM) exec playwright install firefox; \
+	elif [ "$(FRONTEND_CONTAINER_UP)" = "1" ]; then \
+		docker compose exec -T $(FRONTEND_SERVICE) pnpm exec playwright install firefox; \
 	else \
-		$(PNPM) install --frozen-lockfile && $(PNPM) exec playwright install firefox; \
+		echo "ERROR: no host Node and frontend container is not running. Run 'make up' first."; \
+		exit 1; \
 	fi
 
 test-e2e:
-	cd frontend && if [ -x ./node_modules/.bin/playwright ]; then \
-		./node_modules/.bin/playwright test; \
+	@if [ -x frontend/node_modules/.bin/playwright ]; then \
+		cd frontend && ./node_modules/.bin/playwright test; \
+	elif [ "$(HOST_HAS_NODE)" = "1" ]; then \
+		cd frontend && $(PNPM) install --frozen-lockfile && $(PNPM) exec playwright test; \
+	elif [ "$(FRONTEND_CONTAINER_UP)" = "1" ]; then \
+		docker compose exec -T $(FRONTEND_SERVICE) pnpm exec playwright test; \
 	else \
-		$(PNPM) install --frozen-lockfile && $(PNPM) exec playwright test; \
+		echo "ERROR: no host Node and frontend container is not running. Run 'make up' first."; \
+		exit 1; \
 	fi
 
 lint: lint-backend lint-frontend
 
 lint-backend: install
-	cd backend && ../$(PYTHON) -m ruff check .
-	cd backend && ../$(PYTHON) -m mypy src tests
+	PYTHONPATH=backend/src $(PYTHON) -m ruff check backend
+	PYTHONPATH=backend/src $(PYTHON) -m mypy backend/src backend/tests
 
 lint-frontend:
-	cd frontend && if [ -x ./node_modules/.bin/eslint ]; then \
-		./node_modules/.bin/eslint src --ext .ts,.tsx --report-unused-disable-directives --max-warnings 0; \
+	@if [ -x frontend/node_modules/.bin/eslint ]; then \
+		cd frontend && ./node_modules/.bin/eslint src --ext .ts,.tsx --report-unused-disable-directives --max-warnings 0; \
+	elif [ "$(HOST_HAS_NODE)" = "1" ]; then \
+		cd frontend && $(PNPM) install --frozen-lockfile && $(PNPM) lint; \
+	elif [ "$(FRONTEND_CONTAINER_UP)" = "1" ]; then \
+		echo "Running eslint inside frontend container..."; \
+		docker compose exec -T $(FRONTEND_SERVICE) pnpm lint; \
 	else \
-		$(PNPM) install --frozen-lockfile && $(PNPM) lint; \
+		echo "ERROR: no host Node and frontend container is not running. Run 'make up' first."; \
+		exit 1; \
 	fi
 
 pre-commit: install
 	$(PYTHON) -m pre_commit run --all-files
+
+## generate-api-types: Regenerate frontend/src/api/openapi.ts from docs/interfaces/openapi_v1.yaml.
+## Run this whenever openapi_v1.yaml changes.
+## Uses host Node if available, otherwise runs inside the live frontend container.
+generate-api-types:
+	@if [ "$(HOST_HAS_NODE)" = "1" ]; then \
+		cd frontend && $(PNPM) install --frozen-lockfile && $(PNPM) generate:api; \
+	elif [ "$(FRONTEND_CONTAINER_UP)" = "1" ]; then \
+		echo "Generating openapi.ts inside frontend container..."; \
+		docker compose exec -T $(FRONTEND_SERVICE) pnpm generate:api; \
+	else \
+		echo "ERROR: no host Node and frontend container is not running. Run 'make up' first."; \
+		exit 1; \
+	fi
 
 serve-api: install
 	PYTHONPATH=backend/src $(PYTHON) -m uvicorn pitwall.api.main:app --reload --port 8000
@@ -224,7 +292,9 @@ replay: install db-wait
 ## Opens Swagger automatically. Requires: cp .env.example .env first.
 demo-api: db-up migrate seed fit-degradation-demo
 	docker compose up -d backend
-	$(MAKE) api-wait
+	@echo "Waiting for API to be ready..."
+	@until curl -fsS http://localhost:8000/health >/dev/null 2>&1; do sleep 1; done
+	@echo "API is ready."
 	$(PYTHON) -m webbrowser -t http://localhost:8000/docs
 	@echo "Demo API is running at: http://localhost:8000/docs"
 
@@ -232,7 +302,9 @@ demo-api: db-up migrate seed fit-degradation-demo
 ## Opens the React dashboard and leaves Swagger available at :8000/docs.
 demo: db-up migrate seed fit-degradation-demo
 	docker compose up -d backend frontend
-	$(MAKE) api-wait
+	@echo "Waiting for API to be ready..."
+	@until curl -fsS http://localhost:8000/health >/dev/null 2>&1; do sleep 1; done
+	@echo "API is ready."
 	$(PYTHON) -m webbrowser -t http://localhost:5173
 	@echo "Demo frontend is running at: http://localhost:5173"
 	@echo "Swagger is available at: http://localhost:8000/docs"
