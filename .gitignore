@@ -68,6 +68,12 @@ reports/figures/
 reports/ml/
 
 data/ml/
+# data/causal/ is gitignored by default because the parquet files are large
+# and regenerable via `make build-causal-dataset`.
+# The causal dataset files on main/causal2 were force-committed with `git add -f`
+# during the causal model development sprint. After a fresh clone, run:
+#   make db-up && make ingest-demo && make build-causal-dataset
+# to regenerate them. See docs/causal_model_performance.md for details.
 data/causal/
 
 # Modelos serializados grandes (regenerables)
