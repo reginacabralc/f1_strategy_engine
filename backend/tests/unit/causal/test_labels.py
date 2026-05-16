@@ -127,12 +127,14 @@ def test_traffic_penalty_reduces_projected_gain() -> None:
     )
 
     rows = [
-        {"circuit_id": "bahrain", "compound": "SOFT",   "a": 94_000.0, "b": 50.0, "c": 1.0, "r_squared": 0.5},
-        {"circuit_id": "bahrain", "compound": "MEDIUM",  "a": 94_500.0, "b": 30.0, "c": 0.5, "r_squared": 0.5},
+        {"circuit_id": "bahrain", "compound": "SOFT",
+         "a": 94_000.0, "b": 50.0, "c": 1.0, "r_squared": 0.5},
+        {"circuit_id": "bahrain", "compound": "MEDIUM",
+         "a": 94_500.0, "b": 30.0, "c": 0.5, "r_squared": 0.5},
     ]
     lookup = build_degradation_lookup(rows)
 
-    def _make(traffic: str | None) -> object:
+    def _make(traffic: str | None) -> ViabilityInputs:
         return ViabilityInputs(
             circuit_id="bahrain",
             attacker_compound="SOFT",
@@ -150,6 +152,11 @@ def test_traffic_penalty_reduces_projected_gain() -> None:
     label_high = compute_undercut_viability_label(_make("high"), lookup)
     label_med  = compute_undercut_viability_label(_make("medium"), lookup)
 
+    assert label_low.projected_gain_if_pit_now_ms is not None
+    assert label_high.projected_gain_if_pit_now_ms is not None
+    assert label_med.projected_gain_if_pit_now_ms is not None
+    assert label_high.projected_gap_after_pit_ms is not None
+    assert label_high.required_gain_to_clear_rival_ms is not None
     assert label_high.projected_gain_if_pit_now_ms == (
         label_low.projected_gain_if_pit_now_ms - TRAFFIC_PENALTY_HIGH_MS
     )

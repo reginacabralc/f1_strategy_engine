@@ -357,7 +357,7 @@ def _scenario_from_metrics(
     )
 
 
-# Adaptive confidence thresholds calibrated for demo-race R² range (0.05–0.36).
+# Adaptive confidence thresholds calibrated for demo-race R² range (0.05-0.36).
 # "strong": R² ≥ 0.35 — fit explains ≥35% of variance, acceptable for advisory.
 # "weak":   R² ≥ 0.15 — directionally useful, explicit caveat recommended.
 # Below 0.15 is effectively noise on small F1 datasets.
