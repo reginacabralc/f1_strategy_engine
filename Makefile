@@ -18,6 +18,7 @@ PNPM ?= $(shell if command -v pnpm >/dev/null 2>&1; then echo pnpm; elif command
         compare-causal-engines prepare-causal-extended-data \
         replay test test-backend test-frontend test-e2e test-e2e-install \
         lint lint-backend lint-frontend \
+        pre-commit \
         demo demo-api serve-api api-wait
 
 install: .venv/.installed
@@ -196,6 +197,9 @@ lint-frontend:
 	else \
 		$(PNPM) install --frozen-lockfile && $(PNPM) lint; \
 	fi
+
+pre-commit: install
+	$(PYTHON) -m pre_commit run --all-files
 
 serve-api: install
 	PYTHONPATH=backend/src $(PYTHON) -m uvicorn pitwall.api.main:app --reload --port 8000

@@ -40,6 +40,8 @@ make demo
 
 PostgreSQL se publica en `localhost:5433` para no chocar con instalaciones locales que suelen usar `5432`. Dentro de Docker los servicios siguen usando `db:5432`.
 
+Última validación Stream D Day 9: clon limpio + volumen DB fresco en 481.10s con descargas FastF1 frías; el primer arranque necesita internet y los siguientes suelen aprovechar cache.
+
 Para probar la API manualmente:
 
 ```bash

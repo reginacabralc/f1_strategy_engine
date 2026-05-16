@@ -51,6 +51,11 @@ Esto:
 PostgreSQL se publica en `localhost:5433` para evitar conflictos con un
 Postgres local en `5432`; dentro de Docker sigue siendo `db:5432`.
 
+Tiempo esperado: una validación Stream D Day 9 desde clon limpio y volumen DB
+fresco tardó 481.10s con descargas FastF1 frías para Bahrain, Monaco y Hungary
+2024. Reintentos posteriores suelen ser más rápidos por cache de FastF1 y
+layers Docker.
+
 ## 4. Verificar la API
 
 Servicios disponibles:

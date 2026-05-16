@@ -18,7 +18,7 @@
 | **XGBoost entrenado y serializado** | ✅ | Día 8 | Stream A — native Booster trained, serialized, and validated; weak 3-race holdout metrics documented |
 | **XGBoost temporal multi-season preparado** | ✅ | Día 8.5 | Stream A — manifest 2024/2025, temporal CV, tuning, plots, ADR 0011; full ingestion run pending |
 | **Backtest comparativo scipy vs XGBoost** | ⏳ | Día 9 | Stream A+B |
-| Demo end-to-end probada en limpio | ⏳ | Día 10 | Todos |
+| Demo end-to-end probada en limpio | ✅ | Día 9 | Stream D — clean clone + fresh DB volume validated in 481.10s |
 
 ### Fix — demo API localhost
 - [x] Stream B/D: `make demo` now starts the Docker backend, waits for
@@ -64,8 +64,18 @@
       CI and local commands (`make test-e2e-install`, `make test-e2e`), Day 6
       contribution hygiene files exist (`.pre-commit-config.yaml`, issue
       templates, PR template), `.env.example` documents host-vs-Docker DB URLs,
-      and ADR numbering/status drift was corrected (`0010` DoWhy, `0011`
-      temporal XGBoost validation).
+      `make pre-commit` runs the local hooks from `.venv`, and ADR
+      numbering/status drift was corrected (`0010` DoWhy, `0011` temporal
+      XGBoost validation).
+- [x] Stream D Day 9 completion: `make demo` passed from a clean clone at
+      `/private/tmp/pitwall-day9-clean-20260515194802` with a fresh Compose DB
+      volume and cold FastF1 downloads for the three demo races. Command:
+      `cp .env.example .env && /usr/bin/time -p make demo`; result:
+      `real 481.10`, `user 29.32`, `sys 6.11`. Post-demo checks passed for
+      `/health`, `/ready`, `/api/v1/sessions`, the Vite frontend, Docker
+      health, and `scripts/ws_demo_client.py` streaming live replay snapshots.
+      Docker layer cache was not manually pruned, so this is a clean clone/DB
+      timing pass rather than a fully no-cache image benchmark.
 
 ## Semana 1
 
@@ -466,7 +476,10 @@
   Backtest endpoint returns 404 until Stream A populates curated list (E9-E10).
   **265 tests (231 unit + 34 contract), ruff clean, mypy clean (89 files).**
 - [ ] Stream C: backtest view en UI.
-- [ ] Stream D: `make demo` end-to-end probado en máquina limpia.
+- [x] Stream D: `make demo` end-to-end probado en clon limpio con volumen DB
+      fresco. Measured 481.10s for migrate + FastF1 demo ingest + degradation
+      fit + Docker backend/frontend startup; no DB dump was added because the
+      source-of-truth bootstrap path met the <10 min target.
 
 ### Día 10 — Entrega
 - [ ] Stream A: quanta `06-curva-fit-vs-xgboost.md` escrita con números reales.
