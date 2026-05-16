@@ -43,6 +43,10 @@ class TestPaceContext:
         assert ctx.lap_in_stint is None
         assert ctx.laps_remaining is None
         assert ctx.total_laps is None
+        assert ctx.lap_number is None
+        assert ctx.position is None
+        assert ctx.gap_to_ahead_ms is None
+        assert ctx.reference_lap_time_ms is None
 
     def test_all_optional_fields_accepted(self) -> None:
         ctx = PaceContext(
@@ -58,10 +62,26 @@ class TestPaceContext:
             lap_in_stint=10,
             laps_remaining=55,
             total_laps=78,
+            lap_number=23,
+            lap_in_stint_ratio=0.5,
+            race_progress=23 / 78,
+            fuel_proxy=1 - (23 / 78),
+            position=1,
+            gap_to_ahead_ms=1200,
+            gap_to_leader_ms=0,
+            is_in_traffic=True,
+            dirty_air_proxy_ms=800,
+            reference_lap_time_ms=79_500,
+            driver_pace_offset_ms=-120.5,
+            driver_pace_offset_missing=False,
         )
         assert ctx.team_code == "RBR"
         assert ctx.track_temp_c == pytest.approx(38.2)
         assert ctx.humidity_pct == pytest.approx(62.0)
+        assert ctx.lap_number == 23
+        assert ctx.position == 1
+        assert ctx.reference_lap_time_ms == 79_500
+        assert ctx.driver_pace_offset_missing is False
 
     def test_rejects_empty_driver_code(self) -> None:
         with pytest.raises(ValueError, match="driver_code"):
@@ -138,6 +158,36 @@ class TestPaceContext:
                 compound="MEDIUM",
                 tyre_age=10,
                 laps_remaining=-1,
+            )
+
+    def test_rejects_negative_lap_number(self) -> None:
+        with pytest.raises(ValueError, match="lap_number must be >= 0"):
+            PaceContext(
+                driver_code="VER",
+                circuit_id="monaco",
+                compound="MEDIUM",
+                tyre_age=10,
+                lap_number=-1,
+            )
+
+    def test_rejects_invalid_position(self) -> None:
+        with pytest.raises(ValueError, match="position must be >= 1"):
+            PaceContext(
+                driver_code="VER",
+                circuit_id="monaco",
+                compound="MEDIUM",
+                tyre_age=10,
+                position=0,
+            )
+
+    def test_rejects_negative_reference_lap_time(self) -> None:
+        with pytest.raises(ValueError, match="reference_lap_time_ms must be > 0"):
+            PaceContext(
+                driver_code="VER",
+                circuit_id="monaco",
+                compound="MEDIUM",
+                tyre_age=10,
+                reference_lap_time_ms=-1,
             )
 
     def test_rejects_humidity_below_zero(self) -> None:

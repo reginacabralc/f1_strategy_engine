@@ -2,19 +2,25 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from typing import Any, cast
+
 from pitwall.degradation.predictor import ScipyCoefficient, ScipyPredictor
+from pitwall.engine.projection import PaceContext, PacePrediction
 from pitwall.engine.state import DriverState, RaceState
 from pitwall.engine.undercut import (
     CONFIDENCE_THRESHOLD,
     SCORE_THRESHOLD,
     evaluate_undercut,
 )
+from pitwall.feeds.base import Event
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 _PIT_LOSS = 21_000
+_TS = datetime(2024, 5, 26, 13, 0, 0, tzinfo=UTC)
 
 
 def _pred(
@@ -61,6 +67,13 @@ def _attacker(gap_ms: int = 5_000, tyre_age: int = 23, position: int = 2) -> Dri
     )
 
 
+def _event(event_type: str, payload: dict[str, Any]) -> Event:
+    return cast(
+        Event,
+        {"type": event_type, "session_id": "monaco_2024_R", "ts": _TS, "payload": payload},
+    )
+
+
 # ---------------------------------------------------------------------------
 # Viable undercut scenario
 # ---------------------------------------------------------------------------
@@ -82,6 +95,108 @@ def test_evaluate_undercut_viable_with_high_degradation_defender() -> None:
     assert decision.confidence > CONFIDENCE_THRESHOLD
     assert decision.should_alert is True
     assert decision.estimated_gain_ms > 0
+
+
+def test_evaluate_undercut_passes_live_ml_context_and_references() -> None:
+    class _CapturingPredictor:
+        def __init__(self) -> None:
+            self.contexts: list[PaceContext] = []
+
+        def predict(self, ctx: PaceContext) -> PacePrediction:
+            self.contexts.append(ctx)
+            lap_ms = 90_000 if ctx.compound == "MEDIUM" else 72_000
+            return PacePrediction(predicted_lap_time_ms=lap_ms, confidence=0.9)
+
+        def is_available(self, circuit_id: str, compound: str) -> bool:
+            return True
+
+    state = RaceState()
+    state.apply(_event("session_start", {"circuit_id": "monaco", "total_laps": 78}))
+    state.apply(
+        _event(
+            "weather_update",
+            {"track_temp_c": 42.0, "air_temp_c": 28.0, "humidity_pct": 35.0},
+        )
+    )
+    state.apply(
+        _event(
+            "lap_complete",
+            {
+                "driver_code": "VER",
+                "lap_number": 12,
+                "position": 1,
+                "gap_to_leader_ms": 0,
+                "lap_time_ms": 80_000,
+                "compound": "MEDIUM",
+                "tyre_age": 25,
+                "is_valid": True,
+                "is_pit_in": False,
+                "is_pit_out": False,
+                "track_status": "GREEN",
+            },
+        )
+    )
+    state.drivers["VER"].laps_in_stint = 25
+    state.apply(
+        _event(
+            "lap_complete",
+            {
+                "driver_code": "HAM",
+                "lap_number": 12,
+                "position": 3,
+                "gap_to_ahead_ms": 5_000,
+                "lap_time_ms": 79_000,
+                "compound": "HARD",
+                "tyre_age": 8,
+                "is_valid": True,
+                "is_pit_in": False,
+                "is_pit_out": False,
+                "track_status": "GREEN",
+            },
+        )
+    )
+    state.drivers["HAM"].laps_in_stint = 8
+    state.apply(
+        _event(
+            "lap_complete",
+            {
+                "driver_code": "NOR",
+                "lap_number": 12,
+                "position": 2,
+                "gap_to_ahead_ms": 1_200,
+                "gap_to_leader_ms": 1_200,
+                "lap_time_ms": 81_000,
+                "compound": "MEDIUM",
+                "tyre_age": 23,
+                "is_valid": True,
+                "is_pit_in": False,
+                "is_pit_out": False,
+                "track_status": "GREEN",
+            },
+        )
+    )
+    state.drivers["NOR"].laps_in_stint = 23
+    predictor = _CapturingPredictor()
+
+    decision = evaluate_undercut(
+        state,
+        state.drivers["NOR"],
+        state.drivers["VER"],
+        predictor,
+        _PIT_LOSS,
+    )
+
+    assert decision.should_alert is True
+    assert predictor.contexts
+    assert all(ctx.lap_number is not None for ctx in predictor.contexts)
+    assert all(ctx.total_laps == 78 for ctx in predictor.contexts)
+    assert all(ctx.track_temp_c == 42.0 for ctx in predictor.contexts)
+    assert all(ctx.position in {1, 2} for ctx in predictor.contexts)
+    assert {ctx.compound: ctx.reference_lap_time_ms for ctx in predictor.contexts} == {
+        "MEDIUM": 80_500,
+        "HARD": 79_000,
+    }
+    assert any(ctx.is_in_traffic is True for ctx in predictor.contexts)
 
 
 # ---------------------------------------------------------------------------

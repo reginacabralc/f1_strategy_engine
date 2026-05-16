@@ -305,8 +305,8 @@ verified: events → state → undercut_score written per lap_complete.
   - `scipy` → always succeeds: reloads `ScipyPredictor` from DB (empty fallback if
     DB unreachable). Calls `engine_loop.set_predictor(predictor, "scipy")`.
   - `xgboost` → 409 when `models/xgb_pace_v1.json` is missing (run
-    `make train-xgb`). 409 from `ImportError` when model exists but
-    `pitwall.ml.predictor.XGBoostPredictor` is not yet implemented (Day 8-10).
+    `make train-xgb`). 409 from `ImportError` when the runtime lacks the
+    `xgboost` package.
   - Returns `SetPredictorResponse { active_predictor }`.
   - Unknown predictor name (not in `Literal["scipy", "xgboost"]`) → 422 from
     Pydantic validation (FastAPI standard).
@@ -358,11 +358,12 @@ verified: events → state → undercut_score written per lap_complete.
 - [x] **`XGBoostPredictor` loadable from `models/xgb_pace_v1.json`.**
   Created `backend/src/pitwall/ml/__init__.py` and `backend/src/pitwall/ml/predictor.py`.
   `XGBoostPredictor.from_file(path)` loads an `xgb.Booster` (native JSON format,
-  no sklearn dependency). `predict()` raises `UnsupportedContextError` until
-  Stream A wires the feature pipeline (E10). `is_available()` returns `False`
-  (engine handles gracefully as `INSUFFICIENT_DATA`). Satisfies `PacePredictor`
-  Protocol (isinstance check passes). Optional `.meta.json` sidecar loaded for
-  training metadata (MAE, feature list, training date).
+  no sklearn dependency). `predict()` is now metadata-driven: it preserves
+  `feature_schema.feature_names`, maps unseen categorical values to `UNKNOWN`,
+  uses XGBoost-native missing values for absent numeric live fields, and converts
+  `lap_time_delta_ms` to absolute lap time with a live-safe reference. Satisfies
+  `PacePredictor` Protocol (isinstance check passes). Optional `.meta.json`
+  sidecar loaded for training metadata.
   `POST /api/v1/config/predictor {"predictor": "xgboost"}` already wired in Day 7:
   checks model file existence → 409 if missing, otherwise loads and calls
   `engine_loop.set_predictor()`.
@@ -407,8 +408,9 @@ Rain/pit edge cases verified inline. XGBoostPredictor Protocol compliance verifi
   - `test_score_always_in_zero_one` (400 ex): score ∈ [0, 1] always.
   - `test_should_alert_iff_both_thresholds_exceeded` (500 ex): alert ↔ both thresholds.
 - [x] **`GET /api/v1/backtest/{session_id}`** (`getBacktestResult`, tag `backtest`).
-  Returns 404 until Stream A populates the curated undercut table (E9-E10).
-  Accepts optional `predictor: PredictorName | None` query param; unknown value → 422.
+  Runs replay-derived backtests for `predictor=scipy|xgboost` and returns
+  precision/recall/F1, lead time and MAE@k metrics. Returns 404 only when no
+  replay events are available for the requested session. Unknown predictor → 422.
   `BacktestResult` + `UndercutMatch` schemas added to `api/schemas.py`.
   Wired in `api/main.py` + added to `IMPLEMENTED` in contract test.
 
@@ -418,7 +420,7 @@ Rain/pit edge cases verified inline. XGBoostPredictor Protocol compliance verifi
 - `backend/src/pitwall/engine/undercut.py` — `_data_quality_factor`, `_FULL_QUALITY_LAPS`,
   `_TRAFFIC_GAP_MS`, `_TRAFFIC_CONFIDENCE_PENALTY` constants; confidence updated.
 - `backend/src/pitwall/engine/projection.py` — `cold_tyre_penalties` optional param.
-- `backend/src/pitwall/api/routes/backtest.py` — `getBacktestResult` 404 stub.
+- `backend/src/pitwall/api/routes/backtest.py` — real `getBacktestResult` runner.
 - `backend/src/pitwall/api/schemas.py` — `UndercutMatch`, `BacktestResult`.
 - `backend/src/pitwall/api/main.py` — `backtest_routes.router` included.
 - `backend/tests/contract/test_openapi_export.py` — backtest path added to `IMPLEMENTED`.
@@ -455,8 +457,8 @@ verified.
   - `test_predictor_switch_reflected_in_snapshots` — scipy → xgboost mid-session.
   - `test_set_predictor_name_reflected_on_get_snapshot` — get_snapshot() after switch.
   - `test_unsupported_predictor_does_not_crash_loop` — UnsupportedContextError is handled.
-  - `test_xgboost_stub_satisfies_protocol` — XGBoostPredictor isinstance(PacePredictor).
-  - `test_xgboost_stub_predict_raises_unsupported` — stub behavior verified.
+  - `test_xgboost_predictor_satisfies_protocol` — XGBoostPredictor isinstance(PacePredictor).
+  - `test_xgboost_predictor_without_feature_schema_raises_unsupported` — metadata guard verified.
   - `test_viable_undercut_alert_emitted_with_scipy` — ScipyPredictor end-to-end shape check.
   - `test_alert_payload_has_required_fields` — UNDERCUT_VIABLE alert field completeness.
   - `test_replay_start_broadcasts_replay_state` — HTTP + WS integration.
@@ -476,7 +478,7 @@ verified.
 #### Smoke run — Day 10
 
 **280 tests passing (246 unit + 34 contract), ruff clean, mypy clean (90 source files).**
-Full pipeline verified with ScipyPredictor and XGBoostPredictor stub end-to-end.
+Full pipeline verified with ScipyPredictor and XGBoostPredictor runtime contract end-to-end.
 `replay_state(started)` + `replay_state(stopped)` confirmed in WS stream.
 Snapshot on reconnect confirmed via `_MockEngineLoop` injection.
 

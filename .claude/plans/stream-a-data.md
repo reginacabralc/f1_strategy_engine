@@ -288,16 +288,16 @@ docs/adr/0009-xgboost-vs-scipy-resultados.md
     over zero-delta.
 
 ### Día 9 — Backtest comparativo (E9 + E10) ⭐
-- [ ] `backend/src/pitwall/engine/backtest.py` con métricas precision/recall/MAE@k.
-- [ ] Notebook `04_backtest_v1.ipynb` corriendo replay determinista para 5 sesiones hold-out.
-- [ ] Tabla comparativa: `B0 mediana | B1 scipy | B2 xgboost`.
+- [x] `backend/src/pitwall/engine/backtest.py` con métricas precision/recall/MAE@k.
+- [x] `make compare-predictors` genera replay determinista para las sesiones demo.
+- [x] Tabla comparativa `scipy | xgboost` en ADR 0009 y quanta 06.
 - [ ] Métricas segmentadas por compuesto y bucket de stint.
 
 ### Día 10 — Documentación final
-- [ ] Quanta `06-curva-fit-vs-xgboost.md` con números reales.
-- [ ] ADR `0009-xgboost-vs-scipy-resultados.md` cerrado con la decisión.
-- [ ] Default `PACE_PREDICTOR=` actualizado en `.env.example`.
-- [ ] README sección ML actualizada.
+- [x] Quanta `06-curva-fit-vs-xgboost.md` con números reales.
+- [x] ADR `0009-xgboost-vs-scipy-resultados.md` cerrado con la decisión.
+- [x] Default `PACE_PREDICTOR=` queda en `scipy` en `.env.example`.
+- [x] README sección ML actualizada.
 
 ## Definition of Done por tarea
 - Código + test unitario en mismo PR.

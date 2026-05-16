@@ -2,11 +2,10 @@
 
 ## Estado
 
-**Propuesto** — _queda abierto hasta Day 9 backtesting_
+**Aceptado** — 2026-05-16
 
-Nota 2026-05-13: Day 8 diagnostics showed the 3-race XGBoost model is
-engineering-complete but too weak to decide the runtime default. ADR 0011 now
-defines the required temporal validation path before this ADR can be closed.
+Nota 2026-05-16: el runtime XGBoost ya está integrado vía `PacePredictor` y
+el comparativo replay-backed se genera con `make compare-predictors`.
 
 ## Contexto
 
@@ -19,9 +18,7 @@ Ambos detrás de la interfaz `PacePredictor`, con switch en runtime. Este ADR do
 
 ## Decisión
 
-_(Se cierra después de la E10 con datos reales. Esqueleto de la decisión:)_
-
-**Default `PACE_PREDICTOR` =** _`scipy` | `xgb`_ — basado en métricas medibles.
+**Default `PACE_PREDICTOR` = `scipy`.**
 
 Criterio de elección:
 
@@ -29,54 +26,66 @@ Criterio de elección:
 - Si mejora marginalmente (< 5%) → default `scipy` (más simple).
 - Si empeora → default `scipy`, documentamos honestamente que con el dataset disponible XGBoost no generaliza.
 
-## Resultados
+Resultado observado: XGBoost mejoró MAE@k=3 medio de 1619 ms a 1482 ms
+(~8.5%), pero no alcanzó el umbral de 10%. Ambos predictores tuvieron F1=0.0
+en las tres sesiones demo porque no emitieron alertas que matchearan los
+undercuts exitosos derivados de replay. Se mantiene `scipy` como default
+operacional y XGBoost queda como entregable ML alternable/defendible.
 
-_(Se llenan al final del sprint.)_
+## Resultados
 
 ### Métricas
 
 | Métrica | Baseline scipy | XGBoost | Δ | Mejora? |
 |---------|---------------|---------|---|---------|
-| MAE@k=1 | _ms_ | _ms_ | _ms_ | _sí/no_ |
-| MAE@k=3 | _ms_ | _ms_ | _ms_ | _sí/no_ |
-| MAE@k=5 | _ms_ | _ms_ | _ms_ | _sí/no_ |
-| MAE en cliff (último 20% stint) | _ms_ | _ms_ | _ms_ | _sí/no_ |
-| Precision alertas | _0.X_ | _0.X_ | _Δ_ | _sí/no_ |
-| Recall alertas | _0.X_ | _0.X_ | _Δ_ | _sí/no_ |
-| Inferencia/par (ms) | _<1_ | _<5_ | _+Y_ | _aceptable/no_ |
+| MAE@k=1 | 1753 ms | 1407 ms | -346 ms | sí |
+| MAE@k=3 | 1619 ms | 1482 ms | -137 ms | mejora marginal, <10% |
+| MAE@k=5 | 1637 ms | 1563 ms | -74 ms | sí |
+| Precision alertas | 0.0 | 0.0 | 0.0 | no |
+| Recall alertas | 0.0 | 0.0 | 0.0 | no |
+| F1 alertas | 0.0 | 0.0 | 0.0 | no |
 
-### Por compuesto
+Fuente: `reports/ml/scipy_xgboost_backtest_report.json`, generado con
+`make compare-predictors` sobre Bahrain, Monaco y Hungary 2024 demo.
 
-_(Tabla por SOFT/MEDIUM/HARD)_
+### Por sesión
 
-### Por bucket de `lap_in_stint_ratio`
-
-_(Tabla por bucket 0-25%, 25-50%, 50-75%, 75-100%)_
+| Sesión | Predictor | MAE@k=1 | MAE@k=3 | MAE@k=5 | TP | FP | FN |
+|--------|-----------|---------|---------|---------|----|----|----|
+| bahrain_2024_R | scipy | 1887 | 1900 | 1956 | 0 | 0 | 13 |
+| bahrain_2024_R | xgboost | 1490 | 1510 | 1563 | 0 | 0 | 13 |
+| monaco_2024_R | scipy | 1789 | 1373 | 1356 | 0 | 0 | 2 |
+| monaco_2024_R | xgboost | 1369 | 1491 | 1633 | 0 | 0 | 2 |
+| hungary_2024_R | scipy | 1584 | 1584 | 1599 | 0 | 0 | 10 |
+| hungary_2024_R | xgboost | 1363 | 1445 | 1492 | 0 | 0 | 10 |
 
 ## Consecuencias
 
-_(Se llenan al cerrar.)_
-
 **Positivas:**
 
-- _e.g._ XGBoost captura mejor el cliff de degradación.
-- _e.g._ scipy es más predecible y rápido.
+- XGBoost ya no es stub: se puede alternar en runtime, evaluar por API y
+  reemplazar por un futuro `xgb_pace_v2.json` con el mismo contrato sidecar.
+- XGBoost reduce MAE de pace en promedio frente a scipy en las tres sesiones demo.
+- `scipy` se mantiene como default simple mientras se mejora la calidad de alerta.
 
 **Negativas:**
 
-- _e.g._ XGBoost tiene MAE peor en early-stint, posiblemente por overfitting.
-- _e.g._ regenerar el modelo es un paso extra cuando se cargan nuevas carreras.
+- La mejora XGBoost no alcanza el umbral de 10% en MAE@k=3.
+- Ningún predictor emite alertas que matcheen los undercuts exitosos derivados
+  del replay demo; el siguiente trabajo debe ajustar umbrales/contexto de alerta,
+  no solo entrenar otro modelo.
+- El runtime XGBoost depende de una referencia live-safe por sesión/compuesto;
+  si aún no existe, devuelve `INSUFFICIENT_DATA` en lugar de inventar lap times.
 
 ## Acciones derivadas
 
-- [ ] Default en `.env.example` actualizado.
-- [ ] README sección "ML" actualizada.
-- [ ] Quanta `06-curva-fit-vs-xgboost.md` con números reales.
-- [ ] Si hay caminos claros de mejora (más datos, tuning, otras features), documentar como issues post-MVP.
+- [x] Default en `.env.example` permanece `scipy`.
+- [x] Quanta `06-curva-fit-vs-xgboost.md` con números reales.
+- [x] Si hay caminos claros de mejora (más datos, tuning, otras features), documentar como issues post-MVP.
 
 ## Referencias
 
 - [ADR 0004](0004-baseline-scipy-antes-de-xgboost.md) — la decisión que dio origen al experimento.
 - [ADR 0011](0011-temporal-expanding-xgboost-validation.md) — validación temporal sin leakage.
 - [`docs/quanta/06-curva-fit-vs-xgboost.md`](../quanta/06-curva-fit-vs-xgboost.md)
-- [`notebooks/04_backtest_v1.ipynb`](../../notebooks/04_backtest_v1.ipynb) — fuente de los números.
+- `reports/ml/scipy_xgboost_backtest_report.json` — fuente local de los números.

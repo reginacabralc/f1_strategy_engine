@@ -63,9 +63,22 @@ class PaceContext:
     air_temp_c: float | None = None
     humidity_pct: float | None = None  # FastF1 reports humidity as 0..100
     stint_position: int | None = None  # 1 = first stint, 2 = second, ...
+    stint_number: int | None = None
     lap_in_stint: int | None = None  # tyre_age within the current stint
+    lap_in_stint_ratio: float | None = None
     laps_remaining: int | None = None
     total_laps: int | None = None
+    lap_number: int | None = None
+    race_progress: float | None = None
+    fuel_proxy: float | None = None
+    position: int | None = None
+    gap_to_ahead_ms: int | None = None
+    gap_to_leader_ms: int | None = None
+    is_in_traffic: bool | None = None
+    dirty_air_proxy_ms: int | None = None
+    reference_lap_time_ms: float | None = None
+    driver_pace_offset_ms: float | None = None
+    driver_pace_offset_missing: bool | None = None
 
     def __post_init__(self) -> None:
         if not self.driver_code:
@@ -78,12 +91,37 @@ class PaceContext:
             raise ValueError(f"lap_in_stint must be >= 0, got {self.lap_in_stint}")
         if self.stint_position is not None and self.stint_position < 1:
             raise ValueError(f"stint_position must be >= 1, got {self.stint_position}")
+        if self.stint_number is not None and self.stint_number < 1:
+            raise ValueError(f"stint_number must be >= 1, got {self.stint_number}")
         if self.total_laps is not None and self.total_laps <= 0:
             raise ValueError(f"total_laps must be > 0, got {self.total_laps}")
         if self.laps_remaining is not None and self.laps_remaining < 0:
             raise ValueError(f"laps_remaining must be >= 0, got {self.laps_remaining}")
         if self.humidity_pct is not None and not 0.0 <= self.humidity_pct <= 100.0:
             raise ValueError(f"humidity_pct must be in [0, 100], got {self.humidity_pct}")
+        if self.lap_number is not None and self.lap_number < 0:
+            raise ValueError(f"lap_number must be >= 0, got {self.lap_number}")
+        if self.position is not None and self.position < 1:
+            raise ValueError(f"position must be >= 1, got {self.position}")
+        if self.gap_to_ahead_ms is not None and self.gap_to_ahead_ms < 0:
+            raise ValueError(f"gap_to_ahead_ms must be >= 0, got {self.gap_to_ahead_ms}")
+        if self.gap_to_leader_ms is not None and self.gap_to_leader_ms < 0:
+            raise ValueError(f"gap_to_leader_ms must be >= 0, got {self.gap_to_leader_ms}")
+        if self.dirty_air_proxy_ms is not None and self.dirty_air_proxy_ms < 0:
+            raise ValueError(
+                f"dirty_air_proxy_ms must be >= 0, got {self.dirty_air_proxy_ms}"
+            )
+        if self.reference_lap_time_ms is not None and self.reference_lap_time_ms <= 0:
+            raise ValueError(
+                f"reference_lap_time_ms must be > 0, got {self.reference_lap_time_ms}"
+            )
+        for name, value in (
+            ("lap_in_stint_ratio", self.lap_in_stint_ratio),
+            ("race_progress", self.race_progress),
+            ("fuel_proxy", self.fuel_proxy),
+        ):
+            if value is not None and not 0.0 <= value <= 1.0:
+                raise ValueError(f"{name} must be in [0, 1], got {value}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,6 +216,27 @@ def project_pace(
     *,
     apply_cold_tyre_penalty: bool = False,
     cold_tyre_penalties: tuple[int, ...] | None = None,
+    team_code: str | None = None,
+    track_temp_c: float | None = None,
+    air_temp_c: float | None = None,
+    humidity_pct: float | None = None,
+    stint_position: int | None = None,
+    stint_number: int | None = None,
+    lap_in_stint: int | None = None,
+    lap_in_stint_ratio: float | None = None,
+    laps_remaining: int | None = None,
+    total_laps: int | None = None,
+    lap_number: int | None = None,
+    race_progress: float | None = None,
+    fuel_proxy: float | None = None,
+    position: int | None = None,
+    gap_to_ahead_ms: int | None = None,
+    gap_to_leader_ms: int | None = None,
+    is_in_traffic: bool | None = None,
+    dirty_air_proxy_ms: int | None = None,
+    reference_lap_time_ms: float | None = None,
+    driver_pace_offset_ms: float | None = None,
+    driver_pace_offset_missing: bool | None = None,
 ) -> list[int]:
     """Project *k* lap times (ms) forward from tyre age *start_age*.
 
@@ -216,11 +275,37 @@ def project_pace(
     penalties = COLD_TYRE_PENALTIES_MS if cold_tyre_penalties is None else cold_tyre_penalties
     times: list[int] = []
     for j in range(1, k + 1):
+        projected_lap_number = lap_number + j if lap_number is not None else None
+        projected_lap_in_stint = lap_in_stint + j if lap_in_stint is not None else None
+        projected_laps_remaining = (
+            max(0, laps_remaining - j) if laps_remaining is not None else None
+        )
         ctx = PaceContext(
             driver_code=driver_code,
             circuit_id=circuit_id,
             compound=cast(Compound, compound),
             tyre_age=start_age + j,
+            team_code=team_code,
+            track_temp_c=track_temp_c,
+            air_temp_c=air_temp_c,
+            humidity_pct=humidity_pct,
+            stint_position=stint_position,
+            stint_number=stint_number,
+            lap_in_stint=projected_lap_in_stint,
+            lap_in_stint_ratio=lap_in_stint_ratio,
+            laps_remaining=projected_laps_remaining,
+            total_laps=total_laps,
+            lap_number=projected_lap_number,
+            race_progress=race_progress,
+            fuel_proxy=fuel_proxy,
+            position=position,
+            gap_to_ahead_ms=gap_to_ahead_ms,
+            gap_to_leader_ms=gap_to_leader_ms,
+            is_in_traffic=is_in_traffic,
+            dirty_air_proxy_ms=dirty_air_proxy_ms,
+            reference_lap_time_ms=reference_lap_time_ms,
+            driver_pace_offset_ms=driver_pace_offset_ms,
+            driver_pace_offset_missing=driver_pace_offset_missing,
         )
         lap_ms = predictor.predict(ctx).predicted_lap_time_ms
         if apply_cold_tyre_penalty:

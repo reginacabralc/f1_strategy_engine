@@ -82,9 +82,9 @@ async def set_active_predictor(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
-                    "XGBoostPredictor is not yet implemented "
-                    "(Stream A Day 8-10). Model file exists but the predictor "
-                    "class is not available."
+                    "XGBoost dependency is not installed in this runtime. "
+                    "The model file exists, but the predictor cannot load "
+                    "without the xgboost package."
                 ),
             ) from exc
     else:

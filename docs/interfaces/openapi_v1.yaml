@@ -375,7 +375,7 @@ paths:
     get:
       tags: [backtest]
       operationId: getBacktestResult
-      summary: Engine alerts vs known undercuts for a session
+      summary: Engine alerts vs replay-derived undercuts for a session
       parameters:
         - $ref: "#/components/parameters/SessionId"
         - in: query
@@ -393,7 +393,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/BacktestResult" }
         "404":
-          description: Session not found, or no curated known-undercut list yet.
+          description: Session not found, or replay events are unavailable.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Problem" }

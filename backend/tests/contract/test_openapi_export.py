@@ -2,13 +2,9 @@
 spec in ``docs/interfaces/openapi_v1.yaml`` for every path the backend
 implements.
 
-Day 2 implements three paths: ``/health``, ``/ready``, and
-``/api/v1/sessions``. The static spec also describes the Day-3+ paths
-(``/api/v1/replay/start``, ``/api/v1/replay/stop``,
-``/api/v1/sessions/{session_id}/snapshot``,
-``/api/v1/degradation``, ``/api/v1/backtest/{session_id}``,
-``/api/v1/config/predictor``); those are not yet implemented and are
-explicitly tolerated by this test.
+The static spec may describe paths before they are wired into FastAPI; those
+planned-but-unimplemented paths are tolerated by this test until they are added
+to ``IMPLEMENTED`` below.
 
 What we *do* enforce:
 

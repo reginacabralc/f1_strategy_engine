@@ -143,22 +143,31 @@ backtesting de estrategia.
 
 | Métrica | scipy | XGBoost | Δ |
 |---------|-------|---------|---|
-| MAE@k=3 (ms) | _TBD_ | _TBD_ | _TBD_ |
-| MAE en cliff (ms) | _TBD_ | _TBD_ | _TBD_ |
-| Precision alertas | _TBD_ | _TBD_ | _TBD_ |
-| Recall alertas | _TBD_ | _TBD_ | _TBD_ |
+| MAE@k=1 medio (ms) | 1753 | 1407 | -346 |
+| MAE@k=3 medio (ms) | 1619 | 1482 | -137 |
+| MAE@k=5 medio (ms) | 1637 | 1563 | -74 |
+| Precision alertas | 0.0 | 0.0 | 0.0 |
+| Recall alertas | 0.0 | 0.0 | 0.0 |
+| F1 alertas | 0.0 | 0.0 | 0.0 |
+
+El reporte se genera con `make compare-predictors` y queda en
+`reports/ml/scipy_xgboost_backtest_report.json`. XGBoost mejora el error de
+pace, pero la mejora de MAE@k=3 (~8.5%) no supera el umbral de 10% definido en
+ADR 0009. Por eso el default operativo queda en `scipy`, aunque `xgboost` ya
+es un predictor runtime real y alternable.
 
 ## Cuándo usar cuál
 
 Recomendaciones (post-experimento):
 
-- **Demo "al profesor"**: usa `xgb` para mostrar el componente de ML, pero
-  explica si el modelo fue entrenado solo con las tres demos o con el manifiesto completo.
+- **Demo "al profesor"**: usa `scipy` como default estable y alterna a `xgb`
+  para mostrar el componente de ML. Explica que XGBoost reduce MAE de pace,
+  pero no cruzó el umbral para ser default de estrategia.
 - **Debug de motor**: usa `scipy` (predicciones interpretables).
 - **Carreras con datos pobres**: scipy es más estable.
 - **Carreras con muchos datos recientes**: XGBoost ya pasó el gate temporal de
-  Day 8.2, pero debe confirmarse en backtesting Day 9 antes de hacerlo default
-  de calidad estratégica.
+  Day 8.2 y el backtest demo, pero sigue siendo alternativa hasta que mejore
+  calidad de alerta y supere el umbral de ADR 0009.
 
 ## Implementación
 

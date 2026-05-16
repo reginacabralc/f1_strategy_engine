@@ -85,13 +85,15 @@ Solución: en el training set, usamos `tyre_age` calculado online (acumulando la
 
 Además del backtest de la **predicción de pace** (MAE@k), evaluamos la **señal del motor**:
 
-1. Curamos lista de ~15 undercuts conocidos: `(session, attacker, defender, lap, was_successful)`.
-2. Replay determinista de cada sesión.
-3. Para cada alerta `UNDERCUT_VIABLE` que emite el motor, marcamos:
-   - **TP** si correspondió a un undercut real exitoso ≥ 1 vuelta antes.
-   - **FP** si no.
-4. Para cada undercut real conocido que NO fue alertado: **FN**.
-5. Reportamos precision, recall, F1, lead time medio.
+1. Derivamos undercuts exitosos desde replay: un atacante entra a pits detrás
+   de un defensor y termina delante después del intercambio.
+2. Ignoramos pit stops de vuelta 1 y paradas que no invierten posición.
+3. Replay determinista de cada sesión con `ScipyPredictor` y `XGBoostPredictor`.
+4. Para cada alerta `UNDERCUT_VIABLE`:
+   - **TP** si matchea atacante/defensor y cae dentro de la ventana `K_MAX`.
+   - **FP** si no matchea ningún undercut exitoso.
+5. Para cada undercut exitoso no alertado: **FN**.
+6. Reportamos precision, recall, F1, lead time medio y MAE@k=1/3/5.
 
 ## Anti-pattern: "el modelo predice perfectamente Mónaco"
 
@@ -103,14 +105,16 @@ Si entrenamos con Mónaco 2023 y testeamos con Mónaco 2024, el modelo va a pred
 
 - Random seed fijado: `random_state=42`.
 - Versión exacta de xgboost en `pyproject.toml` con `==`.
-- `model_registry` guarda metadatos: features usadas, fecha de entrenamiento, métricas obtenidas, hash de los datos de train.
+- El sidecar `models/xgb_pace_v1.meta.json` guarda features usadas, fecha de
+  entrenamiento, métricas y política de leakage. El reporte comparativo queda
+  en `reports/ml/scipy_xgboost_backtest_report.json`.
 
 ## Implementación
 
-- Split LORO: [`backend/src/pitwall/ml/dataset.py`](../../backend/src/pitwall/ml/dataset.py)
-- Features (sin leakage): [`backend/src/pitwall/ml/features.py`](../../backend/src/pitwall/ml/features.py)
+- Dataset y features sin leakage: [`backend/src/pitwall/ml/dataset.py`](../../backend/src/pitwall/ml/dataset.py)
+- Runtime XGBoost: [`backend/src/pitwall/ml/predictor.py`](../../backend/src/pitwall/ml/predictor.py)
 - Backtest motor: [`backend/src/pitwall/engine/backtest.py`](../../backend/src/pitwall/engine/backtest.py)
-- Notebook: [`notebooks/04_backtest_v1.ipynb`](../../notebooks/04_backtest_v1.ipynb)
+- Script de comparación: [`scripts/compare_predictors.py`](../../scripts/compare_predictors.py)
 
 ## Quanta relacionadas
 

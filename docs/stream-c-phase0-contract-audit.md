@@ -57,7 +57,7 @@ Valid compounds: `SOFT`, `MEDIUM`, `HARD`, `INTER`, `WET`.
 
 | Method | Path | Operation ID | Status | Notes |
 |--------|------|--------------|--------|-------|
-| `GET` | `/api/v1/backtest/{session_id}?predictor=` | `getBacktestResult` | ⛔ always 404 | Route is wired but implementation is a `raise HTTPException(404)` stub. Blocked on Stream A (E9–E10) populating the curated known-undercut table. |
+| `GET` | `/api/v1/backtest/{session_id}?predictor=` | `getBacktestResult` | ✅ live | Returns replay-derived Scipy/XGBoost comparison metrics when session events exist; 404 only when replay events are unavailable. |
 
 ### Causal (Stream D addition)
 
@@ -168,8 +168,8 @@ The frontend `AlertPayload` interface in [api/ws.ts](../frontend/src/api/ws.ts) 
 ### BacktestView — [components/BacktestView.tsx](../frontend/src/components/BacktestView.tsx)
 
 - **No mock data** — calls `GET /api/v1/backtest/{session_id}` via `useBacktest`.
-- Backend returns 404 (stub). Frontend shows "No curated backtest data for this session yet." — correct placeholder behaviour.
-- **Phase 1 action**: None needed. Will work automatically once Stream A populates the backtest table.
+- Backend now returns real replay-derived comparison data when events exist.
+- **Phase 1 action**: Keep unavailable state for sessions without replay events.
 
 ### PredictorToggle — [components/PredictorToggle.tsx](../frontend/src/components/PredictorToggle.tsx)
 

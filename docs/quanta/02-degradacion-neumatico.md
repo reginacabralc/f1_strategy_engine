@@ -30,7 +30,8 @@ Persistido en tabla `degradation_coefficients` con R² del ajuste y `n_samples`.
 
 ### V1 ML (`XGBoostPredictor`)
 
-XGBoost predice `delta_to_reference = lap_time - p20_of(compound, circuit)` con features:
+XGBoost predice `lap_time_delta_ms = lap_time - median(prior clean dry laps in session+compound)`
+con features:
 
 - `tyre_age`, `compound_one_hot`, `circuit_id_one_hot`
 - `track_temp`, `air_temp`, `humidity`

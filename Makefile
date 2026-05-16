@@ -12,7 +12,7 @@ PNPM ?= $(shell if command -v pnpm >/dev/null 2>&1; then echo pnpm; elif command
         build-xgb-dataset validate-xgb-dataset diagnose-xgb-shift \
         evaluate-xgb-baselines run-xgb-ablations \
         tune-xgb train-xgb validate-xgb-model \
-        plot-xgb-diagnostics \
+        plot-xgb-diagnostics compare-predictors \
         audit-causal-inputs reconstruct-race-gaps derive-known-undercuts \
         import-curated-known-undercuts build-causal-dataset run-causal-dowhy \
         compare-causal-engines prepare-causal-extended-data \
@@ -158,6 +158,9 @@ tune-xgb: install
 
 plot-xgb-diagnostics: install
 	PYTHONPATH=backend/src $(PYTHON) scripts/plot_xgb_diagnostics.py
+
+compare-predictors: install db-wait
+	PYTHONPATH=backend/src $(PYTHON) scripts/compare_predictors.py
 
 test: test-backend test-frontend
 

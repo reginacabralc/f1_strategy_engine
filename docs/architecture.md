@@ -154,7 +154,7 @@ class RaceState:
 | Polars vs pandas | [ADR 0006](adr/0006-polars-vs-pandas.md) | Polars por velocidad y API declarativa |
 | Asyncio sin broker | [ADR 0007](adr/0007-asyncio-sin-broker.md) | `asyncio.Queue` in-process suficiente |
 | OpenAPI como fuente de verdad | [ADR 0008](adr/0008-openapi-como-fuente-verdad.md) | Generado por FastAPI; cliente TS lo consume |
-| Resultado XGBoost vs scipy | [ADR 0009](adr/0009-xgboost-vs-scipy-resultados.md) | Por escribir tras E10 |
+| Resultado XGBoost vs scipy | [ADR 0009](adr/0009-xgboost-vs-scipy-resultados.md) | Cerrado: default scipy, XGBoost alternable |
 | DoWhy para causal undercut | [ADR 0010](adr/0010-dowhy-for-causal-undercut.md) | Causal offline/refuters sin reemplazar XGBoost |
 | Validación temporal XGBoost | [ADR 0011](adr/0011-temporal-expanding-xgboost-validation.md) | 2024/2025 + expanding-window CV para evitar leakage |
 

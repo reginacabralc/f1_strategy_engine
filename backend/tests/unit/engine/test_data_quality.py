@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pitwall.api.dependencies import get_event_loader
 from pitwall.degradation.predictor import ScipyCoefficient, ScipyPredictor
 from pitwall.engine.calibration import calibrate_cold_tyre_penalties
 from pitwall.engine.projection import COLD_TYRE_PENALTIES_MS, project_pace
@@ -13,6 +14,7 @@ from pitwall.engine.undercut import (
     _data_quality_factor,
     evaluate_undercut,
 )
+from pitwall.feeds.base import Event
 
 # ---------------------------------------------------------------------------
 # data_quality_factor
@@ -267,24 +269,31 @@ def test_calibrate_then_apply_roundtrip() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_backtest_endpoint_returns_404_stub() -> None:
+class _EmptyEventLoader:
+    async def load_events(self, session_id: str) -> list[Event]:
+        return []
+
+
+def test_backtest_endpoint_returns_404_when_session_events_unavailable() -> None:
     from fastapi.testclient import TestClient
 
     from pitwall.api.main import create_app
 
     app = create_app()
+    app.dependency_overrides[get_event_loader] = lambda: _EmptyEventLoader()
     with TestClient(app) as client:
         r = client.get("/api/v1/backtest/monaco_2024_R")
     assert r.status_code == 404
     assert "monaco_2024_R" in r.json()["detail"]
 
 
-def test_backtest_endpoint_with_predictor_param_returns_404() -> None:
+def test_backtest_endpoint_predictor_param_returns_404_without_events() -> None:
     from fastapi.testclient import TestClient
 
     from pitwall.api.main import create_app
 
     app = create_app()
+    app.dependency_overrides[get_event_loader] = lambda: _EmptyEventLoader()
     with TestClient(app) as client:
         r = client.get("/api/v1/backtest/bahrain_2024_R?predictor=scipy")
     assert r.status_code == 404

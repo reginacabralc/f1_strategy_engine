@@ -16,6 +16,7 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
+from statistics import median
 from typing import Any
 
 from pitwall.feeds.base import Event
@@ -107,6 +108,12 @@ class RaceState:
 
     drivers: dict[str, DriverState] = field(default_factory=dict)
     last_event_ts: datetime | None = None
+    _reference_lap_times_by_compound: dict[str, list[int]] = field(
+        default_factory=dict,
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
     # ------------------------------------------------------------------
     # Public interface
@@ -138,6 +145,17 @@ class RaceState:
         elif event_type == "data_stale":
             self._apply_data_stale(payload)
         # Unknown event types are silently ignored.
+
+    def reference_lap_time_ms(self, compound: str) -> float | None:
+        """Median prior clean dry lap time for the session+compound.
+
+        XGBoost's selected target is a live-safe session-normalized delta:
+        ``lap_time_ms - median(prior clean dry laps in session+compound)``.
+        This helper exposes that reference to the engine without reading any
+        future laps.
+        """
+        values = self._reference_lap_times_by_compound.get(str(compound or "").upper(), [])
+        return float(median(values)) if values else None
 
     # ------------------------------------------------------------------
     # Per-type handlers (private)
@@ -208,6 +226,7 @@ class RaceState:
             self.track_status = str(ts)
         if (lap := payload.get("lap_number")) is not None:
             self.current_lap = max(self.current_lap, int(lap))
+        self._record_reference_lap(payload)
 
     def _apply_pit_in(self, payload: dict[str, Any]) -> None:
         code = str(payload.get("driver_code") or "")
@@ -255,6 +274,20 @@ class RaceState:
         d.data_stale = True
         if (lap := payload.get("stale_since_lap")) is not None:
             d.stale_since_lap = int(lap)
+
+    def _record_reference_lap(self, payload: dict[str, Any]) -> None:
+        compound = str(payload.get("compound") or "").upper()
+        if compound not in {"SOFT", "MEDIUM", "HARD"}:
+            return
+        if payload.get("is_valid", True) is False:
+            return
+        if bool(payload.get("is_pit_in", False)) or bool(payload.get("is_pit_out", False)):
+            return
+        if str(payload.get("track_status") or self.track_status or "GREEN").upper() != "GREEN":
+            return
+        if (lap_time := payload.get("lap_time_ms")) is None:
+            return
+        self._reference_lap_times_by_compound.setdefault(compound, []).append(int(lap_time))
 
 
 # ---------------------------------------------------------------------------
