@@ -1,0 +1,21 @@
+{
+  "dataset_version": "causal_driver_rival_lap_v1",
+  "feature_source": "driver-rival-lap consecutive race order pairs",
+  "gap_source": "reconstructed_fastf1_time",
+  "generated_at": "2026-05-16T04:45:27.525479+00:00",
+  "leakage_policy": [
+    "features use lap-t observations only",
+    "pit_now is treatment/outcome context, not a viability input",
+    "known_undercuts joins only into undercut_success outcome labels",
+    "XGBoost features, predictions, and importances are not used"
+  ],
+  "observed_success_rows": 77,
+  "pace_source": "causal_scipy",
+  "row_count": 22257,
+  "target_columns": [
+    "undercut_viable",
+    "undercut_success"
+  ],
+  "undercut_viable_rows": 1033,
+  "usable_row_count": 19750
+}

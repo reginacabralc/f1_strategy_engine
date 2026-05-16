@@ -16,6 +16,8 @@ NEXT_COMPOUND: dict[str, str] = {
 }
 DEFAULT_PROJECTION_LAPS = 5
 DEFAULT_SAFETY_MARGIN_MS = 500
+TRAFFIC_PENALTY_HIGH_MS: int = 3_000
+TRAFFIC_PENALTY_MEDIUM_MS: int = 1_500
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +46,7 @@ class ViabilityInputs:
     rainfall: bool | None
     attacker_laps_in_stint: int | None = None
     defender_laps_in_stint: int | None = None
+    traffic_after_pit: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,6 +146,8 @@ def compute_undercut_viability_label(
         for defender_ms, attacker_ms in zip(defender_laps, attacker_laps, strict=True)
     ]
     projected_gain_ms = sum(per_lap_advantages)
+    traffic_penalty = _traffic_penalty_ms(inputs.traffic_after_pit)
+    projected_gain_ms = projected_gain_ms - traffic_penalty
     fresh_tyre_advantage_ms = round(projected_gain_ms / projection_laps)
     required_gain_ms = inputs.gap_to_rival_ms + inputs.pit_loss_estimate_ms + safety_margin_ms
     projected_gap_after_pit_ms = required_gain_ms - projected_gain_ms
@@ -199,6 +204,21 @@ def _curve_for(
     return degradation_lookup.get((circuit_id, compound)) or degradation_lookup.get(
         ("__global__", compound)
     )
+
+
+def _traffic_penalty_ms(traffic_after_pit: str | None) -> int:
+    """Return ms to subtract from projected_gain for the given traffic level.
+
+    Dirty-air following costs ~1 s/lap for ~3 laps of out-lap exposure.
+    'high' = ≥2 cars within 3 s of projected pit exit.
+    'medium' = 1 car within 3 s.
+    'low'/'unknown'/None = no penalty.
+    """
+    if traffic_after_pit == "high":
+        return TRAFFIC_PENALTY_HIGH_MS
+    if traffic_after_pit == "medium":
+        return TRAFFIC_PENALTY_MEDIUM_MS
+    return 0
 
 
 def _unusable(reason: str) -> ViabilityLabel:
