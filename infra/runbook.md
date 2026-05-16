@@ -157,6 +157,22 @@ docker compose logs -f backend | grep -i "alert\|undercut\|engine"
 2. **`confidence` siempre < 0.5**: probablemente faltan coeficientes de degradación. `make fit-degradation`.
 3. **Track status SC/VSC todo el tiempo**: alertas se suspenden por diseño. Revisa eventos `track_status_change`.
 4. **Datos de la sesión ingerida con `is_valid=false` masivo**: revisa la ingesta.
+5. **`gap_to_ahead_ms` es NULL en los laps demo**: FastF1 no proporciona este campo
+   nativo. Sin el gap reconstruido, el motor descarta los pares por datos insuficientes
+   y nunca emite `UNDERCUT_VIABLE`.
+
+   **Solución:** corre `make reconstruct-race-gaps` con la DB activa y reinicia el
+   replay. Desde Phase 5B, `make demo` y `make demo-api` incluyen este paso
+   automáticamente; solo es necesario correrlo a mano si se ingirió una sesión
+   nueva directamente vía `make ingest`.
+
+   ```bash
+   make reconstruct-race-gaps
+   # Verifica cobertura
+   docker compose exec -T db psql -U pitwall -d pitwall -c \
+     "SELECT session_id, COUNT(*) total, COUNT(gap_to_ahead_ms) with_gap \
+      FROM laps GROUP BY session_id;"
+   ```
 
 ---
 
