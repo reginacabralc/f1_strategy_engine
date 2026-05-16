@@ -576,6 +576,24 @@
 - [ ] Stream D: changelog v0.1.0, video demo enlazado.
 - [ ] **Tag `v0.1.0` y release notes.**
 
+### Phase 5C — Live Alert Verification (branch: phase5c-live-alert-verification)
+- [x] `make lint` → ruff + mypy + eslint clean.
+- [x] `make test` → 383 backend + 87 frontend tests pass.
+- [x] Phase 5B wiring confirmed: `make demo` runs `reconstruct-race-gaps` after seed.
+- [x] In-process engine verification via `scripts/verify_alerts_phase5c.py`:
+      - Monaco 2024: 17,415 pairs evaluated, 16,717 UNDERCUT_VIABLE decisions, **0 alerts fired**.
+      - Bahrain 2024: 18,900 INSUFFICIENT_DATA (no MEDIUM coefficient), 0 viable.
+      - Hungary 2024: 21,124 UNDERCUT_VIABLE decisions, **0 alerts fired**.
+- [x] WebSocket/AlertPanel path verified correct by code review (emission, normalizeAlertPayload, rendering).
+- [x] Blockers classified precisely:
+      1. **Score = 0** (Monaco/Hungary): low degradation → `gap_recuperable ≤ 0` under green flag.
+         Monaco is VSC-driven; green-flag undercuts are genuinely unviable (engine correct).
+      2. **Confidence < 0.5** (all sessions): max R²=0.362 (Monaco MEDIUM), threshold=0.5 unreachable.
+      3. **Bahrain INSUFFICIENT_DATA**: `_NEXT_COMPOUND` maps to MEDIUM, no Bahrain MEDIUM coefficient.
+- [x] Validation doc: `docs/stream-c-phase5c-live-alert-verification.md`.
+- [ ] Alerts do not yet fire — remaining fixes before panel-by-panel design:
+      lower `CONFIDENCE_THRESHOLD` to 0.25–0.30, or use a session with real green-flag degradation.
+
 ### Phase 5B — Demo Gap Reconstruction Fix (branch: phase5b-demo-gap-reconstruction)
 - [x] Root cause confirmed: `gap_to_ahead_ms` NULL for all Monaco 2024 lap rows because
       FastF1 does not provide this field natively and `reconstruct-race-gaps` was not wired

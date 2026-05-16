@@ -176,5 +176,5 @@ def test_estimate_stratified_effects_skips_small_circuits() -> None:
     ]
     results = estimate_stratified_effects(tiny_data, specs)
     assert len(results) == 1
-        _spec, estimate = results[0]
+    _spec, estimate = results[0]
     assert estimate is None  # < 200 rows → skipped
