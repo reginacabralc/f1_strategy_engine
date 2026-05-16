@@ -45,6 +45,10 @@ services:
       LOG_LEVEL: INFO
       PACE_PREDICTOR: scipy
       XGB_MODEL_PATH: models/xgb_pace_v1.json
+      # scripted_alerts.json is baked into the image at build time; the env
+      # var lets local-dev runs override the path. /app/backend/data/demo/
+      # is the in-image location set by docker/backend.Dockerfile.
+      SCRIPTED_ALERTS_PATH: /app/data/demo/scripted_alerts.json
     volumes:
       - ./models:/app/backend/models:ro
     healthcheck:

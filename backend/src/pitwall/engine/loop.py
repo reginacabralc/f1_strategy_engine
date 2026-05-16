@@ -29,7 +29,17 @@ import logging
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
+from pitwall.causal.live_inference import evaluate_causal_live
 from pitwall.core.topics import Topics
+import pitwall.engine.demo_mode as _demo_mode_mod
+from pitwall.engine.demo_mode import (
+    RELAXED_CONFIDENCE_THRESHOLD,
+    RELAXED_SCORE_THRESHOLD,
+    ScriptedAlert,
+    build_causal_alert_payload,
+    build_scripted_alert_payload,
+    load_scripted_alerts,
+)
 from pitwall.engine.pit_loss import PitLossTable, lookup_pit_loss
 from pitwall.engine.projection import PacePredictor
 from pitwall.engine.state import DriverState, RaceState, compute_relevant_pairs
@@ -77,6 +87,9 @@ class EngineLoop:
         self._state = RaceState()
         self._task: asyncio.Task[None] | None = None
         self._last_snapshot_lap: int | None = None
+        self._demo_mode: bool = False
+        self._scripted_alerts: dict[str, list[ScriptedAlert]] = {}
+        self._emitted_scripted_keys: set[str] = set()  # prevents duplicate emissions per (session, lap, atk, def)
 
     # ------------------------------------------------------------------
     # Public interface
@@ -95,6 +108,24 @@ class EngineLoop:
     def set_pit_loss_table(self, pit_loss_table: PitLossTable) -> None:
         """Swap the active pit-loss lookup table at runtime."""
         self._pit_loss_table = pit_loss_table
+
+    def set_demo_mode(self, active: bool) -> None:
+        """Toggle class-demo behaviour.
+
+        When active, the engine uses relaxed alert thresholds and emits curated
+        scripted alerts from data/demo/scripted_alerts.json. Has no effect on
+        production behaviour when False (the default).
+        """
+        self._demo_mode = bool(active)
+        if self._demo_mode and not self._scripted_alerts:
+            self._scripted_alerts = load_scripted_alerts(_demo_mode_mod.DEFAULT_SCRIPTED_ALERTS_PATH)
+        if not self._demo_mode:
+            self._emitted_scripted_keys.clear()
+        logger.info(
+            "engine demo_mode=%s scripted_sessions=%s",
+            self._demo_mode,
+            list(self._scripted_alerts.keys()),
+        )
 
     async def start(self) -> None:
         if self._task is None or self._task.done():
@@ -162,10 +193,65 @@ class EngineLoop:
                 decision = evaluate_undercut(self._state, atk, def_, self._predictor, pit_loss)
                 self._state.drivers[atk.driver_code].undercut_score = decision.score
 
-                if decision.should_alert:
+                should_alert = decision.should_alert
+                if self._demo_mode and not should_alert:
+                    # In demo mode, relax the production gate so models actually fire.
+                    relaxed = (
+                        decision.alert_type == "UNDERCUT_VIABLE"
+                        and decision.score > RELAXED_SCORE_THRESHOLD
+                        and decision.confidence > RELAXED_CONFIDENCE_THRESHOLD
+                    )
+                    if relaxed:
+                        should_alert = True
+                if should_alert:
                     await self._broadcaster.broadcast_json(
                         _alert_message(decision, self._state, self._predictor_name)
                     )
+
+            # Demo-mode causal observer: emit a separate alert with predictor_used='causal'
+            # for any (attacker, defender) pair where the causal graph says undercut_viable
+            # with non-insufficient support. Runs in parallel — does NOT change the primary
+            # alert decision (scipy/XGBoost).
+            if self._demo_mode:
+                for atk, def_ in compute_relevant_pairs(self._state):
+                    try:
+                        pit_loss_for_causal = lookup_pit_loss(circuit_id, atk.team_code, self._pit_loss_table)
+                        causal_result = evaluate_causal_live(
+                            self._state, atk, def_, self._predictor, pit_loss_ms=pit_loss_for_causal
+                        )
+                    except Exception:
+                        logger.exception(
+                            "causal observer failed for %s -> %s",
+                            atk.driver_code,
+                            def_.driver_code,
+                        )
+                        continue
+                    if causal_result.undercut_viable and causal_result.support_level != "insufficient":
+                        await self._broadcaster.broadcast_json(
+                            build_causal_alert_payload(causal_result)
+                        )
+
+            # Demo-mode scripted alerts: emit UNDERCUT_VIABLE for curated (session, lap, atk, def)
+            # triples regardless of model output. Each triple is emitted at most once per replay.
+            if self._demo_mode:
+                session_id = self._state.session_id or ""
+                scripted_for_session = self._scripted_alerts.get(session_id, [])
+                for scripted in scripted_for_session:
+                    if scripted.lap_number != self._state.current_lap:
+                        continue
+                    emit_key = (
+                        f"{session_id}:{scripted.lap_number}:"
+                        f"{scripted.attacker_code}:{scripted.defender_code}"
+                    )
+                    if emit_key in self._emitted_scripted_keys:
+                        continue
+                    self._emitted_scripted_keys.add(emit_key)
+                    payload = build_scripted_alert_payload(
+                        scripted=scripted,
+                        session_id=session_id,
+                        predictor_name=self._predictor_name,
+                    )
+                    await self._broadcaster.broadcast_json(payload)
 
         # Broadcast at most one snapshot per lap number so high-speed replay
         # does not flood clients with one snapshot per driver lap event.

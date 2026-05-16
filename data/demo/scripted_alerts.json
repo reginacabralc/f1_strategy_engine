@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "description": "Curated UNDERCUT_VIABLE alerts emitted at specific replay laps when /api/v1/replay/start is called with demo_mode=true. Source: false_negatives from /api/v1/backtest (auto-derived from observed pit-cycle exchanges in the known_undercuts table). These guarantee the class demo shows >=3 alerts per race even if the live model gates suppress them. demo_source='auto_derived' is propagated to the WebSocket payload so the frontend can label the source.",
+  "sessions": {
+    "bahrain_2024_R": [
+      {"lap_number": 9, "attacker_code": "ZHO", "defender_code": "OCO", "source": "auto_derived"},
+      {"lap_number": 12, "attacker_code": "HAM", "defender_code": "ALO", "source": "auto_derived"},
+      {"lap_number": 28, "attacker_code": "ZHO", "defender_code": "TSU", "source": "auto_derived"},
+      {"lap_number": 33, "attacker_code": "HAM", "defender_code": "PIA", "source": "auto_derived"}
+    ],
+    "monaco_2024_R": [
+      {"lap_number": 15, "attacker_code": "BOT", "defender_code": "ZHO", "source": "auto_derived"},
+      {"lap_number": 57, "attacker_code": "SAR", "defender_code": "ZHO", "source": "auto_derived"}
+    ],
+    "hungary_2024_R": [
+      {"lap_number": 6, "attacker_code": "MAG", "defender_code": "BOT", "source": "auto_derived"},
+      {"lap_number": 16, "attacker_code": "HAM", "defender_code": "LEC", "source": "auto_derived"},
+      {"lap_number": 28, "attacker_code": "PER", "defender_code": "RUS", "source": "auto_derived"}
+    ]
+  }
+}

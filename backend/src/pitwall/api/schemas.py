@@ -45,6 +45,14 @@ class ReplayStartRequest(BaseModel):
         description="Wall-clock acceleration factor. 1 = real time, 1000 = test mode.",
         examples=[30.0],
     )
+    demo_mode: bool = Field(
+        default=False,
+        description=(
+            "When True, the engine uses relaxed alert thresholds and emits curated "
+            "scripted alerts from data/demo/scripted_alerts.json. "
+            "For the live class demo only; has no effect on production behaviour."
+        ),
+    )
 
 
 class ReplayRun(BaseModel):

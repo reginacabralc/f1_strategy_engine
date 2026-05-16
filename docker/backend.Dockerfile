@@ -44,6 +44,9 @@ FROM base AS prod
 COPY --from=builder /opt/venv /opt/venv
 COPY backend/alembic.ini ./backend/alembic.ini
 COPY backend/src/ ./backend/src/
+# Bake demo data into the image (avoids macOS bind-mount deadlock when
+# the engine reads scripted_alerts.json during a replay).
+COPY data/demo/ ./data/demo/
 
 WORKDIR /app/backend
 CMD ["uvicorn", "pitwall.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

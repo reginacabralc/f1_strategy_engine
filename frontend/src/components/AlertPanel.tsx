@@ -41,6 +41,13 @@ function msToSec(ms: number): string {
   return `+${(ms / 1000).toFixed(1)}s`;
 }
 
+function predictorBadgeColor(predictor?: string): string {
+  if (predictor === "scipy") return "text-blue-400 bg-blue-400/10 border-blue-400/40";
+  if (predictor === "xgboost") return "text-purple-400 bg-purple-400/10 border-purple-400/40";
+  if (predictor === "causal") return "text-pitwall-green bg-pitwall-green/10 border-pitwall-green/40";
+  return "text-pitwall-muted bg-pitwall-muted/10 border-pitwall-muted/40";
+}
+
 export function AlertPanel({ alerts = [] }: Props) {
   return (
     <section
@@ -93,6 +100,15 @@ export function AlertPanel({ alerts = [] }: Props) {
                     >
                       {LEVEL_LABEL[level]}
                     </span>
+                    {alert.predictor_used && (
+                      <span
+                        className={`text-[9px] font-mono uppercase px-1.5 py-0.5 rounded border ${predictorBadgeColor(alert.predictor_used)}`}
+                        data-testid={`predictor-badge-${alert.predictor_used}`}
+                        title={alert.causal_explanations?.[0] ?? alert.demo_source ?? ""}
+                      >
+                        {alert.predictor_used}
+                      </span>
+                    )}
                     <span className="ml-auto text-[10px] font-mono text-pitwall-muted">
                       L{alert.lap_number}
                     </span>
