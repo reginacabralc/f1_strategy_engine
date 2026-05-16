@@ -13,6 +13,7 @@ import type { AlertType, PredictorName, RaceSnapshot, TrackStatus } from "./type
 // snapshot payload is RaceSnapshot from the OpenAPI spec.
 export type { RaceSnapshot };
 
+// Normalized shape used by all components. Always produced by normalizeAlertPayload.
 export interface AlertPayload {
   alert_id: string;
   session_id: string;
@@ -27,6 +28,56 @@ export interface AlertPayload {
   confidence: number;
   ventana_laps: number;
   predictor_used: string;
+}
+
+// Raw shape the backend currently emits (attacker/defender/current_lap).
+// Also accepts spec-shaped payloads so the normalizer handles both.
+export interface BackendAlertPayload {
+  alert_type: AlertType;
+  session_id: string;
+  score: number;
+  confidence: number;
+  estimated_gain_ms: number;
+  pit_loss_ms: number;
+  gap_actual_ms: number;
+  // backend-shaped fields
+  attacker?: string;
+  defender?: string;
+  current_lap?: number;
+  // spec-shaped fields (may arrive once backend is updated)
+  alert_id?: string;
+  attacker_code?: string;
+  defender_code?: string;
+  lap_number?: number;
+  ventana_laps?: number;
+  predictor_used?: string;
+}
+
+// Accepts either backend-shaped or spec-shaped alert payloads and returns a
+// fully populated AlertPayload. Generates a deterministic alert_id when absent
+// so React keys remain stable across re-renders.
+export function normalizeAlertPayload(raw: BackendAlertPayload): AlertPayload {
+  const attacker_code = raw.attacker_code ?? raw.attacker ?? "";
+  const defender_code = raw.defender_code ?? raw.defender ?? "";
+  const lap_number = raw.lap_number ?? raw.current_lap ?? 0;
+  const alert_id =
+    raw.alert_id ??
+    `${raw.session_id}|${raw.alert_type}|${attacker_code}|${defender_code}|${lap_number}|${raw.estimated_gain_ms}|${raw.score}`;
+  return {
+    alert_id,
+    session_id: raw.session_id,
+    lap_number,
+    alert_type: raw.alert_type,
+    attacker_code,
+    defender_code,
+    estimated_gain_ms: raw.estimated_gain_ms,
+    pit_loss_ms: raw.pit_loss_ms,
+    gap_actual_ms: raw.gap_actual_ms,
+    score: raw.score,
+    confidence: raw.confidence,
+    ventana_laps: raw.ventana_laps ?? 0,
+    predictor_used: raw.predictor_used ?? "",
+  };
 }
 
 export interface LapUpdatePayload {
@@ -79,11 +130,12 @@ export interface WsErrorPayload {
 
 // Mapping of type discriminant → payload shape.
 // ping/pong have no payload (undefined at runtime; optional in the type).
+// alert uses BackendAlertPayload (wire shape); useRaceFeed normalizes before state.
 type WsMessageMap = {
   snapshot: RaceSnapshot;
   lap_update: LapUpdatePayload;
   pit_stop: PitStopPayload;
-  alert: AlertPayload;
+  alert: BackendAlertPayload;
   track_status: TrackStatusPayload;
   replay_state: ReplayStatePayload;
   error: WsErrorPayload;

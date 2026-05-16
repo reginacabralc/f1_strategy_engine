@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { Compound, RaceSnapshot } from "../api/types";
+import {
+  normalizeAlertPayload,
+} from "../api/ws";
 import type {
   AlertPayload,
   LapUpdatePayload,
@@ -135,7 +138,9 @@ export function useRaceFeed() {
             break;
           case "alert":
             if (msg.payload) {
-              setAlerts((prev) => [msg.payload!, ...prev].slice(0, MAX_ALERTS));
+              setAlerts((prev) =>
+                [normalizeAlertPayload(msg.payload!), ...prev].slice(0, MAX_ALERTS),
+              );
             }
             break;
           case "lap_update":
