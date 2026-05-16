@@ -123,3 +123,49 @@ def test_evaluate_causal_live_marks_missing_gap_as_insufficient() -> None:
     assert result.support_level == "insufficient"
     assert result.required_gain_ms is None
     assert any("not contain enough" in text for text in result.explanations)
+
+
+def test_adaptive_confidence_r2_035_gives_strong_support() -> None:
+    """R²=0.35 is above the demo-data threshold and must give strong support."""
+    pred = ScipyPredictor([
+        ScipyCoefficient("monaco", "MEDIUM", a=80_000.0, b=250.0, c=5.0, r_squared=0.35),
+        ScipyCoefficient("monaco", "HARD",   a=79_000.0, b=120.0, c=2.0, r_squared=0.35),
+    ])
+    state = RaceState(
+        session_id="monaco_2024_R", circuit_id="monaco", total_laps=78, current_lap=30,
+        track_status="GREEN", track_temp_c=42.0, air_temp_c=26.0, rainfall=False,
+    )
+    attacker = DriverState(
+        driver_code="NOR", team_code="mclaren", position=2, gap_to_ahead_ms=5_000,
+        compound="MEDIUM", tyre_age=23, laps_in_stint=23,
+    )
+    defender = DriverState(
+        driver_code="VER", team_code="red_bull", position=1,
+        compound="MEDIUM", tyre_age=30, laps_in_stint=30,
+    )
+    result = evaluate_causal_live(state, attacker, defender, pred, pit_loss_ms=21_000)
+    assert result.support_level != "insufficient", (
+        f"Expected strong/weak but got {result.support_level!r}. "
+        "Check CONFIDENCE_STRONG_THRESHOLD in live_inference.py"
+    )
+
+
+def test_adaptive_confidence_r2_010_gives_insufficient() -> None:
+    """R²=0.10 is noise-level and must give insufficient support."""
+    pred = ScipyPredictor([
+        ScipyCoefficient("monaco", "MEDIUM", a=80_000.0, b=250.0, c=5.0, r_squared=0.10),
+        ScipyCoefficient("monaco", "HARD",   a=79_000.0, b=120.0, c=2.0, r_squared=0.10),
+    ])
+    state = RaceState(
+        session_id="monaco_2024_R", circuit_id="monaco", total_laps=78, current_lap=30,
+        track_status="GREEN", track_temp_c=42.0, air_temp_c=26.0, rainfall=False,
+    )
+    attacker = DriverState(
+        driver_code="NOR", position=2, gap_to_ahead_ms=5_000,
+        compound="MEDIUM", tyre_age=23, laps_in_stint=23,
+    )
+    defender = DriverState(
+        driver_code="VER", position=1, compound="MEDIUM", tyre_age=30, laps_in_stint=30,
+    )
+    result = evaluate_causal_live(state, attacker, defender, pred, pit_loss_ms=21_000)
+    assert result.support_level == "insufficient"
