@@ -57,4 +57,49 @@ describe("ReplayControls", () => {
     expect(screen.getByTestId("replay-current-lap")).toHaveTextContent("18");
     expect(screen.getByTestId("replay-total-laps")).toHaveTextContent("78");
   });
+
+  it("enables play when a session is selected", () => {
+    render(<ReplayControls selectedSession="monaco_2024_R" />);
+
+    expect(screen.getByLabelText("Start replay")).not.toBeDisabled();
+  });
+
+  it("marks skip and step buttons as not supported in V1", () => {
+    render(<ReplayControls selectedSession="monaco_2024_R" />);
+
+    for (const label of ["Skip to start", "Step back", "Step forward", "Skip to end"]) {
+      const btn = screen.getByLabelText(label);
+      expect(btn).toBeDisabled();
+      expect(btn).toHaveAttribute("title", "Not supported in V1");
+    }
+  });
+
+  it("shows Stop button and running status when replayState is started", () => {
+    render(<ReplayControls selectedSession="monaco_2024_R" replayState="started" />);
+
+    expect(screen.getByLabelText("Stop replay")).toBeInTheDocument();
+    expect(screen.getByText("Replay running")).toBeInTheDocument();
+  });
+
+  it("shows error message when startReplay fails", async () => {
+    mockStartReplay.mockRejectedValueOnce(new Error("API 503: Service Unavailable"));
+    render(<ReplayControls selectedSession="monaco_2024_R" />);
+
+    fireEvent.click(screen.getByLabelText("Start replay"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("replay-error")).toHaveTextContent("API 503: Service Unavailable");
+    });
+  });
+
+  it("shows error message when stopReplay fails", async () => {
+    mockStopReplay.mockRejectedValueOnce(new Error("Network error"));
+    render(<ReplayControls selectedSession="monaco_2024_R" replayState="started" />);
+
+    fireEvent.click(screen.getByLabelText("Stop replay"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("replay-error")).toHaveTextContent("Network error");
+    });
+  });
 });

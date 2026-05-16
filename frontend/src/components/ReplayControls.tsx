@@ -79,6 +79,7 @@ export function ReplayControls({
 }: ReplayControlsProps) {
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(30);
   const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const isStarted = replayState === "started";
   const safeCurrentLap = currentLap ?? 0;
@@ -91,8 +92,11 @@ export function ReplayControls({
   async function handleStart() {
     if (!selectedSession) return;
     setIsPending(true);
+    setError(null);
     try {
       await startReplay(selectedSession, speed);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to start replay");
     } finally {
       setIsPending(false);
     }
@@ -100,8 +104,11 @@ export function ReplayControls({
 
   async function handleStop() {
     setIsPending(true);
+    setError(null);
     try {
       await stopReplay();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to stop replay");
     } finally {
       setIsPending(false);
     }
@@ -126,6 +133,7 @@ export function ReplayControls({
           <button
             key={btn.label}
             aria-label={btn.label}
+            title="Not supported in V1"
             disabled
             className="w-8 h-8 rounded flex items-center justify-center text-pitwall-muted hover:text-pitwall-text hover:bg-pitwall-panel transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
@@ -145,6 +153,7 @@ export function ReplayControls({
           <button
             key={btn.label}
             aria-label={btn.label}
+            title="Not supported in V1"
             disabled
             className="w-8 h-8 rounded flex items-center justify-center text-pitwall-muted hover:text-pitwall-text hover:bg-pitwall-panel transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
@@ -208,9 +217,15 @@ export function ReplayControls({
         </div>
       </div>
 
-      <span className="text-[10px] text-pitwall-muted ml-1 hidden sm:inline">
-        {statusText}
-      </span>
+      {error ? (
+        <span className="text-[10px] text-red-400 ml-1" data-testid="replay-error">
+          {error}
+        </span>
+      ) : (
+        <span className="text-[10px] text-pitwall-muted ml-1 hidden sm:inline">
+          {statusText}
+        </span>
+      )}
     </footer>
   );
 }
