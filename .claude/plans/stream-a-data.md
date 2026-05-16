@@ -254,7 +254,7 @@ docs/adr/0009-xgboost-vs-scipy-resultados.md
   - XGBoost remains the only implemented model family; CatBoost/LightGBM are
     deferred in code/docs.
 - [x] Documentation.
-  - Added ADR 0010 and `docs/ml_temporal_modeling_plan.md`.
+  - Added ADR 0011 and `docs/ml_temporal_modeling_plan.md`.
   - Added `notebooks/07_augmented_temporal_model.md`.
   - Updated architecture, quanta 06, training report, and progress.
 

@@ -27,6 +27,19 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), vers
 - Contrato OpenAPI v1 actualizado con `GET /api/v1/causal/prediction` y sus
   esquemas de validación/respuesta para evitar drift entre FastAPI y
   `docs/interfaces/openapi_v1.yaml`.
+- Playwright e2e agregado al workflow de tests con instalación explícita de
+  Firefox, más targets `make test-e2e-install` y `make test-e2e`.
+- Higiene de contribución Stream D: pre-commit local, templates de issue/PR y
+  `.env.example` documentado; `make pre-commit` ejecuta los hooks desde
+  `.venv`.
+- ADR numbering/status corregido: ADR 0010 es DoWhy causal, ADR 0011 es
+  validación temporal XGBoost, y ADR 0009 sigue abierto hasta el backtest
+  comparativo real.
+- Bootstrap local endurecido: `make demo` exige Python 3.12+ de forma explícita
+  y prefiere `python3.12` al crear `.venv`.
+- Validación Stream D Day 9: `make demo` pasó desde clon limpio con volumen DB
+  fresco en 481.10s, seguido por checks de `/health`, `/ready`, sesiones,
+  frontend y WebSocket replay smoke.
 
 ### Pendiente para v0.1.0 (entrega MVP)
 
@@ -37,6 +50,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), vers
 - [x] Dashboard React con tabla, charts, feed y controles de replay.
 - [x] docker-compose con `make demo` funcional para backend + frontend.
 - [x] CI local y workflows para lint, tests y build de imágenes.
+- [x] `make demo` validado en clon limpio con volumen DB fresco (<10 min).
 - [ ] Motor de undercut V1 emitiendo alertas demo con `ScipyPredictor`.
 - [ ] **XGBoost integrado en runtime vía `PacePredictor`.**
 - [ ] **Backtest comparativo scipy vs XGBoost.**

@@ -7,7 +7,8 @@
 - Docker Desktop >= 4.x (con Compose v2).
 - GNU Make.
 - Git.
-- Python 3.12 recomendado.
+- Python 3.12+. El Makefile prefiere `python3.12` al crear `.venv`; si no
+  existe, falla temprano con una instrucción explícita.
 - Internet para descargar datos de FastF1 la primera vez.
 - (Opcional) `uv` para desarrollo local.
 - (Opcional) `pnpm` para trabajar en `frontend/` fuera de Docker. Si no existe, el Makefile usa `npx -y pnpm@9.15.9`.
@@ -18,6 +19,7 @@ Verificación rápida:
 docker compose version
 make --version
 git --version
+python3.12 --version
 ```
 
 ## 2. Clonar y configurar
@@ -48,6 +50,11 @@ Esto:
 
 PostgreSQL se publica en `localhost:5433` para evitar conflictos con un
 Postgres local en `5432`; dentro de Docker sigue siendo `db:5432`.
+
+Tiempo esperado: una validación Stream D Day 9 desde clon limpio y volumen DB
+fresco tardó 481.10s con descargas FastF1 frías para Bahrain, Monaco y Hungary
+2024. Reintentos posteriores suelen ser más rápidos por cache de FastF1 y
+layers Docker.
 
 ## 4. Verificar la API
 
@@ -158,11 +165,15 @@ FastF1 y llena `data/cache/`.
 make test           # backend unit tests + frontend vitest
 make test-backend   # pytest backend
 make test-frontend  # vitest frontend
+make test-e2e-install  # installs the Playwright Firefox browser locally
+make test-e2e      # mocked Playwright happy path
 make lint           # ruff + mypy + eslint
 ```
 
-Playwright e2e existe como target de frontend, pero requiere instalar los
-browsers de Playwright antes de correrlo localmente o en CI.
+Playwright e2e corre un happy path mockeado del dashboard. No requiere backend
+vivo porque intercepta las llamadas API, pero sí requiere el browser de
+Playwright. En CI se instala con `playwright install --with-deps firefox`; en
+local usa `make test-e2e-install` una vez antes de `make test-e2e`.
 
 ## 10. Apagar
 
@@ -218,5 +229,7 @@ Ver [`infra/runbook.md`](../infra/runbook.md) para diagnóstico de problemas com
 - "Cannot connect to db" — espera healthcheck.
 - "FastF1 cache permission denied" — chmod del volumen.
 - "WebSocket disconnects" — prueba primero `.venv/bin/python scripts/ws_demo_client.py`.
+- "Playwright browser missing" — corre `make test-e2e-install` y repite
+  `make test-e2e`.
 - "XGBoost model not found" — usa `PACE_PREDICTOR=scipy` o genera el artifact con los targets `build-xgb-dataset`, `train-xgb` y `validate-xgb-model`.
 - "Backtest sale precision = 0" — revisa que cargaste la lista curada de undercuts.

@@ -223,6 +223,80 @@ docker compose logs backend | jq 'select(.level=="ERROR")'
 docker compose logs backend | jq 'select(.component=="engine")'
 ```
 
+## Playwright e2e
+
+```bash
+make test-e2e-install
+make test-e2e
+```
+
+Problemas comunes:
+
+- `pnpm: command not found`: usa `make test-e2e`, que cae a `npx -y pnpm@9.15.9`
+  cuando `pnpm` no está instalado globalmente.
+- `Executable doesn't exist ... firefox`: falta el browser de Playwright; corre
+  `make test-e2e-install`.
+- `Host system is missing dependencies`: en Linux/CI instala con
+  `pnpm exec playwright install --with-deps firefox`.
+- `listen EPERM` o `connect EPERM` en el sandbox de Codex: limitación local de
+  permisos de red del sandbox. Verifica fuera del sandbox o deja que CI ejecute
+  el job Playwright.
+
+## Python local incorrecto
+
+`make demo` crea `.venv` con `python3.12` cuando existe. Si una máquina solo
+tiene `python3` apuntando a 3.9/3.10, el Makefile falla antes de instalar
+dependencias:
+
+```text
+Python 3.12+ is required. Install python3.12 or run make with PYTHON_BOOTSTRAP=/path/to/python3.12
+```
+
+Soluciones:
+
+- Instalar Python 3.12 y repetir `make demo`.
+- O ejecutar `make demo PYTHON_BOOTSTRAP=/ruta/a/python3.12`.
+
+## Validación Day 9 de `make demo`
+
+La validación Stream D Day 9 se corrió desde un clon limpio con volumen DB
+fresco:
+
+```bash
+cp .env.example .env
+/usr/bin/time -p make demo
+```
+
+Resultado medido: `real 481.10`, `user 29.32`, `sys 6.11`. Ese tiempo incluyó
+migraciones, ingesta FastF1 fría de Bahrain/Monaco/Hungary 2024, fit de
+degradación demo y arranque Docker de backend/frontend. No se podó manualmente
+la cache de layers Docker del host.
+
+Checks posteriores que deben pasar:
+
+```bash
+curl -fsS http://localhost:8000/health
+curl -fsS http://localhost:8000/ready
+curl -fsS http://localhost:8000/api/v1/sessions
+curl -fsS http://localhost:5173
+```
+
+WebSocket smoke:
+
+```bash
+curl -fsS -X POST http://localhost:8000/api/v1/replay/start \
+  -H 'Content-Type: application/json' \
+  -d '{"session_id":"monaco_2024_R","speed_factor":1000}'
+.venv/bin/python scripts/ws_demo_client.py ws://localhost:8000/ws/v1/live
+curl -fsS -X POST http://localhost:8000/api/v1/replay/stop
+```
+
+Si `make demo` supera 10 minutos, revisar primero red/FastF1 y el build de la
+imagen backend. En rebuilds de la capa Python, XGBoost y `nvidia-nccl-cu12`
+dominan el tiempo de descarga. La ruta medida cumple el objetivo sin dump de
+DB; mantener un dump pre-cargado solo como fallback si una prueba futura con
+cache Docker podada rompe el objetivo.
+
 ---
 
 ## Cuándo escalar a un humano

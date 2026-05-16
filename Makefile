@@ -1,5 +1,6 @@
 PYTHON ?= .venv/bin/python
 PIP ?= $(PYTHON) -m pip
+PYTHON_BOOTSTRAP ?= $(shell if command -v python3.12 >/dev/null 2>&1; then echo python3.12; else echo python3; fi)
 PNPM ?= $(shell if command -v pnpm >/dev/null 2>&1; then echo pnpm; elif command -v corepack >/dev/null 2>&1; then echo "corepack pnpm"; else echo "npx -y pnpm@9.15.9"; fi)
 
 .PHONY: install db-up db-wait db-down up down down-v logs ps migrate \
@@ -15,13 +16,16 @@ PNPM ?= $(shell if command -v pnpm >/dev/null 2>&1; then echo pnpm; elif command
         audit-causal-inputs reconstruct-race-gaps derive-known-undercuts \
         import-curated-known-undercuts build-causal-dataset run-causal-dowhy \
         compare-causal-engines prepare-causal-extended-data \
-        replay test test-backend test-frontend lint lint-backend lint-frontend \
+        replay test test-backend test-frontend test-e2e test-e2e-install \
+        lint lint-backend lint-frontend \
+        pre-commit \
         demo demo-api serve-api api-wait
 
 install: .venv/.installed
 
 .venv/.installed: backend/pyproject.toml
-	python3 -m venv .venv
+	$(PYTHON_BOOTSTRAP) -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 'Python 3.12+ is required. Install python3.12 or run make with PYTHON_BOOTSTRAP=/path/to/python3.12')"
+	$(PYTHON_BOOTSTRAP) -m venv .venv
 	$(PIP) install -U pip
 	$(PIP) install -e 'backend[dev]'
 	touch .venv/.installed
@@ -167,6 +171,20 @@ test-frontend:
 		$(PNPM) install --frozen-lockfile && $(PNPM) test; \
 	fi
 
+test-e2e-install:
+	cd frontend && if [ -x ./node_modules/.bin/playwright ]; then \
+		./node_modules/.bin/playwright install firefox; \
+	else \
+		$(PNPM) install --frozen-lockfile && $(PNPM) exec playwright install firefox; \
+	fi
+
+test-e2e:
+	cd frontend && if [ -x ./node_modules/.bin/playwright ]; then \
+		./node_modules/.bin/playwright test; \
+	else \
+		$(PNPM) install --frozen-lockfile && $(PNPM) exec playwright test; \
+	fi
+
 lint: lint-backend lint-frontend
 
 lint-backend: install
@@ -179,6 +197,9 @@ lint-frontend:
 	else \
 		$(PNPM) install --frozen-lockfile && $(PNPM) lint; \
 	fi
+
+pre-commit: install
+	$(PYTHON) -m pre_commit run --all-files
 
 serve-api: install
 	PYTHONPATH=backend/src $(PYTHON) -m uvicorn pitwall.api.main:app --reload --port 8000

@@ -1,4 +1,4 @@
-# ADR 0010 — Temporal expanding-window validation for XGBoost
+# ADR 0011 — Temporal expanding-window validation for XGBoost
 
 ## Estado
 

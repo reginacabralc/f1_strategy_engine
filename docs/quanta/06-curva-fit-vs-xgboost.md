@@ -107,7 +107,7 @@ evidencia de calidad suficiente:
 
 La causa principal fue cobertura insuficiente: LORO con tres carreras es casi
 leave-one-circuit-out. La decisión nueva está en
-[ADR 0010](../adr/0010-temporal-expanding-xgboost-validation.md): usar 2024/2025
+[ADR 0011](../adr/0011-temporal-expanding-xgboost-validation.md): usar 2024/2025
 recientes, validación temporal y tuning pequeño antes de Day 9.
 
 ## Day 8.2 — antes de backtesting

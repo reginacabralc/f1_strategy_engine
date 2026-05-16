@@ -81,11 +81,14 @@ docs/walkthrough.md (mantenimiento)
 - [x] **Hito S1 contribución**: `make demo` arranca todo el stack local.
 
 ### Día 6 — Pre-commit + badges + README polish
-- [ ] `.pre-commit-config.yaml` con ruff, prettier, eslint.
+- [x] `.pre-commit-config.yaml` con ruff/mypy y eslint. Prettier no se agregó
+      porque el frontend no declara `prettier` como dependencia y no queremos
+      hooks que descarguen paquetes en cada commit. `make pre-commit` ejecuta
+      los hooks locales desde `.venv`.
 - [x] Badges de CI en README.
-- [ ] `.env.example` documentado.
-- [ ] Issue templates en `.github/ISSUE_TEMPLATE/`.
-- [ ] PR template `.github/pull_request_template.md`.
+- [x] `.env.example` documentado.
+- [x] Issue templates en `.github/ISSUE_TEMPLATE/`.
+- [x] PR template `.github/pull_request_template.md`.
 
 ### Día 7 — Frontend prod + nginx
 - [x] `docker/frontend.Dockerfile` con stage `prod` que sirve `dist/` por nginx.
@@ -94,16 +97,30 @@ docs/walkthrough.md (mantenimiento)
 - [ ] Agregar/validar un profile compose `prod` si la demo necesita servir nginx localmente.
 
 ### Día 8 — Test suite verde + ADRs revisados
-- [ ] `backend/tests/conftest.py` con fixtures de DB (testcontainers).
+- [x] CI backend corre pytest contra servicio TimescaleDB; no se agregó
+      `testcontainers` porque el workflow ya valida migraciones y tests con
+      Postgres real.
 - [x] CI corre tests en cada PR.
-- [ ] ADRs 0005-0008 escritos.
-- [ ] Validador `openapi-spec-validator` en CI.
+- [x] Playwright e2e agregado a CI con browser Firefox instalado por el workflow.
+- [x] ADRs 0005-0008 escritos.
+- [x] Validador `openapi-spec-validator` en CI.
+- [x] ADR numbering/status reviewed: 0010 = DoWhy causal, 0011 = temporal
+      XGBoost validation, 0009 remains open until comparative backtest.
 
 ### Día 9 — `make demo` end-to-end probado
-- [ ] Probar `make demo` en máquina limpia (segundo dev sin cache local).
-- [ ] Time-to-demo < 10 min (incluye build de imágenes y descarga de FastF1).
-- [ ] Pre-cargar dump de DB con 1 carrera para que demo arranque rápido.
-- [ ] Documentar en `infra/runbook.md` los problemas que aparezcan.
+- [x] Probar `make demo` en clon limpio con volumen DB fresco.
+      Validación local: `/private/tmp/pitwall-day9-clean-20260515194802`,
+      `cp .env.example .env && /usr/bin/time -p make demo`.
+- [x] Time-to-demo < 10 min: `real 481.10`, `user 29.32`, `sys 6.11`.
+      Alcance: clon fresco + volumen Compose fresco + cache FastF1 fría para
+      Bahrain/Monaco/Hungary 2024; no se podó manualmente la cache de layers
+      Docker del host.
+- [x] Dump DB no agregado: la ruta fuente-de-verdad (`migrate` + ingesta
+      FastF1 + fit demo) cumple < 10 min en la validación anterior. Mantener
+      dump como fallback solo si una prueba futura sin cache Docker rompe el
+      objetivo de tiempo.
+- [x] Documentar en `infra/runbook.md` los problemas que aparezcan
+      (Python local <3.12, Playwright browser/deps, timing de demo).
 
 ### Día 10 — Cierre documental
 - [ ] Walkthrough actualizado.

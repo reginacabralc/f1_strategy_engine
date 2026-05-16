@@ -27,7 +27,7 @@ Más detalle: [`docs/architecture.md`](docs/architecture.md).
 
 ## Quickstart
 
-Pre-requisitos: Docker Desktop, GNU Make, Python 3.12 recomendado, ~10 GB libres, internet para descargar datos de FastF1 la primera vez.
+Pre-requisitos: Docker Desktop, GNU Make, Python 3.12+, ~10 GB libres, internet para descargar datos de FastF1 la primera vez.
 
 ```bash
 git clone https://github.com/reginacabralc/f1_strategy_engine.git
@@ -39,6 +39,8 @@ make demo
 `make demo` levanta TimescaleDB, crea `.venv`, instala el backend, corre migraciones, carga las 3 carreras demo de 2024 (Bahrain, Monaco y Hungary), ajusta coeficientes de degradación demo, arranca backend + frontend con Docker Compose y abre el dashboard React en <http://localhost:5173>. Swagger queda disponible en <http://localhost:8000/docs>.
 
 PostgreSQL se publica en `localhost:5433` para no chocar con instalaciones locales que suelen usar `5432`. Dentro de Docker los servicios siguen usando `db:5432`.
+
+Última validación Stream D Day 9: clon limpio + volumen DB fresco en 481.10s con descargas FastF1 frías; el primer arranque necesita internet y los siguientes suelen aprovechar cache.
 
 Para probar la API manualmente:
 
@@ -66,7 +68,7 @@ Demo race round numbers for 2024: **Bahrain = 1**, **Monaco = 8**, **Hungary = 1
 - **DB**: PostgreSQL 15 + TimescaleDB
 - **Frontend**: React + Vite + TypeScript + TanStack Query + Tailwind + Recharts
 - **Infra**: docker-compose
-- **CI**: GitHub Actions (`lint`, `test`, `build`)
+- **CI**: GitHub Actions (`lint`, `test` including Vitest + Playwright, `build`)
 - **Datos abiertos**: [FastF1](https://docs.fastf1.dev/), [OpenF1](https://openf1.org), [Jolpica](https://github.com/jolpica/jolpica-f1) (sucesor de Ergast)
 
 ## ML

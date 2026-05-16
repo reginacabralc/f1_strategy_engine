@@ -10,8 +10,9 @@
     "preview": "vite preview",
     "lint": "eslint src --ext .ts,.tsx --report-unused-disable-directives --max-warnings 0",
     "test": "vitest run",
-    "test:e2e": "PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1 playwright test",
-    "test:e2e:setup": "apt-get download libasound2t64 && dpkg -x libasound2t64_*.deb .playwright-libs-extract && cp .playwright-libs-extract/usr/lib/x86_64-linux-gnu/libasound.so.2.0.0 .playwright-libs/ && ln -sf libasound.so.2.0.0 .playwright-libs/libasound.so.2 && rm -rf .playwright-libs-extract libasound2t64_*.deb && echo 'Browser dependencies installed'",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install firefox",
+    "test:e2e:install:ci": "playwright install --with-deps firefox",
     "generate:api": "openapi-typescript ../docs/interfaces/openapi_v1.yaml -o src/api/openapi.ts",
     "typecheck": "tsc --noEmit"
   },
