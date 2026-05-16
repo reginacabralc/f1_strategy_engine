@@ -37,6 +37,17 @@ class EffectSpec:
 
 
 @dataclass(frozen=True, slots=True)
+class StratifiedEffectSpec:
+    """An EffectSpec filtered to one circuit substring (e.g. 'bahrain', 'monaco')."""
+
+    treatment: str
+    outcome: str
+    circuit_filter: str
+    method_name: str = "backdoor.linear_regression"
+    common_causes: tuple[str, ...] = DEFAULT_COMMON_CAUSES
+
+
+@dataclass(frozen=True, slots=True)
 class EffectEstimate:
     treatment: str
     outcome: str
@@ -190,6 +201,82 @@ def default_effect_specs() -> list[EffectSpec]:
             ),
         ),
     ]
+
+
+def stratified_effect_specs() -> list[StratifiedEffectSpec]:
+    """Per-circuit DoWhy specs for heterogeneous treatment effects.
+
+    gap_to_rival_ms has different causal paths at tight street circuits (Monaco)
+    vs open tracks (Bahrain). Pooling hides both effects.
+
+    nearest_traffic_gap_ms is the numeric proxy for traffic intensity.
+    The categorical traffic_after_pit bucket cannot be a DoWhy linear-regression
+    treatment directly, so we use nearest_traffic_gap_ms instead.
+    """
+    circuits = [
+        "bahrain", "monaco", "hungary", "mexico_city",
+        "monza", "spa", "silverstone", "australia",
+        "canada", "spain", "austria", "dutch",
+        "singapore", "azerbaijan", "qatar", "abu_dhabi",
+        "las_vegas", "miami", "brazil",
+    ]
+    specs: list[StratifiedEffectSpec] = []
+    gap_common = (
+        "lap_number", "laps_remaining", "current_position", "rival_position",
+        "pit_loss_estimate_ms", "attacker_tyre_age", "defender_tyre_age",
+        "tyre_age_delta", "track_temp_c", "rainfall",
+    )
+    traffic_common = (
+        "lap_number", "current_position", "rival_position",
+        "gap_to_rival_ms", "pit_loss_estimate_ms",
+        "attacker_tyre_age", "defender_tyre_age", "track_temp_c",
+    )
+    for circuit in circuits:
+        specs.append(StratifiedEffectSpec(
+            treatment="gap_to_rival_ms",
+            outcome="undercut_viable",
+            circuit_filter=circuit,
+            common_causes=gap_common,
+        ))
+        specs.append(StratifiedEffectSpec(
+            treatment="nearest_traffic_gap_ms",
+            outcome="undercut_viable",
+            circuit_filter=circuit,
+            common_causes=traffic_common,
+        ))
+    return specs
+
+
+def estimate_stratified_effects(
+    data: Any,
+    specs: list[StratifiedEffectSpec] | None = None,
+) -> list[tuple[StratifiedEffectSpec, EffectEstimate | None]]:
+    """Run per-circuit stratified effects, skipping circuits with < 200 rows.
+
+    Each spec filters data to rows where session_id contains spec.circuit_filter,
+    then runs a standard estimate_effect on that subset. Circuits with fewer than
+    200 rows are skipped (too few for a stable DoWhy estimate) and return None.
+    """
+    if specs is None:
+        specs = stratified_effect_specs()
+    results: list[tuple[StratifiedEffectSpec, EffectEstimate | None]] = []
+    for spec in specs:
+        subset = data[data["session_id"].str.contains(spec.circuit_filter, na=False)]
+        if len(subset) < 200:
+            results.append((spec, None))
+            continue
+        try:
+            plain_spec = EffectSpec(
+                treatment=spec.treatment,
+                outcome=spec.outcome,
+                method_name=spec.method_name,
+                common_causes=spec.common_causes,
+            )
+            estimate = estimate_effect(subset, plain_spec)
+            results.append((spec, estimate))
+        except Exception:
+            results.append((spec, None))
+    return results
 
 
 def _prepare_frame(data: Any, spec: EffectSpec) -> Any:

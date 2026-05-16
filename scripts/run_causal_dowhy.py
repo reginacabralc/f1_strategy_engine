@@ -46,6 +46,24 @@ def main() -> int:
     print("- Refuters are sensitivity checks, not proof of true causal validity.")
     print("- Demo-race linear models may be ill-conditioned; unstable effects need more data.")
     print("- XGBoost predictions/features/importances are not used.")
+
+    from pitwall.causal.estimators import estimate_stratified_effects, stratified_effect_specs
+
+    stratified = estimate_stratified_effects(data, stratified_effect_specs())
+    ran = [(spec, est) for spec, est in stratified if est is not None]
+    if ran:
+        print()
+        print("Stratified effects by circuit")
+        print(f"{'circuit':<18} {'treatment':<25} {'n_rows':>7} {'estimate':>12}")
+        print("-" * 66)
+        for spec, est in ran:
+            print(
+                f"{spec.circuit_filter:<18} {spec.treatment:<25} "
+                f"{est.n_rows:>7} {est.estimate_value:>12.6f}"
+            )
+    else:
+        print()
+        print("Stratified effects: all circuits have < 200 rows, skipped.")
     return 0
 
 

@@ -121,3 +121,59 @@ def test_refuted_value_and_stability_labels() -> None:
     assert _stability_label(0.10, 0.17) == "sensitive"
     assert _stability_label(0.10, 0.30) == "unstable"
     assert _stability_label(0.10, None) == "unsupported"
+
+
+def test_stratified_effect_specs_returns_nonempty_list() -> None:
+    """stratified_effect_specs must return specs covering gap and traffic treatments."""
+    from pitwall.causal.estimators import stratified_effect_specs
+
+    specs = stratified_effect_specs()
+    assert len(specs) > 0
+    # Must have circuit_filter field on each spec
+    assert all(hasattr(spec, "circuit_filter") for spec in specs)
+    # Must cover gap_to_rival_ms across multiple circuits
+    gap_specs = [s for s in specs if s.treatment == "gap_to_rival_ms"]
+    assert len(gap_specs) >= 2
+    # Must cover nearest_traffic_gap_ms (numeric traffic proxy)
+    traffic_specs = [s for s in specs if s.treatment == "nearest_traffic_gap_ms"]
+    assert len(traffic_specs) >= 1
+
+
+def test_estimate_stratified_effects_skips_small_circuits() -> None:
+    """estimate_stratified_effects returns None for circuits with <200 rows."""
+    import pandas as pd
+    from pitwall.causal.estimators import (
+        StratifiedEffectSpec,
+        estimate_stratified_effects,
+    )
+
+    # Make a tiny dataframe that only has 10 rows for any circuit filter
+    tiny_data = pd.DataFrame({
+        "session_id": ["bahrain_2024_R"] * 10,
+        "fresh_tyre_advantage_ms": range(10),
+        "undercut_viable": [0, 1] * 5,
+        "gap_to_rival_ms": range(1000, 1010),
+        "nearest_traffic_gap_ms": range(500, 510),
+        "lap_number": range(10),
+        "laps_remaining": range(10),
+        "current_position": [2] * 10,
+        "rival_position": [1] * 10,
+        "pit_loss_estimate_ms": [22000] * 10,
+        "attacker_tyre_age": range(10),
+        "defender_tyre_age": range(5, 15),
+        "tyre_age_delta": range(10),
+        "track_temp_c": [30.0] * 10,
+        "air_temp_c": [25.0] * 10,
+        "rainfall": [False] * 10,
+    })
+    specs = [
+        StratifiedEffectSpec(
+            treatment="gap_to_rival_ms",
+            outcome="undercut_viable",
+            circuit_filter="bahrain",
+        )
+    ]
+    results = estimate_stratified_effects(tiny_data, specs)
+    assert len(results) == 1
+    spec, estimate = results[0]
+    assert estimate is None  # < 200 rows → skipped
