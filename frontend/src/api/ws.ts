@@ -131,15 +131,25 @@ export interface WsErrorPayload {
 // Mapping of type discriminant → payload shape.
 // ping/pong have no payload (undefined at runtime; optional in the type).
 // alert uses BackendAlertPayload (wire shape); useRaceFeed normalizes before state.
+//
+// Backend V1 actually emits:        snapshot | alert | replay_state | ping
+// Spec-defined, not yet emitted:    lap_update | pit_stop | track_status | error
+//   - lap_update/pit_stop/track_status: V1 engine emits a full snapshot on each
+//     lap_complete instead of incremental per-driver messages.
+//   - error: V1 backend disconnects on error rather than sending an error frame.
+//   These types are kept for forward compatibility; their switch cases in
+//   useRaceFeed are dead code in V1 and will activate when backend V2 emits them.
 type WsMessageMap = {
+  // ── Emitted by backend V1 ─────────────────────────────────────────────────
   snapshot: RaceSnapshot;
+  alert: BackendAlertPayload;
+  replay_state: ReplayStatePayload;
+  ping: Record<string, unknown>;
+  // ── Spec-defined; not emitted by backend V1 ───────────────────────────────
   lap_update: LapUpdatePayload;
   pit_stop: PitStopPayload;
-  alert: BackendAlertPayload;
   track_status: TrackStatusPayload;
-  replay_state: ReplayStatePayload;
   error: WsErrorPayload;
-  ping: Record<string, unknown>;
   pong: Record<string, unknown>;
 };
 

@@ -133,6 +133,7 @@ export function useRaceFeed() {
         }
         setLastMessage(msg);
         switch (msg.type) {
+          // ── Backend V1 emitted types ───────────────────────────────────────
           case "snapshot":
             if (msg.payload) setSnapshot(msg.payload);
             break;
@@ -143,35 +144,40 @@ export function useRaceFeed() {
               );
             }
             break;
-          case "lap_update":
-            if (msg.payload)
-              setSnapshot((prev) =>
-                prev ? applyLapUpdate(prev, msg.payload!) : prev,
-              );
-            break;
-          case "pit_stop":
-            if (msg.payload)
-              setSnapshot((prev) =>
-                prev ? applyPitStop(prev, msg.payload!) : prev,
-              );
-            break;
-          case "track_status":
-            if (msg.payload)
-              setSnapshot((prev) =>
-                prev ? applyTrackStatus(prev, msg.payload!) : prev,
-              );
-            break;
           case "replay_state":
             if (msg.payload) setReplayState(msg.payload);
-            break;
-          case "error":
-            if (msg.payload) setError(msg.payload.message);
             break;
           case "ping": {
             const pong: WsPongMessage = { type: "pong", ts: new Date().toISOString() };
             ws.send(JSON.stringify(pong));
             break;
           }
+          // ── Spec-defined; not emitted by backend V1 ───────────────────────
+          // V1 engine broadcasts a full snapshot on each lap_complete instead.
+          case "lap_update":
+            if (msg.payload)
+              setSnapshot((prev) =>
+                prev ? applyLapUpdate(prev, msg.payload!) : prev,
+              );
+            break;
+          // Pit information flows through snapshot.drivers[].is_in_pit in V1.
+          case "pit_stop":
+            if (msg.payload)
+              setSnapshot((prev) =>
+                prev ? applyPitStop(prev, msg.payload!) : prev,
+              );
+            break;
+          // SC/VSC arrives as a SUSPENDED_SC/SUSPENDED_VSC alert type in V1.
+          case "track_status":
+            if (msg.payload)
+              setSnapshot((prev) =>
+                prev ? applyTrackStatus(prev, msg.payload!) : prev,
+              );
+            break;
+          // V1 backend disconnects on error rather than sending an error frame.
+          case "error":
+            if (msg.payload) setError(msg.payload.message);
+            break;
           default:
             break;
         }
