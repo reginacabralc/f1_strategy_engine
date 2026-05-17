@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import random
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -14,12 +15,19 @@ import polars as pl
 from pitwall.ml.train import (
     FoldEvaluationResult,
     ModelTrainer,
+    TargetClipConfig,
     default_hyperparameters,
     evaluate_folds,
     train_booster,
 )
 
 DEFAULT_TUNING_REPORT_PATH = Path("data/ml/xgb_tuning_report.json")
+
+
+@dataclass(frozen=True, slots=True)
+class SearchCandidate:
+    hyperparameters: dict[str, Any]
+    num_boost_round: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,6 +93,56 @@ def candidate_hyperparameters() -> list[dict[str, Any]]:
     return [{**base, **candidate} for candidate in candidates]
 
 
+def candidate_search_space(
+    *,
+    n_random: int = 12,
+    seed: int = 42,
+    include_curated: bool = True,
+) -> list[SearchCandidate]:
+    """Return deterministic curated + structured-random XGBoost candidates."""
+
+    base = default_hyperparameters()
+    candidates: list[SearchCandidate] = []
+    if include_curated:
+        candidates.extend(
+            SearchCandidate(hyperparameters=params, num_boost_round=200)
+            for params in candidate_hyperparameters()
+        )
+    objectives = ("reg:squarederror", "reg:absoluteerror", "reg:pseudohubererror")
+    rounds = (100, 200, 350, 500, 800)
+    rng = random.Random(seed)
+    forced_objectives = list(objectives)
+    for index in range(n_random):
+        objective = (
+            forced_objectives[index]
+            if index < len(forced_objectives)
+            else rng.choice(objectives)
+        )
+        params = {
+            **base,
+            "objective": objective,
+            "eval_metric": "mae" if objective == "reg:absoluteerror" else ["mae", "rmse"],
+            "tree_method": "hist",
+            "max_depth": rng.randint(1, 6),
+            "eta": rng.uniform(0.005, 0.15),
+            "min_child_weight": rng.choice((1, 2, 5, 10, 20, 50, 100)),
+            "subsample": rng.uniform(0.5, 1.0),
+            "colsample_bytree": rng.uniform(0.5, 1.0),
+            "lambda": rng.choice((0, 1, 5, 10, 20, 50, 100)),
+            "alpha": rng.choice((0, 1, 5, 10, 20, 50)),
+            "gamma": rng.choice((0, 0.5, 1, 2, 5, 10, 20)),
+            "early_stopping_rounds": rng.choice((20, 35, 50)),
+            "seed": seed,
+        }
+        candidates.append(
+            SearchCandidate(
+                hyperparameters=params,
+                num_boost_round=rng.choice(rounds),
+            )
+        )
+    return candidates
+
+
 def _candidate(
     max_depth: int,
     eta: float,
@@ -112,29 +170,43 @@ def tune_xgb_hyperparameters(
     frame: pl.DataFrame,
     dataset_metadata: Mapping[str, Any],
     *,
-    candidates: Sequence[Mapping[str, Any]] | None = None,
+    candidates: Sequence[Mapping[str, Any] | SearchCandidate] | None = None,
     num_boost_round: int = 200,
     trainer: ModelTrainer = train_booster,
     feature_columns: Sequence[str] | None = None,
+    random_candidates: int = 12,
+    seed: int = 42,
+    target_clip_config: TargetClipConfig | None = None,
 ) -> TuningResult:
     """Evaluate candidate configs on dataset folds and select the best one."""
 
     candidate_rows: list[CandidateResult] = []
     selected_features = tuple(feature_columns) if feature_columns is not None else None
-    for index, params in enumerate(candidates or candidate_hyperparameters(), start=1):
+    for index, candidate in enumerate(
+        candidates
+        or candidate_search_space(n_random=random_candidates, seed=seed, include_curated=True),
+        start=1,
+    ):
+        if isinstance(candidate, SearchCandidate):
+            params = dict(candidate.hyperparameters)
+            rounds = candidate.num_boost_round
+        else:
+            params = dict(candidate)
+            rounds = num_boost_round
         evaluation: FoldEvaluationResult = evaluate_folds(
             frame,
             dataset_metadata,
-            hyperparameters=dict(params),
-            num_boost_round=num_boost_round,
+            hyperparameters=params,
+            num_boost_round=rounds,
             trainer=trainer,
             feature_columns=feature_columns,
+            target_clip_config=target_clip_config,
         )
         candidate_rows.append(
             CandidateResult(
                 candidate_id=f"candidate_{index:02d}",
-                hyperparameters=dict(params),
-                num_boost_round=num_boost_round,
+                hyperparameters=params,
+                num_boost_round=rounds,
                 aggregate_metrics=evaluation.aggregate_metrics,
                 fold_metrics=evaluation.fold_metrics,
                 feature_columns=selected_features,

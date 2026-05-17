@@ -110,6 +110,13 @@ def test_run_backtest_matches_first_alert_to_actual_successful_undercut() -> Non
     assert result.true_positives[0].defender == "LEC"
     assert result.true_positives[0].lap_actual == 9
     assert result.mae_k1_ms is not None
+    assert result.threshold_sweep
+    default_row = next(
+        row for row in result.threshold_sweep
+        if row["score_threshold"] == 0.4 and row["confidence_threshold"] == 0.5
+    )
+    assert default_row["precision"] == pytest.approx(1.0)
+    assert default_row["recall"] == pytest.approx(1.0)
 
 
 def test_run_backtest_returns_zero_metrics_when_no_known_undercuts() -> None:
@@ -157,3 +164,24 @@ def test_run_backtest_does_not_count_unsuccessful_pit_stops_as_false_negatives()
 
     assert result.false_negatives == []
     assert result.recall == 0.0
+
+
+def test_threshold_sweep_counts_confidence_suppressed_alerts() -> None:
+    class _LowConfidencePredictor(_UndercutPredictor):
+        def predict(self, ctx: PaceContext) -> PacePrediction:
+            lap_ms = 90_000 if ctx.compound == "MEDIUM" else 72_000
+            return PacePrediction(predicted_lap_time_ms=lap_ms, confidence=0.3)
+
+    result = run_backtest(
+        "monaco_2024_R",
+        _session_events(),
+        _LowConfidencePredictor(),
+        predictor_name="xgboost",
+        pit_loss_table={},
+    )
+
+    default_row = next(
+        row for row in result.threshold_sweep
+        if row["score_threshold"] == 0.4 and row["confidence_threshold"] == 0.5
+    )
+    assert default_row["suppressed_by_confidence"] > 0

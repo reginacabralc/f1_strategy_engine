@@ -248,7 +248,8 @@ docs/adr/0009-xgboost-vs-scipy-resultados.md
     sessions only.
 - [x] Training, tuning, and plots.
   - `train.py` evaluates generic folds, then trains the final runtime model.
-  - `scripts/tune_xgb.py` runs a curated 12-candidate XGBoost search.
+  - `scripts/tune_xgb.py` runs curated candidates plus a deterministic structured
+    random search.
   - `scripts/plot_xgb_diagnostics.py` writes matplotlib plots under
     `reports/figures/`.
   - XGBoost remains the only implemented model family; CatBoost/LightGBM are
@@ -282,16 +283,44 @@ docs/adr/0009-xgboost-vs-scipy-resultados.md
 - [x] Day 8.2 quality gate.
   - Selected `TARGET_STRATEGY=session_normalized_delta` and
     `FEATURE_SET=no_reference_lap_time_ms`.
-  - Aggregate temporal CV: XGBoost MAE 1,561.9 ms vs zero-delta 1,762.7 ms
-    and train-mean 1,612.9 ms.
-  - Gate passed by 200.8 ms vs zero-delta (11.4%) and all five folds improved
-    over zero-delta.
+  - Original gate run: XGBoost MAE 1,561.9 ms vs zero-delta 1,762.7 ms and
+    train-mean 1,612.9 ms.
+  - Hardened run: XGBoost MAE 1,379.7 ms, RMSE 4,585.0 ms, R2 0.020; beats
+    zero-delta by 383.0 ms and train-mean by 233.2 ms.
+
+### Día 8.6 — XGBoost undercut decision hardening
+- [x] Stronger but bounded search.
+  - 24 candidates total: curated plus 12 seeded random candidates.
+  - Objectives include `reg:squarederror`, `reg:absoluteerror`, and
+    `reg:pseudohubererror`.
+  - Selected `candidate_18`: `reg:absoluteerror`, depth 5, eta
+    0.032881845587215686, subsample 0.5229121918278311, colsample
+    0.6139491378257734, lambda 5, alpha 0, gamma 20, `hist`, 100 rounds, early
+    stopping 20.
+- [x] Decision-relevant diagnostics.
+  - Training metadata now records median/p75/p90 absolute error, signed bias,
+    target distribution, and signed bias by circuit, compound, tyre-age bucket,
+    driver, and team.
+  - Backtest report includes score/confidence threshold sweeps and
+    confidence-suppressed alert counts.
+- [x] Confidence calibration.
+  - `XGBoostPredictor` no longer gates on raw aggregate R2 when metadata includes
+    `confidence_calibration`.
+  - Current base confidence is 0.755 from temporal validation support, with
+    runtime feature-support penalties.
+- [x] Pair-level challenger and Random Forest verdict.
+  - `backend/src/pitwall/ml/undercut_challenger.py` evaluates an offline
+    pair-level XGBoost and optional Random Forest.
+  - Pair XGBoost proxy-label F1=0.400, observed-success validation rows=27.
+  - Random Forest proxy-label F1=0.0, so it is not the better approach.
+  - No pair model is promoted to runtime.
 
 ### Día 9 — Backtest comparativo (E9 + E10) ⭐
 - [x] `backend/src/pitwall/engine/backtest.py` con métricas precision/recall/MAE@k.
 - [x] `make compare-predictors` genera replay determinista para las sesiones demo.
 - [x] Tabla comparativa `scipy | xgboost` en ADR 0009 y quanta 06.
-- [ ] Métricas segmentadas por compuesto y bucket de stint.
+- [x] Threshold sweep por score/confidence.
+- [x] Métricas segmentadas por compuesto/edad de neumático vía metadata de XGBoost.
 
 ### Día 10 — Documentación final
 - [x] Quanta `06-curva-fit-vs-xgboost.md` con números reales.

@@ -78,7 +78,11 @@ def compute_relevant_pairs(state):
 ## Score y confidence
 
 - **score ∈ [0, 1]**: 0 = no viable, 1 = ganancia >> pit_loss + gap.
-- **confidence ∈ [0, 1]**: combinación de R² del predictor y "calidad de datos del momento" (¿hay vueltas faltantes?, ¿SC reciente?, ¿stint corto?).
+- **confidence ∈ [0, 1]**: soporte validado del predictor para el contexto
+  runtime. En scipy sigue dependiendo de la calidad del ajuste y del dato vivo;
+  en XGBoost se calibra desde validación temporal (`confidence_calibration`) y
+  se penaliza por categorías desconocidas o features live faltantes. Ya no se
+  interpreta como "R2 > 0.5".
 
 Alerta solo si **score > 0.4 AND confidence > 0.5**.
 

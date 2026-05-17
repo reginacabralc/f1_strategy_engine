@@ -45,6 +45,7 @@ class BacktestResultData:
     true_positives: list[BacktestMatch] = field(default_factory=list)
     false_positives: list[BacktestMatch] = field(default_factory=list)
     false_negatives: list[BacktestMatch] = field(default_factory=list)
+    threshold_sweep: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,15 @@ class _Alert:
     lap_alerted: int
 
 
+@dataclass(frozen=True)
+class _DecisionObservation:
+    attacker: str
+    defender: str
+    lap_number: int
+    score: float
+    confidence: float
+
+
 def run_backtest(
     session_id: str,
     events: list[Event],
@@ -73,7 +83,8 @@ def run_backtest(
     """Evaluate one predictor against one replay session."""
     ordered_events = sorted(events, key=_event_sort_key)
     labels = _derive_labels(ordered_events)
-    alerts = _collect_alerts(ordered_events, predictor, pit_loss_table)
+    decisions = _collect_decisions(ordered_events, predictor, pit_loss_table)
+    alerts = _alerts_from_decisions(decisions, score_threshold=0.4, confidence_threshold=0.5)
     true_pos, false_pos, false_neg = _score_alerts(labels, alerts)
     mae_by_k = _pace_mae_by_horizon(ordered_events, predictor)
 
@@ -98,16 +109,17 @@ def run_backtest(
         true_positives=true_pos,
         false_positives=false_pos,
         false_negatives=false_neg,
+        threshold_sweep=_threshold_sweep(labels, decisions),
     )
 
 
-def _collect_alerts(
+def _collect_decisions(
     events: list[Event],
     predictor: PacePredictor,
     pit_loss_table: PitLossTable,
-) -> list[_Alert]:
+) -> list[_DecisionObservation]:
     state = RaceState()
-    first_alert_by_pair: dict[tuple[str, str], _Alert] = {}
+    decisions: list[_DecisionObservation] = []
     for event in events:
         state.apply(event)
         if event["type"] != "lap_complete":
@@ -117,17 +129,39 @@ def _collect_alerts(
         for attacker, defender in compute_relevant_pairs(state):
             pit_loss = lookup_pit_loss(state.circuit_id, attacker.team_code, pit_loss_table)
             decision = evaluate_undercut(state, attacker, defender, predictor, pit_loss)
-            if not decision.should_alert:
+            if decision.alert_type != "UNDERCUT_VIABLE":
                 continue
-            key = (decision.attacker_code, decision.defender_code)
-            first_alert_by_pair.setdefault(
-                key,
-                _Alert(
+            decisions.append(
+                _DecisionObservation(
                     attacker=decision.attacker_code,
                     defender=decision.defender_code,
-                    lap_alerted=state.current_lap,
+                    lap_number=state.current_lap,
+                    score=decision.score,
+                    confidence=decision.confidence,
                 ),
             )
+    return decisions
+
+
+def _alerts_from_decisions(
+    decisions: list[_DecisionObservation],
+    *,
+    score_threshold: float,
+    confidence_threshold: float,
+) -> list[_Alert]:
+    first_alert_by_pair: dict[tuple[str, str], _Alert] = {}
+    for decision in decisions:
+        if decision.score <= score_threshold or decision.confidence <= confidence_threshold:
+            continue
+        key = (decision.attacker, decision.defender)
+        first_alert_by_pair.setdefault(
+            key,
+            _Alert(
+                attacker=decision.attacker,
+                defender=decision.defender,
+                lap_alerted=decision.lap_number,
+            ),
+        )
     return list(first_alert_by_pair.values())
 
 
@@ -219,6 +253,55 @@ def _score_alerts(
         if (alert.attacker, alert.defender) not in matched_alerts
     ]
     return true_pos, false_pos, false_neg
+
+
+def _threshold_sweep(
+    labels: list[_Label],
+    decisions: list[_DecisionObservation],
+    *,
+    score_thresholds: tuple[float, ...] = (0.0, 0.2, 0.4, 0.6),
+    confidence_thresholds: tuple[float, ...] = (0.0, 0.15, 0.35, 0.5, 0.7),
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for score_threshold in score_thresholds:
+        for confidence_threshold in confidence_thresholds:
+            alerts = _alerts_from_decisions(
+                decisions,
+                score_threshold=score_threshold,
+                confidence_threshold=confidence_threshold,
+            )
+            true_pos, false_pos, false_neg = _score_alerts(labels, alerts)
+            precision = (
+                len(true_pos) / (len(true_pos) + len(false_pos))
+                if true_pos or false_pos
+                else 0.0
+            )
+            recall = (
+                len(true_pos) / (len(true_pos) + len(false_neg))
+                if true_pos or false_neg
+                else 0.0
+            )
+            f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+            rows.append(
+                {
+                    "score_threshold": score_threshold,
+                    "confidence_threshold": confidence_threshold,
+                    "precision": precision,
+                    "recall": recall,
+                    "f1": f1,
+                    "true_positives": len(true_pos),
+                    "false_positives": len(false_pos),
+                    "false_negatives": len(false_neg),
+                    "alerts": len(alerts),
+                    "suppressed_by_confidence": sum(
+                        1
+                        for decision in decisions
+                        if decision.score > score_threshold
+                        and decision.confidence <= confidence_threshold
+                    ),
+                }
+            )
+    return rows
 
 
 def _pace_mae_by_horizon(events: list[Event], predictor: PacePredictor) -> dict[int, int | None]:

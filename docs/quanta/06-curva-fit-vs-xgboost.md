@@ -37,8 +37,8 @@ Por (circuito × compuesto). Parámetros ajustados con `scipy.optimize.curve_fit
 
 Native `xgboost.Booster` con:
 
-- hiperparámetros por defecto conservadores,
-- búsqueda pequeña opcional con `make tune-xgb`,
+- hiperparámetros conservadores o seleccionados por tuning,
+- búsqueda estructurada reproducible con `make tune-xgb`,
 - selección por MAE temporal de validación, después RMSE y gap train-validación.
 
 ### Features
@@ -50,20 +50,24 @@ Native `xgboost.Booster` con:
 | `circuit_id` | one-hot |
 | `track_temp_c` | float |
 | `air_temp_c` | float |
-| `humidity` | float |
 | `lap_in_stint_ratio` | float ∈ [0, 1+] |
-| `stint_position` | int (1, 2, 3, ...) |
-| `driver_skill_offset` | float (precomputado) |
-| `team_id` | one-hot |
+| `lap_in_stint` / `stint_number` | int |
+| `position` | int |
+| `gap_to_ahead_ms` / `gap_to_leader_ms` | float |
+| `is_in_traffic` / `dirty_air_proxy_ms` | traffic proxies |
+| `driver_pace_offset_ms` | float (fold-safe) |
+| `team_code` | one-hot |
 | `fuel_proxy` | float ∈ [0, 1] |
 
 ### Target
 
 ```
-delta_to_reference = lap_time_ms - p20_of(compound, circuit)
+session_normalized_delta = lap_time_ms - median(prior clean dry laps in same session+compound)
 ```
 
-Donde `p20` es el percentil 20 (vueltas más rápidas) de ese (compuesto, circuito) en train fold.
+El valor se persiste en `lap_time_delta_ms` por compatibilidad con los scripts.
+Si no hay referencia live-safe de sesión/compuesto, cae al reference pace del
+fold de entrenamiento.
 
 ### Split
 
@@ -141,33 +145,42 @@ train-mean por 51.0 ms. El gate queda aprobado para pasar a Day 9, con la
 advertencia de que la ventaja sigue siendo moderada y debe validarse en
 backtesting de estrategia.
 
+Resultado Day 8.6 observado: el mismo target y feature set, con búsqueda
+estructurada y `reg:absoluteerror`, mejoró el CV temporal a MAE/RMSE/R2 de
+1,379.7 ms / 4,585.0 ms / 0.020. Gana a zero-delta por 383.0 ms (21.7%) y a
+train-mean por 233.2 ms. La confidence runtime de XGBoost ahora viene de
+validación temporal (`base_confidence=0.755`) más penalizaciones por soporte de
+features, no del R2 agregado.
+
 | Métrica | scipy | XGBoost | Δ |
 |---------|-------|---------|---|
-| MAE@k=1 medio (ms) | 1753 | 1407 | -346 |
-| MAE@k=3 medio (ms) | 1619 | 1482 | -137 |
-| MAE@k=5 medio (ms) | 1637 | 1563 | -74 |
+| MAE@k=1 medio (ms) | 1753 | 1324 | -430 |
+| MAE@k=3 medio (ms) | 1619 | 1424 | -195 |
+| MAE@k=5 medio (ms) | 1637 | 1482 | -155 |
 | Precision alertas | 0.0 | 0.0 | 0.0 |
 | Recall alertas | 0.0 | 0.0 | 0.0 |
 | F1 alertas | 0.0 | 0.0 | 0.0 |
 
 El reporte se genera con `make compare-predictors` y queda en
 `reports/ml/scipy_xgboost_backtest_report.json`. XGBoost mejora el error de
-pace, pero la mejora de MAE@k=3 (~8.5%) no supera el umbral de 10% definido en
-ADR 0009. Por eso el default operativo queda en `scipy`, aunque `xgboost` ya
-es un predictor runtime real y alternable.
+pace, y la mejora de MAE@k=3 (~12.0%) supera el umbral de 10% definido en ADR
+0009 para el artifact entrenado. Aun así, las alertas siguen con F1=0.0; el
+problema restante está en la superficie score/labels de decisión, no en la
+confianza XGBoost.
 
 ## Cuándo usar cuál
 
 Recomendaciones (post-experimento):
 
-- **Demo "al profesor"**: usa `scipy` como default estable y alterna a `xgb`
-  para mostrar el componente de ML. Explica que XGBoost reduce MAE de pace,
-  pero no cruzó el umbral para ser default de estrategia.
+- **Demo "al profesor"**: `.env.example` sigue en `scipy` para que un clone limpio
+  arranque sin artifact ML preentrenado. Si ya corriste `make train-xgb`, usa
+  `xgboost` para mostrar el mejor simulador de pace y explica que la capa de
+  alerta todavía no tiene F1 positivo.
 - **Debug de motor**: usa `scipy` (predicciones interpretables).
 - **Carreras con datos pobres**: scipy es más estable.
-- **Carreras con muchos datos recientes**: XGBoost ya pasó el gate temporal de
-  Day 8.2 y el backtest demo, pero sigue siendo alternativa hasta que mejore
-  calidad de alerta y supere el umbral de ADR 0009.
+- **Carreras con muchos datos recientes**: XGBoost ya pasó el gate temporal y el
+  umbral de MAE@k=3 del backtest demo, pero todavía no reemplaza a una capa de
+  decisión calibrada.
 
 ## Implementación
 

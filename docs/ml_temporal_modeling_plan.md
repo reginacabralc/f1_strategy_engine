@@ -37,8 +37,9 @@ Primary split: `temporal_expanding`.
   experiments: `lap_time_delta`, `session_normalized_delta`,
   `stint_relative_delta`, `absolute_lap_time`, and
   `season_circuit_compound_delta`.
-- `make tune-xgb` evaluates a curated 12-candidate XGBoost search including
-  conservative regularized candidates.
+- `make tune-xgb` evaluates curated candidates plus a deterministic structured
+  random search including non-square objectives, regularization, sampling, early
+  stopping, and varied boost rounds.
 - Selection criterion is validation MAE, then RMSE, then train-validation MAE gap.
 - `make plot-xgb-diagnostics` writes matplotlib figures under `reports/figures/`.
 - CatBoost and LightGBM are deferred to V2 to avoid destabilizing the default
@@ -61,18 +62,21 @@ Final temporal CV on the full 2024/2025 manifest:
   races.
 - Dataset: 151,363 usable rows, 47 usable sessions, five expanding folds.
 - Zero-usable session: 2024 Sao Paulo, `unsupported_or_missing_compound`.
-- Selected XGBoost config: `max_depth=2`, `eta=0.02`, `subsample=0.8`,
-  `colsample_bytree=0.8`, `min_child_weight=20`, `lambda=20`, `alpha=5`,
-  `num_boost_round=200`.
-- Aggregate temporal CV: MAE 1,561.9 ms, RMSE 4,614.4 ms, R² 0.007.
+- Selected XGBoost config: `reg:absoluteerror`, `max_depth=5`,
+  `eta=0.032881845587215686`, `subsample=0.5229121918278311`,
+  `colsample_bytree=0.6139491378257734`, `min_child_weight=1`, `lambda=5`,
+  `alpha=0`, `gamma=20`, `tree_method=hist`, `num_boost_round=100`, early
+  stopping 20.
+- Aggregate temporal CV: MAE 1,379.7 ms, RMSE 4,585.0 ms, R2 0.020.
 - Baselines: zero-delta MAE 1,762.7 ms, train-mean MAE 1,612.9 ms.
-- Gate: passed. XGBoost beats zero-delta by 200.8 ms (11.4%) and beats
-  train-mean by 51.0 ms; all five folds improve over zero-delta.
+- Gate: passed. XGBoost beats zero-delta by 383.0 ms (21.7%) and beats
+  train-mean by 233.2 ms.
+- Runtime confidence is calibrated from temporal validation support instead of
+  raw aggregate R2. The current model sidecar reports base confidence 0.755.
 
 ## Validation Boundary
 
-This work does not start Day 9 backtesting. The next gate is to ingest the full
-manifest, rebuild temporal folds, run diagnostics/baselines/ablations, and only
-then run the undercut backtest if model quality clears the gate. The preferred
-gate is at least 500 ms or 7% aggregate MAE improvement vs zero-delta, with the
-model improving or staying within 100 ms of zero-delta on at least 4 of 5 folds.
+This work starts the model-side portion of Day 9 but does not promote a
+pair-level decision model to runtime. The current replay-backed comparison
+selects XGBoost as the stronger pace simulator, while alert F1 remains 0.0 and
+must be solved at the decision-label/threshold layer.

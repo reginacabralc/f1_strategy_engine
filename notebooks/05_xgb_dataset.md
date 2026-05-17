@@ -2,8 +2,8 @@
 
 ## Goal
 
-Day 7 builds the lap-level pace dataset for Day 8 XGBoost training. This step
-does not train the model and does not implement `XGBoostPredictor.predict`.
+Day 7 builds the lap-level pace dataset for XGBoost training. This step does
+not train the model; runtime prediction is covered by `XGBoostPredictor`.
 
 Generated artifacts:
 
@@ -29,19 +29,20 @@ make validate-xgb-dataset
 
 ## Target
 
-The target is:
+The current default target is:
 
 ```text
-lap_time_delta_ms = lap_time_ms - reference_lap_time_ms
+session_normalized_delta_ms = lap_time_ms - median(prior clean dry laps in the same session+compound)
 ```
 
-We model delta instead of raw lap time because raw lap time mixes circuit
-baseline, compound baseline, fuel load, degradation, traffic, and driver pace
-into one large number. A delta target lets XGBoost focus on residual pace
-variation around a robust reference.
+It is stored in the shared `lap_time_delta_ms` column for experiment
+compatibility. When a live-safe prior session+compound reference is unavailable,
+the dataset falls back to the fold-training reference pace. The older
+`lap_time_delta` target remains available for stress tests, but the temporal
+modeling gate selected `session_normalized_delta` because it reduced
+target/reference shift.
 
-The reference pace is the median clean lap time from the fold's training
-sessions. For a row, lookup order is:
+For fallback reference pace, lookup order is:
 
 1. training-session median for `(circuit_id, compound)`,
 2. training-session global median for `compound`,
@@ -49,9 +50,10 @@ sessions. For a row, lookup order is:
 
 ## Split
 
-The split is leave-one-race-out by `session_id`.
+The main split is `temporal_expanding` by session event order. LORO remains
+available as a stress test.
 
-For the three demo races this creates:
+For the historical three-race smoke, LORO created:
 
 ```text
 fold_bahrain_2024_R
@@ -59,9 +61,9 @@ fold_hungary_2024_R
 fold_monaco_2024_R
 ```
 
-Each fold has rows marked `split=train` or `split=holdout`. Reference pace and
-driver offsets for a holdout row are computed only from that fold's training
-sessions.
+Each fold has rows marked `split=train` or `split=validation`/`split=holdout`.
+Reference pace and driver offsets for evaluation rows are computed only from
+that fold's training sessions.
 
 ## Driver Offsets
 
@@ -121,7 +123,7 @@ driver_pace_offset_missing
 reference_lap_time_ms
 ```
 
-Target:
+Target column:
 
 ```text
 lap_time_delta_ms
@@ -145,9 +147,9 @@ V1 includes only:
 - row count is positive and matches metadata,
 - required columns exist,
 - target is non-null for usable rows,
-- demo LORO folds exist,
-- holdout folds do not list holdout sessions as training sessions,
-- holdout driver-offset source sessions do not contain the holdout session,
+- temporal folds exist by default,
+- evaluation folds do not list evaluation sessions as training sessions,
+- evaluation driver-offset source sessions do not contain the evaluation session,
 - no pit-loss columns exist,
 - dry compounds and clean-lap filters are respected.
 
@@ -163,4 +165,5 @@ all-data model, and reports the real zero-delta baseline comparison.
 - improve traffic modeling beyond simple gap proxies,
 - add SC/VSC-aware pit-loss adjustment in the decision layer,
 - build richer reference pace hierarchies,
-- create the pair-level undercut outcome dataset for Day 9/backtesting.
+- keep the pair-level undercut outcome dataset as an offline challenger until
+  observed success labels are large enough for runtime promotion.

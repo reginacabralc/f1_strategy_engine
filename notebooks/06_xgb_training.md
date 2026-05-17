@@ -5,8 +5,9 @@
 Day 8 trains, evaluates, serializes, and validates the first XGBoost pace
 model from the Day 7 leakage-safe dataset.
 
-This is not the Day 9 backtest. It does not add pit-loss features, known
-undercut labels, or a full `XGBoostPredictor.predict()` feature pipeline.
+This is not the Day 9 backtest and it does not add pit-loss features to the
+lap-level pace model. Runtime prediction is handled by
+`backend/src/pitwall/ml/predictor.py`.
 
 ## Reproduce
 
@@ -19,35 +20,35 @@ make ingest-demo
 make fit-degradation
 make fit-pit-loss
 make fit-driver-offsets
-make build-xgb-dataset
+make build-xgb-dataset TARGET_STRATEGY=session_normalized_delta
 make validate-xgb-dataset
-make train-xgb
+make tune-xgb FEATURE_SET=no_reference_lap_time_ms TARGET_STRATEGY=session_normalized_delta
+make train-xgb FEATURE_SET=no_reference_lap_time_ms
 make validate-xgb-model
 ```
 
 For a faster artifact-only rerun after the dataset already exists:
 
 ```bash
-make train-xgb
+make train-xgb FEATURE_SET=no_reference_lap_time_ms
 make validate-xgb-model
 ```
 
 ## Modeling Decisions
 
-The target is:
+The selected runtime target is:
 
 ```text
-lap_time_delta_ms = lap_time_ms - reference_lap_time_ms
+session_normalized_delta_ms = lap_time_ms - median(prior clean dry laps in the same session+compound)
 ```
 
-This keeps the model focused on pace deltas instead of relearning that Bahrain,
-Monaco, and Hungary have different raw lap-time scales.
+The value is stored in `lap_time_delta_ms` for compatibility with the training
+pipeline. If the live-safe session+compound reference is missing, the dataset
+falls back to fold-training reference pace.
 
-The split strategy is leave-one-race-out by `session_id`. For each fold, the
-holdout race is completely excluded when Day 7 computes reference pace and
-driver pace offsets. This is the right V1 split because the production question
-is whether the model generalizes to another race, not whether it memorizes laps
-from the same session.
+The main split strategy is `temporal_expanding`: each fold trains on earlier
+sessions and validates on later sessions. LORO remains a stress test because, on
+only a few races, it behaves like leave-one-circuit-out.
 
 Categorical features use one-hot encoding:
 
@@ -202,3 +203,32 @@ Implemented in the augmented modeling patch:
 
 The 3-race temporal run remains a smoke test only. Full model-quality claims
 require running the manifest ingestion first.
+
+## Day 8.6 Undercut Modeling Hardening
+
+The current selected lap model is still the runtime simulator, but confidence is
+no longer raw aggregate R2. Model metadata now includes
+`confidence_calibration`, and `XGBoostPredictor` combines that base confidence
+with runtime feature-support penalties for unknown categories and missing live
+numeric values.
+
+Current temporal CV result from `models/xgb_pace_v1.meta.json`:
+
+| Metric | Value |
+|---|---:|
+| Feature set | `no_reference_lap_time_ms` |
+| Target | `session_normalized_delta` |
+| Candidate | `candidate_18` |
+| Objective | `reg:absoluteerror` |
+| Holdout MAE | 1,379.7 ms |
+| Holdout RMSE | 4,585.0 ms |
+| Holdout R2 | 0.020 |
+| Zero-delta MAE | 1,762.7 ms |
+| Train-mean MAE | 1,612.9 ms |
+| Improvement vs zero | 383.0 ms |
+| Calibrated base confidence | 0.755 |
+
+The pair-level undercut model is implemented only as an offline challenger in
+`backend/src/pitwall/ml/undercut_challenger.py`. It is not promoted to runtime:
+observed success validation has only 27 rows, and the proxy-label model mostly
+learns the current structural/scipy decision surface.
