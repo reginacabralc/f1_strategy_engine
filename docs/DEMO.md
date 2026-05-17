@@ -175,6 +175,73 @@ overall "Undercut Risk" status.
 - **Frontend:** `frontend/src/components/ReplayControls.tsx` checkbox + 6× speed default
 - **Tests:** 12 demo_mode unit tests + 4 frontend tests for the toggle and badges
 
+## Track maps
+
+Each selected circuit shows its own recognisable layout. The track map is
+the largest visual element on the Overview and Track tabs; live driver
+dots move around the circuit as the replay progresses.
+
+### Representation
+
+Track shapes live in [`frontend/src/data/trackLayouts.ts`](../frontend/src/data/trackLayouts.ts).
+Each layout is a closed SVG `<path>` in a fixed `0 0 280 200` viewBox so
+the SVG renderer can swap between circuits without rescaling. The shapes
+are hand-drawn stylised approximations — not topographically exact — but
+they capture each circuit's signature corners (Monaco's hairpin + tunnel
+chicane, Bahrain's twin DRS straights, Spa's Eau Rouge + Kemmel, Monza's
+chicanes + Parabolica, Silverstone's Maggotts-Becketts complex,
+Barcelona's long back straight, Hungaroring's twisty infield, Mexico's
+Foro Sol stadium section, the Red Bull Ring's three-straight layout,
+Marina Bay's tight street grid).
+
+### How driver positions are computed
+
+The backend does not stream telemetry coordinates. The frontend projects
+each driver onto the track centerline using a *spatial approximation*:
+
+```
+fraction_behind_leader = (gap_to_leader_ms mod 90_000) / 90_000
+fraction_around_track  = (startFinishAt + (1 - fraction_behind_leader)) mod 1
+(x, y)                 = path.getPointAtLength(fraction_around_track × pathLength)
+```
+
+The leader sits at the start/finish line; everyone else trails clockwise
+by their gap-to-leader share of a 90-second reference lap. This is good
+enough for the class demo — drivers spread around the track in race
+order, pit-bound cars dim, and the leader is always at the S/F line.
+
+### Currently supported circuits
+
+| Circuit | Display name | Notes |
+|---|---|---|
+| `monaco` | Circuit de Monaco | Ste-Devote → Casino → Loews hairpin → tunnel → harbour chicanes |
+| `bahrain` | Bahrain International Circuit | Twin DRS straights, figure-8 final sector |
+| `silverstone` (alias `british`) | Silverstone Circuit | Maggotts-Becketts-Chapel complex, Hangar straight, Stowe |
+| `monza` (alias `italian`) | Autodromo Nazionale Monza | Variante del Rettifilo, Lesmos, Ascari, Parabolica |
+| `spa` (alias `belgian`) | Spa-Francorchamps | La Source, Eau Rouge, Kemmel, Pouhon, Blanchimont, Bus Stop |
+| `barcelona` (alias `spanish`, `catalunya`) | Circuit de Barcelona-Catalunya | Long back straight + la Caixa hairpin |
+| `hungary` (alias `hungarian`, `hungaroring`) | Hungaroring | Twisty Mickey-Mouse layout, T1 right downhill |
+| `mexico_city` (alias `mexican`, `mexico`) | Autódromo Hermanos Rodríguez | Stadium section through Foro Sol |
+| `austrian` (alias `austria`, `red_bull_ring`) | Red Bull Ring | Three big straights + Spielberg hairpins |
+| `singapore` (alias `marina_bay`) | Marina Bay Street Circuit | Tight street grid, night-race silhouette |
+
+Any circuit not in the table renders a **generic stylised oval** with a
+small footer note: *"Custom layout not available for this track."* The
+dashboard does NOT crash on unknown circuits.
+
+### Adding a new circuit
+
+1. Add a new constant SVG path in `frontend/src/data/trackLayouts.ts`,
+   keeping `viewBox="0 0 280 200"`, drawing clockwise from start/finish,
+   and ending the path with `Z`.
+2. Register it in the `TRACK_LAYOUTS` map keyed by the `circuit_id` value
+   that the backend emits (check `/api/v1/sessions`).
+3. (Optional) Add `aliases: ["alternate_name"]` so older session_id
+   prefixes resolve to the same layout.
+4. Update the table above. Run `make test-frontend` — the layout-module
+   tests confirm the new path closes correctly and resolves via
+   `getTrackLayout(...)`.
+
 ## Reset between attempts
 
 If the demo finishes or a colleague needs to re-run:

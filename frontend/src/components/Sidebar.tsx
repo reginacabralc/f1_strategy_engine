@@ -1,6 +1,4 @@
-import { useState } from "react";
-
-type NavId =
+export type NavId =
   | "overview"
   | "timing"
   | "strategy"
@@ -125,8 +123,17 @@ const NAV_ITEMS: NavItem[] = [
   { id: "weather", label: "Weather", icon: <CloudIcon /> },
 ];
 
-export function Sidebar() {
-  const [active, setActive] = useState<NavId>("timing");
+interface SidebarProps {
+  activeTab?: NavId;
+  onSelectTab?: (id: NavId) => void;
+}
+
+export function Sidebar({
+  activeTab = "overview",
+  onSelectTab,
+}: SidebarProps = {}) {
+  const active = activeTab;
+  const setActive = (id: NavId) => onSelectTab?.(id);
 
   return (
     <nav

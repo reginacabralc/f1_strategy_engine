@@ -404,11 +404,13 @@ paths:
       operationId: setActivePredictor
       summary: Switch the active pace predictor at runtime
       description: |
-        Switches `PacePredictor` between `scipy` and `xgboost` without
-        restarting the backend. The new predictor takes effect on the
-        next `lap_complete` processed by the engine. 409 if the
-        requested predictor's model is not loaded (e.g. `xgboost`
-        before `make train-xgb` has run).
+        Switches `PacePredictor` between `scipy`, `xgboost`, and `causal`
+        without restarting the backend. The new predictor takes effect on
+        the next `lap_complete` processed by the engine. 409 if the
+        requested predictor's model is not loaded (e.g. `xgboost` before
+        `make train-xgb` has run). `causal` uses the scipy predictor for
+        pace projection and the causal observer for explanations — see
+        `docs/causal_model_performance.md`.
       requestBody:
         required: true
         content:
@@ -456,7 +458,7 @@ components:
 
     PredictorName:
       type: string
-      enum: [scipy, xgboost]
+      enum: [scipy, xgboost, causal]
 
     TrackStatus:
       type: string

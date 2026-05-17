@@ -87,6 +87,16 @@ async def set_active_predictor(
                     "without the xgboost package."
                 ),
             ) from exc
+    elif body.predictor == "causal":
+        # Causal mode uses the scipy predictor for pace projection (the causal
+        # graph itself is a structural-equation analyzer, not a learned pace
+        # model — see docs/causal_model_performance.md). We swap to scipy under
+        # the hood but tag the engine with the "causal" label so:
+        #   1. snapshots broadcast active_predictor="causal"
+        #   2. the causal observer keeps emitting predictor_used='causal' alerts
+        #      (it already runs in parallel when demo_mode is active)
+        # No XGBoost / causal model logic is altered.
+        predictor = _load_scipy()
     else:
         predictor = _load_scipy()
 
