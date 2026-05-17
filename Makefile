@@ -19,7 +19,7 @@ FRONTEND_CONTAINER_UP := $(shell docker compose ps --status running --services 2
         build-xgb-dataset validate-xgb-dataset diagnose-xgb-shift \
         evaluate-xgb-baselines run-xgb-ablations \
         tune-xgb train-xgb validate-xgb-model evaluate-undercut-challengers \
-        plot-xgb-diagnostics compare-predictors \
+        plot-xgb-diagnostics compare-predictors diagnose-xgb-undercut-failure \
         audit-causal-inputs reconstruct-race-gaps derive-known-undercuts \
         import-curated-known-undercuts build-causal-dataset run-causal-dowhy \
         compare-causal-engines prepare-causal-extended-data \
@@ -191,6 +191,13 @@ plot-xgb-diagnostics: install
 
 compare-predictors: install db-wait
 	PYTHONPATH=backend/src $(PYTHON) scripts/compare_predictors.py
+
+diagnose-xgb-undercut-failure: install db-wait
+	PYTHONPATH=backend/src $(PYTHON) scripts/diagnose_undercut_scores.py --predictor $(or $(PREDICTOR),xgboost)
+	PYTHONPATH=backend/src $(PYTHON) scripts/audit_undercut_labels.py --predictor $(or $(PREDICTOR),xgboost)
+	PYTHONPATH=backend/src $(PYTHON) scripts/diagnose_projection_error.py --predictor $(or $(PREDICTOR),xgboost)
+	PYTHONPATH=backend/src $(PYTHON) scripts/sweep_undercut_thresholds.py --predictor $(or $(PREDICTOR),xgboost)
+	PYTHONPATH=backend/src $(PYTHON) scripts/diagnose_xgb_runtime_features.py
 
 test: test-backend test-frontend
 

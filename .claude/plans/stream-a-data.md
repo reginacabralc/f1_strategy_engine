@@ -321,6 +321,14 @@ docs/adr/0009-xgboost-vs-scipy-resultados.md
 - [x] Tabla comparativa `scipy | xgboost` en ADR 0009 y quanta 06.
 - [x] Threshold sweep por score/confidence.
 - [x] Métricas segmentadas por compuesto/edad de neumático vía metadata de XGBoost.
+- [x] Diagnóstico de fallo post-PR #58:
+  - `scripts/diagnose_undercut_scores.py`, `scripts/audit_undercut_labels.py`,
+    `scripts/diagnose_projection_error.py`, `scripts/sweep_undercut_thresholds.py`
+    y `scripts/diagnose_xgb_runtime_features.py`.
+  - Resultado real: XGBoost mejora pace, pero el score de undercut queda en
+    0.0 para todos los pares; el problema principal es superficie
+    score/labels/physics, no confidence ni otro tuning de XGBoost.
+  - Reporte: `reports/ml/xgb_failure_diagnosis.md`.
 
 ### Día 10 — Documentación final
 - [x] Quanta `06-curva-fit-vs-xgboost.md` con números reales.

@@ -474,6 +474,17 @@
   success validation has only 27 rows. Random Forest proxy-label F1=0.0, so it
   is not a better runtime direction. Full report:
   `reports/ml/xgb_model_improvement_plan.md`.
+- [x] **Stream A+B: XGBoost undercut failure diagnosis completed.**
+  Added score decomposition, label audit, projection-error, threshold-sweep, and
+  runtime feature-parity diagnostics. Full replay-backed result over Bahrain,
+  Monaco, and Hungary 2024: `60,083` evaluated pairs, `0` positive scores,
+  max raw score `-12,048 ms`, `0` confidence-suppressed alerts, and `0`
+  nonzero-recall rows across the expanded threshold/physics sweep. Label audit
+  found `25` replay-derived positive labels, `21` not observable as exact
+  engine pairs. Runtime parity found all XGBoost contexts missing `team_code`
+  and `lap_in_stint_ratio`, and Bahrain fresh-MEDIUM contexts missing the live
+  reference required by `session_normalized_delta`. Diagnosis report:
+  `reports/ml/xgb_failure_diagnosis.md`.
 
 ### Día 9
 - [x] **Stream C: BacktestView frontend completado.**

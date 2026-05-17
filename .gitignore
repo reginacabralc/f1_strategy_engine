@@ -67,6 +67,7 @@ data/ml/*.parquet
 reports/figures/
 reports/ml/*
 !reports/ml/xgb_model_improvement_plan.md
+!reports/ml/xgb_failure_diagnosis.md
 
 data/ml/
 # data/causal/ is gitignored by default because the parquet files are large

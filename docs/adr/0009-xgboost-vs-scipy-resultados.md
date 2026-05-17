@@ -12,6 +12,12 @@ XGBoost entrenado supera el umbral de MAE@k=3. `.env.example` sigue en `scipy`
 para que un clone limpio arranque sin artifact ML preentrenado, pero el
 predictor recomendado cuando `models/xgb_pace_v1.json` existe es `xgboost`.
 
+Enmienda 2026-05-16: el diagnóstico post-PR #58 confirma que F1=0.0 ya no se
+explica por confianza XGBoost. La superficie de score/labels/physics es el
+bloqueador: `60,083` pares evaluados, `0` scores positivos, max raw score
+`-12,048 ms`, y `21/25` labels replay-derived no observables como pares exactos
+del motor. Ver `reports/ml/xgb_failure_diagnosis.md`.
+
 ## Contexto
 
 [ADR 0004](0004-baseline-scipy-antes-de-xgboost.md) decidió implementar dos predictores:
@@ -81,6 +87,8 @@ Fuente: `reports/ml/scipy_xgboost_backtest_report.json`, generado con
 - Ningún predictor emite alertas que matcheen los undercuts exitosos derivados
   del replay demo; el siguiente trabajo debe ajustar umbrales/contexto de alerta,
   no solo entrenar otro modelo.
+- Bajar umbrales no arregla el fallo actual: una sweep expandida por K, margen,
+  pit loss y cold-tyre produjo `0` filas con alerta y `0` recall no-cero.
 - El runtime XGBoost depende de un artifact entrenado localmente; si no existe,
   el sistema debe caer a `scipy` o pedir `make train-xgb`.
 
@@ -96,4 +104,5 @@ Fuente: `reports/ml/scipy_xgboost_backtest_report.json`, generado con
 - [ADR 0004](0004-baseline-scipy-antes-de-xgboost.md) — la decisión que dio origen al experimento.
 - [ADR 0011](0011-temporal-expanding-xgboost-validation.md) — validación temporal sin leakage.
 - [`docs/quanta/06-curva-fit-vs-xgboost.md`](../quanta/06-curva-fit-vs-xgboost.md)
+- [`reports/ml/xgb_failure_diagnosis.md`](../../reports/ml/xgb_failure_diagnosis.md)
 - `reports/ml/scipy_xgboost_backtest_report.json` — fuente local de los números.
