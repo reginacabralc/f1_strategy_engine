@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
+
+from pitwall.engine.projection import Compound, PaceContext, PacePrediction
 
 
 def test_load_scripted_alerts_returns_per_session_dict(tmp_path: Path) -> None:
@@ -121,7 +124,10 @@ def test_real_demo_alerts_file_loads_successfully() -> None:
         assert len(alerts[session_id]) >= 2, f"{session_id} has too few scripted alerts"
 
 
-def test_engine_loop_set_demo_mode_loads_scripted_alerts(monkeypatch, tmp_path):
+def test_engine_loop_set_demo_mode_loads_scripted_alerts(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     """set_demo_mode(True) populates _scripted_alerts; set_demo_mode(False) resets emit cache."""
     import pitwall.engine.demo_mode as demo_mod
     from pitwall.core.topics import Topics
@@ -140,14 +146,15 @@ def test_engine_loop_set_demo_mode_loads_scripted_alerts(monkeypatch, tmp_path):
     monkeypatch.setattr(demo_mod, "DEFAULT_SCRIPTED_ALERTS_PATH", fake)
 
     class _NoopBroadcaster:
-        async def broadcast_json(self, data):
+        async def broadcast_json(self, data: dict[str, Any]) -> None:
             pass
 
     class _ConstPredictor:
-        from pitwall.engine.projection import PaceContext, PacePrediction
-        def predict(self, ctx):
-            from pitwall.engine.projection import PacePrediction
+        def predict(self, ctx: PaceContext) -> PacePrediction:
             return PacePrediction(predicted_lap_time_ms=74_500, confidence=0.8)
+
+        def is_available(self, circuit_id: str, compound: Compound) -> bool:
+            return True
 
     loop = EngineLoop(
         topics=Topics(),
@@ -276,7 +283,9 @@ def test_build_causal_alert_payload_uses_observation_gap_and_pit_loss() -> None:
 
 
 @pytest.mark.asyncio
-async def test_engine_loop_emits_causal_alert_in_demo_mode(monkeypatch):
+async def test_engine_loop_emits_causal_alert_in_demo_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """When demo_mode is on and a pair is causally viable, a separate
     predictor_used='causal' alert is broadcast in addition to scipy/XGBoost."""
     import pitwall.engine.loop as loop_mod
@@ -286,13 +295,20 @@ async def test_engine_loop_emits_causal_alert_in_demo_mode(monkeypatch):
     from pitwall.engine.loop import EngineLoop
     from pitwall.engine.state import DriverState, RaceState
 
-    captured: list[dict] = []
+    captured: list[dict[str, Any]] = []
 
     class _Capture:
-        async def broadcast_json(self, data):
+        async def broadcast_json(self, data: dict[str, Any]) -> None:
             captured.append(data)
 
-    def _fake_causal(state, atk, def_, predictor, *, pit_loss_ms):
+    def _fake_causal(
+        state: Any,
+        atk: Any,
+        def_: Any,
+        predictor: Any,
+        *,
+        pit_loss_ms: int,
+    ) -> CausalLiveResult:
         obs = CausalLiveObservation(
             session_id=state.session_id or "test",
             circuit_id=state.circuit_id or "bahrain",
@@ -368,7 +384,9 @@ async def test_engine_loop_emits_causal_alert_in_demo_mode(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_engine_loop_does_not_emit_causal_alert_when_demo_mode_off(monkeypatch):
+async def test_engine_loop_does_not_emit_causal_alert_when_demo_mode_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Production path (demo_mode=False) must NOT call evaluate_causal_live."""
     import pitwall.engine.loop as loop_mod
     from pitwall.core.topics import Topics
@@ -378,14 +396,14 @@ async def test_engine_loop_does_not_emit_causal_alert_when_demo_mode_off(monkeyp
 
     called = {"count": 0}
 
-    def _spy_causal(*args, **kwargs):
+    def _spy_causal(*args: Any, **kwargs: Any) -> None:
         called["count"] += 1
         raise RuntimeError("must not be called in production")
 
     monkeypatch.setattr(loop_mod, "evaluate_causal_live", _spy_causal)
 
     class _NoopCast:
-        async def broadcast_json(self, data):
+        async def broadcast_json(self, data: dict[str, Any]) -> None:
             pass
 
     loop = EngineLoop(
