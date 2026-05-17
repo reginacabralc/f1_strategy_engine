@@ -18,7 +18,7 @@ FRONTEND_CONTAINER_UP := $(shell docker compose ps --status running --services 2
         fit-driver-offsets validate-driver-offsets \
         build-xgb-dataset validate-xgb-dataset diagnose-xgb-shift \
         evaluate-xgb-baselines run-xgb-ablations \
-        tune-xgb train-xgb validate-xgb-model \
+        tune-xgb train-xgb validate-xgb-model evaluate-undercut-challengers \
         plot-xgb-diagnostics compare-predictors \
         audit-causal-inputs reconstruct-race-gaps derive-known-undercuts \
         import-curated-known-undercuts build-causal-dataset run-causal-dowhy \
@@ -160,7 +160,7 @@ prepare-causal-extended-data: install
 	PYTHONPATH=backend/src $(PYTHON) scripts/prepare_causal_extended_data.py
 
 build-xgb-dataset: install db-wait
-	PYTHONPATH=backend/src $(PYTHON) scripts/build_xgb_dataset.py --split-strategy $(or $(SPLIT_STRATEGY),temporal_expanding) --target-strategy $(or $(TARGET_STRATEGY),lap_time_delta)
+	PYTHONPATH=backend/src $(PYTHON) scripts/build_xgb_dataset.py --split-strategy $(or $(SPLIT_STRATEGY),temporal_expanding) --target-strategy $(or $(TARGET_STRATEGY),session_normalized_delta)
 
 validate-xgb-dataset: install
 	PYTHONPATH=backend/src $(PYTHON) scripts/validate_xgb_dataset.py
@@ -182,6 +182,9 @@ validate-xgb-model: install
 
 tune-xgb: install
 	PYTHONPATH=backend/src $(PYTHON) scripts/tune_xgb.py --feature-set $(or $(FEATURE_SET),full)
+
+evaluate-undercut-challengers: install
+	PYTHONPATH=backend/src $(PYTHON) scripts/evaluate_undercut_challengers.py
 
 plot-xgb-diagnostics: install
 	PYTHONPATH=backend/src $(PYTHON) scripts/plot_xgb_diagnostics.py

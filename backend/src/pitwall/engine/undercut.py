@@ -15,7 +15,9 @@ Math (§6.4-6.7)
    with cold-tyre penalty on laps 1 and 2).
 3. Sum the per-lap gains: ``gap_recuperable = Σ(defender_k - attacker_k)``.
 4. Score: ``clamp((gap_recuperable - pit_loss - gap_actual - MARGIN) / pit_loss, 0, 1)``
-5. Confidence: ``min(R²_defender, R²_attacker)`` — both models must be reliable.
+5. Confidence: ``min(confidence_defender, confidence_attacker)`` multiplied by
+   live data-quality support. For XGBoost this is validation-calibrated support,
+   not raw aggregate R2.
 6. Alert if ``score > 0.4 AND confidence > 0.5`` (§6.8).
 """
 
@@ -75,7 +77,7 @@ _TRAFFIC_CONFIDENCE_PENALTY: float = 0.2
 def _data_quality_factor(attacker: DriverState) -> float:
     """Compute the data-quality multiplier for confidence (§6.7).
 
-    Returns a value in ``[0.0, 1.0]`` that scales down the raw R² confidence
+    Returns a value in ``[0.0, 1.0]`` that scales down predictor confidence
     when the projection is less reliable than usual:
 
     - **Short stint**: attacker has fewer than :data:`_FULL_QUALITY_LAPS` laps
@@ -187,7 +189,7 @@ class UndercutDecision:
     attacker recovers double the pit-loss time in the projection window."""
 
     confidence: float
-    """Model reliability in ``[0, 1]`` — ``min(R²_defender, R²_attacker)``."""
+    """Model support in ``[0, 1]`` after predictor and live-quality penalties."""
 
     estimated_gain_ms: int
     """``gap_recuperable - pit_loss_ms``: net time gained over the defender

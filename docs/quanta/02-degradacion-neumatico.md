@@ -30,13 +30,15 @@ Persistido en tabla `degradation_coefficients` con R² del ajuste y `n_samples`.
 
 ### V1 ML (`XGBoostPredictor`)
 
-XGBoost predice `lap_time_delta_ms = lap_time - median(prior clean dry laps in session+compound)`
-con features:
+XGBoost predice `session_normalized_delta` guardado en `lap_time_delta_ms`:
+`lap_time - median(prior clean dry laps in session+compound)`, con fallback
+fold-safe si esa referencia live-safe no existe. Features principales:
 
 - `tyre_age`, `compound_one_hot`, `circuit_id_one_hot`
-- `track_temp`, `air_temp`, `humidity`
-- `lap_in_stint_ratio`, `stint_position`
-- `driver_skill_offset`, `team_id_one_hot`
+- `track_temp`, `air_temp`
+- `lap_in_stint`, `lap_in_stint_ratio`, `stint_number`
+- `position`, `gap_to_ahead_ms`, `gap_to_leader_ms`, proxies de tráfico
+- `driver_pace_offset_ms`, `team_code_one_hot`
 - `fuel_proxy = 1 - laps_done / total_laps`
 
 El cliff se captura sin programación explícita gracias a `lap_in_stint_ratio` y la no-linealidad de los árboles.

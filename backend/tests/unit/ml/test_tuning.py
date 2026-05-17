@@ -5,6 +5,8 @@ from pathlib import Path
 
 from pitwall.ml.tuning import (
     CandidateResult,
+    SearchCandidate,
+    candidate_search_space,
     load_selected_hyperparameters,
     load_selected_tuning_config,
     select_best_candidate,
@@ -51,6 +53,20 @@ def test_select_best_candidate_uses_mae_then_rmse_then_gap() -> None:
     selected = select_best_candidate(candidates)
 
     assert selected.candidate_id == "best"
+
+
+def test_candidate_search_space_is_seeded_and_covers_objectives_and_rounds() -> None:
+    first = candidate_search_space(n_random=8, seed=123, include_curated=False)
+    second = candidate_search_space(n_random=8, seed=123, include_curated=False)
+
+    assert first == second
+    assert all(isinstance(candidate, SearchCandidate) for candidate in first)
+    assert {candidate.hyperparameters["objective"] for candidate in first} >= {
+        "reg:squarederror",
+        "reg:absoluteerror",
+        "reg:pseudohubererror",
+    }
+    assert len({candidate.num_boost_round for candidate in first}) > 1
 
 
 def test_load_selected_tuning_config_returns_hyperparameters_and_rounds(tmp_path: Path) -> None:

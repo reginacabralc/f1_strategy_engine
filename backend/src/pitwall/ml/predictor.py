@@ -34,8 +34,8 @@ class XGBoostPredictor:
     The model is expected to be serialised with
     ``XGBRegressor.save_model(path)`` (native JSON format).  An optional
     sidecar file ``<model>.meta.json`` stores training metadata
-    (feature list, training date, MAE, R²) and is loaded automatically
-    when present.
+    (feature list, training date, MAE, confidence calibration) and is loaded
+    automatically when present.
     """
 
     def __init__(self, model: Any, metadata: dict[str, Any]) -> None:
@@ -129,7 +129,7 @@ class XGBoostPredictor:
             )
         return PacePrediction(
             predicted_lap_time_ms=round(lap_time_ms),
-            confidence=self._confidence(),
+            confidence=self._confidence(ctx),
         )
 
     def is_available(self, circuit_id: str, compound: str) -> bool:
@@ -247,7 +247,26 @@ class XGBoostPredictor:
             "team_code": _slug(ctx.team_code or "UNKNOWN"),
         }
 
-    def _confidence(self) -> float:
+    def _confidence(self, ctx: PaceContext) -> float:
+        calibrated = self._calibrated_base_confidence()
+        if calibrated is not None:
+            return max(0.0, min(1.0, calibrated - self._support_penalty(ctx)))
+        return self._legacy_r2_confidence()
+
+    def _calibrated_base_confidence(self) -> float | None:
+        calibration = self._metadata.get("confidence_calibration") or {}
+        if not isinstance(calibration, dict):
+            return None
+        raw = calibration.get("base_confidence")
+        if raw is None:
+            return None
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            return None
+        return max(0.0, min(1.0, value)) if math.isfinite(value) else None
+
+    def _legacy_r2_confidence(self) -> float:
         metrics = self._metadata.get("aggregate_metrics") or {}
         if not isinstance(metrics, dict):
             return 0.5
@@ -263,6 +282,27 @@ class XGBoostPredictor:
             return max(0.0, min(1.0, float(raw)))
         except (TypeError, ValueError):
             return 0.5
+
+    def _support_penalty(self, ctx: PaceContext) -> float:
+        schema = self._feature_schema()
+        categorical_features = [str(name) for name in schema.get("categorical_features") or []]
+        categorical_values = schema.get("categorical_values") or {}
+        category_values = self._categorical_values(ctx)
+        penalty = 0.0
+        for feature in categorical_features:
+            allowed = {str(value) for value in categorical_values.get(feature, [])}
+            actual = category_values.get(feature, "UNKNOWN")
+            if actual not in allowed:
+                penalty += 0.08
+
+        numeric_values = self._numeric_values(ctx)
+        for feature in schema.get("numeric_features") or []:
+            value = numeric_values.get(str(feature))
+            if value is None:
+                penalty += 0.015
+        if numeric_values.get("driver_pace_offset_missing") is True:
+            penalty += 0.05
+        return min(0.45, penalty)
 
 
 def _slug(value: str) -> str:

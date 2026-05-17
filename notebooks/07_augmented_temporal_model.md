@@ -22,9 +22,10 @@ make validate-xgb-dataset
 make diagnose-xgb-shift
 make evaluate-xgb-baselines
 make run-xgb-ablations
-make tune-xgb
-make train-xgb
+make tune-xgb FEATURE_SET=no_reference_lap_time_ms TARGET_STRATEGY=session_normalized_delta
+make train-xgb FEATURE_SET=no_reference_lap_time_ms
 make validate-xgb-model
+make evaluate-undercut-challengers
 make plot-xgb-diagnostics
 ```
 
@@ -36,9 +37,10 @@ make validate-xgb-dataset
 make diagnose-xgb-shift
 make evaluate-xgb-baselines
 make run-xgb-ablations
-make tune-xgb
-make train-xgb
+make tune-xgb FEATURE_SET=no_reference_lap_time_ms TARGET_STRATEGY=session_normalized_delta
+make train-xgb FEATURE_SET=no_reference_lap_time_ms
 make validate-xgb-model
+make evaluate-undercut-challengers
 make plot-xgb-diagnostics
 ```
 
@@ -88,7 +90,7 @@ Known data edge cases are explicit: the rerun loaded 2024 Qatar successfully,
 while 2024 Sao Paulo ingested but produced zero dry usable rows because FastF1
 exposed blank/WET compound data under non-standard conditions.
 
-Observed final Day 8.2 result:
+Observed Day 8.2 result:
 
 - Selected target: `session_normalized_delta`.
 - Selected feature set: `no_reference_lap_time_ms`.
@@ -98,6 +100,34 @@ Observed final Day 8.2 result:
 - Baselines: zero-delta MAE 1,762.7 ms; train-mean MAE 1,612.9 ms.
 - Gate: passed by 200.8 ms vs zero-delta (11.4%) and by 51.0 ms vs
   train-mean; all five folds improve over zero-delta.
+
+## Day 8.6 runtime-first hardening
+
+The undercut-oriented pass kept the same target and feature set, but expanded
+tuning to a deterministic 24-candidate search and fixed XGBoost runtime
+confidence.
+
+- Selected candidate: `candidate_18`.
+- Selected objective: `reg:absoluteerror`.
+- Selected config: depth 5, eta 0.032881845587215686, subsample
+  0.5229121918278311, colsample 0.6139491378257734, min-child-weight 1,
+  lambda 5, alpha 0, gamma 20, `tree_method=hist`, 100 rounds, early stopping 20.
+- Aggregate temporal CV: MAE 1,379.7 ms, RMSE 4,585.0 ms, R2 0.020.
+- Baselines: zero-delta MAE 1,762.7 ms; train-mean MAE 1,612.9 ms.
+- Gate: passed by 383.0 ms vs zero-delta (21.7%) and by 233.2 ms vs
+  train-mean.
+- Runtime confidence: metadata-calibrated base confidence 0.755, with penalties
+  for unknown runtime circuit/compound/driver/team and missing live numeric
+  features. Raw R2 is no longer used as the main confidence gate.
+
+Replay-backed decision metrics still show F1 0.0 for both scipy and XGBoost.
+After the confidence fix, the default threshold sweep reports zero
+confidence-suppressed alerts, so the remaining blocker is the score/label
+decision surface rather than XGBoost confidence.
+
+The pair-level XGBoost and Random Forest challengers are offline only. XGBoost
+gets proxy-label F1 0.400, but observed-success validation has only 27 rows.
+Random Forest gets proxy-label F1 0.0. Neither should become runtime default.
 
 ## Figures
 

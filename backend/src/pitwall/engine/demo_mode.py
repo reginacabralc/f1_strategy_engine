@@ -50,7 +50,10 @@ def _resolve_default_scripted_alerts_path() -> Path:
     candidates = [
         Path("data/demo/scripted_alerts.json"),  # cwd = repo root (local dev)
         Path("/app/data/demo/scripted_alerts.json"),  # Docker volume mount
-        Path(__file__).resolve().parents[4] / "data" / "demo" / "scripted_alerts.json",  # editable install
+        Path(__file__).resolve().parents[4]
+        / "data"
+        / "demo"
+        / "scripted_alerts.json",  # editable install
     ]
     for candidate in candidates:
         if candidate.exists():

@@ -167,9 +167,10 @@ Comparar el predictor scipy contra el artifact XGBoost actual:
 make compare-predictors
 ```
 
-El reporte queda en `reports/ml/scipy_xgboost_backtest_report.json`. El default
-del MVP permanece `PACE_PREDICTOR=scipy` porque XGBoost mejora MAE@k=3 en el
-backtest demo, pero no alcanza el umbral de 10% definido en ADR 0009.
+El reporte queda en `reports/ml/scipy_xgboost_backtest_report.json`. El artifact
+XGBoost entrenado ahora supera el umbral de MAE@k=3 definido en ADR 0009, pero
+el default de bootstrap permanece `PACE_PREDICTOR=scipy` para que un clone limpio
+arranque sin requerir `models/xgb_pace_v1.json`.
 
 Para el run completo de Stream A, primero carga el manifiesto 2024/2025:
 
@@ -217,7 +218,7 @@ Cuando ves `UNDERCUT_VIABLE` para `(attacker=NOR, defender=VER, lap=18)`:
 | `pit_loss_ms` | Tiempo perdido en pit lane (medido del histórico para este equipo y circuito) |
 | `gain_acumulada_5` | Ganancia esperada en 5 vueltas si attacker pone neumáticos nuevos y defender se queda fuera |
 | `score` | (gain - pit_loss - gap) / pit_loss, en [0, 1] |
-| `confidence` | min(R²_defender, R²_attacker) × data_quality_factor |
+| `confidence` | soporte del predictor para el contexto runtime × `data_quality_factor`; en XGBoost viene de validación temporal calibrada, no de R² bruto |
 | `recommended_action` | "PIT_NOW" si score > 0.4 y confidence > 0.5 |
 
 Si `confidence < 0.5`, la alerta no se emite.

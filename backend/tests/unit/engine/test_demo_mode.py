@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
+
+from pitwall.engine.projection import Compound, PaceContext, PacePrediction
 
 
 def test_load_scripted_alerts_returns_per_session_dict(tmp_path: Path) -> None:
@@ -60,10 +63,10 @@ def test_load_scripted_alerts_skips_malformed_entries(tmp_path: Path) -> None:
 
 def test_relaxed_thresholds_are_lower_than_production() -> None:
     from pitwall.engine.demo_mode import (
-        RELAXED_SCORE_THRESHOLD,
         RELAXED_CONFIDENCE_THRESHOLD,
+        RELAXED_SCORE_THRESHOLD,
     )
-    from pitwall.engine.undercut import SCORE_THRESHOLD, CONFIDENCE_THRESHOLD
+    from pitwall.engine.undercut import CONFIDENCE_THRESHOLD, SCORE_THRESHOLD
 
     assert RELAXED_SCORE_THRESHOLD < SCORE_THRESHOLD
     assert RELAXED_CONFIDENCE_THRESHOLD < CONFIDENCE_THRESHOLD
@@ -73,7 +76,7 @@ def test_relaxed_thresholds_are_lower_than_production() -> None:
 
 
 def test_build_scripted_alert_payload_has_required_fields() -> None:
-    from pitwall.engine.demo_mode import build_scripted_alert_payload, ScriptedAlert
+    from pitwall.engine.demo_mode import ScriptedAlert, build_scripted_alert_payload
 
     scripted = ScriptedAlert(
         lap_number=9,
@@ -110,7 +113,7 @@ def test_default_scripted_alerts_path_points_to_data_demo() -> None:
 
 def test_real_demo_alerts_file_loads_successfully() -> None:
     """The committed data/demo/scripted_alerts.json must load without errors."""
-    from pitwall.engine.demo_mode import load_scripted_alerts, DEFAULT_SCRIPTED_ALERTS_PATH
+    from pitwall.engine.demo_mode import DEFAULT_SCRIPTED_ALERTS_PATH, load_scripted_alerts
 
     alerts = load_scripted_alerts(DEFAULT_SCRIPTED_ALERTS_PATH)
     assert "bahrain_2024_R" in alerts
@@ -121,11 +124,14 @@ def test_real_demo_alerts_file_loads_successfully() -> None:
         assert len(alerts[session_id]) >= 2, f"{session_id} has too few scripted alerts"
 
 
-def test_engine_loop_set_demo_mode_loads_scripted_alerts(monkeypatch, tmp_path):
+def test_engine_loop_set_demo_mode_loads_scripted_alerts(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     """set_demo_mode(True) populates _scripted_alerts; set_demo_mode(False) resets emit cache."""
-    from pitwall.engine.loop import EngineLoop
-    from pitwall.core.topics import Topics
     import pitwall.engine.demo_mode as demo_mod
+    from pitwall.core.topics import Topics
+    from pitwall.engine.loop import EngineLoop
 
     # Point the loader at a temp scripted_alerts file
     fake = tmp_path / "alerts.json"
@@ -140,14 +146,15 @@ def test_engine_loop_set_demo_mode_loads_scripted_alerts(monkeypatch, tmp_path):
     monkeypatch.setattr(demo_mod, "DEFAULT_SCRIPTED_ALERTS_PATH", fake)
 
     class _NoopBroadcaster:
-        async def broadcast_json(self, data):
+        async def broadcast_json(self, data: dict[str, Any]) -> None:
             pass
 
     class _ConstPredictor:
-        from pitwall.engine.projection import PaceContext, PacePrediction
-        def predict(self, ctx):
-            from pitwall.engine.projection import PacePrediction
+        def predict(self, ctx: PaceContext) -> PacePrediction:
             return PacePrediction(predicted_lap_time_ms=74_500, confidence=0.8)
+
+        def is_available(self, circuit_id: str, compound: Compound) -> bool:
+            return True
 
     loop = EngineLoop(
         topics=Topics(),
@@ -169,8 +176,8 @@ def test_engine_loop_set_demo_mode_loads_scripted_alerts(monkeypatch, tmp_path):
 
 
 def test_build_causal_alert_payload_marks_predictor_as_causal() -> None:
-    from pitwall.engine.demo_mode import build_causal_alert_payload
     from pitwall.causal.live_inference import CausalLiveObservation, CausalLiveResult
+    from pitwall.engine.demo_mode import build_causal_alert_payload
 
     obs = CausalLiveObservation(
         session_id="bahrain_2024_R",
@@ -204,7 +211,10 @@ def test_build_causal_alert_payload_marks_predictor_as_causal() -> None:
         projected_gap_after_pit_ms=-600,
         traffic_after_pit="low",
         top_factors=("projected_gap_after_pit_ms", "gap_to_rival_ms"),
-        explanations=("Undercut viable: projected fresh-tyre gain is above pit-loss-adjusted requirement.",),
+        explanations=(
+            "Undercut viable: projected fresh-tyre gain is above "
+            "pit-loss-adjusted requirement.",
+        ),
         counterfactuals=(),
     )
     payload = build_causal_alert_payload(result)
@@ -227,9 +237,9 @@ def test_build_causal_alert_payload_marks_predictor_as_causal() -> None:
 
 
 def test_build_causal_alert_payload_uses_observation_gap_and_pit_loss() -> None:
-    """Causal alerts must carry the observation's gap and pit_loss for parity with scipy/xgb alerts."""
-    from pitwall.engine.demo_mode import build_causal_alert_payload
+    """Causal alerts must carry observation gap and pit_loss for predictor parity."""
     from pitwall.causal.live_inference import CausalLiveObservation, CausalLiveResult
+    from pitwall.engine.demo_mode import build_causal_alert_payload
 
     obs = CausalLiveObservation(
         session_id="monaco_2024_R",
@@ -273,24 +283,32 @@ def test_build_causal_alert_payload_uses_observation_gap_and_pit_loss() -> None:
 
 
 @pytest.mark.asyncio
-async def test_engine_loop_emits_causal_alert_in_demo_mode(monkeypatch):
+async def test_engine_loop_emits_causal_alert_in_demo_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """When demo_mode is on and a pair is causally viable, a separate
     predictor_used='causal' alert is broadcast in addition to scipy/XGBoost."""
-    from pitwall.engine.loop import EngineLoop
-    from pitwall.engine.pit_loss import PitLossTable
-    from pitwall.degradation.predictor import ScipyPredictor
-    from pitwall.core.topics import Topics
-    from pitwall.engine.state import RaceState, DriverState
-    from pitwall.causal.live_inference import CausalLiveObservation, CausalLiveResult
     import pitwall.engine.loop as loop_mod
+    from pitwall.causal.live_inference import CausalLiveObservation, CausalLiveResult
+    from pitwall.core.topics import Topics
+    from pitwall.degradation.predictor import ScipyPredictor
+    from pitwall.engine.loop import EngineLoop
+    from pitwall.engine.state import DriverState, RaceState
 
-    captured: list[dict] = []
+    captured: list[dict[str, Any]] = []
 
     class _Capture:
-        async def broadcast_json(self, data):
+        async def broadcast_json(self, data: dict[str, Any]) -> None:
             captured.append(data)
 
-    def _fake_causal(state, atk, def_, predictor, *, pit_loss_ms):
+    def _fake_causal(
+        state: Any,
+        atk: Any,
+        def_: Any,
+        predictor: Any,
+        *,
+        pit_loss_ms: int,
+    ) -> CausalLiveResult:
         obs = CausalLiveObservation(
             session_id=state.session_id or "test",
             circuit_id=state.circuit_id or "bahrain",
@@ -366,24 +384,26 @@ async def test_engine_loop_emits_causal_alert_in_demo_mode(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_engine_loop_does_not_emit_causal_alert_when_demo_mode_off(monkeypatch):
+async def test_engine_loop_does_not_emit_causal_alert_when_demo_mode_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Production path (demo_mode=False) must NOT call evaluate_causal_live."""
-    from pitwall.engine.loop import EngineLoop
-    from pitwall.degradation.predictor import ScipyPredictor
-    from pitwall.core.topics import Topics
-    from pitwall.engine.state import RaceState, DriverState
     import pitwall.engine.loop as loop_mod
+    from pitwall.core.topics import Topics
+    from pitwall.degradation.predictor import ScipyPredictor
+    from pitwall.engine.loop import EngineLoop
+    from pitwall.engine.state import DriverState, RaceState
 
     called = {"count": 0}
 
-    def _spy_causal(*args, **kwargs):
+    def _spy_causal(*args: Any, **kwargs: Any) -> None:
         called["count"] += 1
         raise RuntimeError("must not be called in production")
 
     monkeypatch.setattr(loop_mod, "evaluate_causal_live", _spy_causal)
 
     class _NoopCast:
-        async def broadcast_json(self, data):
+        async def broadcast_json(self, data: dict[str, Any]) -> None:
             pass
 
     loop = EngineLoop(

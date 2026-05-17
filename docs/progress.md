@@ -16,8 +16,8 @@
 | Motor undercut V1 con `ScipyPredictor` | ⏳ | Día 5 | Stream B |
 | Pipeline end-to-end con datos reales | ⏳ | Día 7 | Todos |
 | **XGBoost entrenado y serializado** | ✅ | Día 8 | Stream A — native Booster trained, serialized, and validated; weak 3-race holdout metrics documented |
-| **XGBoost temporal multi-season preparado** | ✅ | Día 8.5 | Stream A — manifest 2024/2025, temporal CV, tuning, plots, ADR 0011; full ingestion run pending |
-| **Backtest comparativo scipy vs XGBoost** | ✅ | Día 9 | Stream A+B — runtime XGBoost + replay-derived comparison; default remains scipy |
+| **XGBoost temporal multi-season preparado** | ✅ | Día 8.5 | Stream A — manifest 2024/2025, temporal CV, structured random tuning, confidence calibration, ADR 0011 |
+| **Backtest comparativo scipy vs XGBoost** | ✅ | Día 9 | Stream A+B — runtime XGBoost + replay-derived comparison; XGBoost wins pace MAE, alert F1 still 0.0 |
 | Demo end-to-end probada en limpio | ✅ | Día 9 | Stream D — clean clone + fresh DB volume validated in 481.10s |
 
 ### Fix — demo API localhost
@@ -453,9 +453,27 @@
   succeeded 48, failed 0, and skipped six disabled 2026 races. Dataset has
   151,363 usable rows across 47 usable sessions; 2024 Sao Paulo is explicit
   zero-usable due unsupported/missing compound rows. Temporal CV aggregate:
-  XGBoost MAE/RMSE/R² = 1,561.9 ms / 4,614.4 ms / 0.007 vs zero-delta
-  1,762.7 ms and train-mean 1,612.9 ms. Improvement vs zero is 200.8 ms
-  (11.4%), and all five folds improve over zero-delta.
+	  XGBoost MAE/RMSE/R² = 1,561.9 ms / 4,614.4 ms / 0.007 vs zero-delta
+	  1,762.7 ms and train-mean 1,612.9 ms. Improvement vs zero is 200.8 ms
+	  (11.4%), and all five folds improve over zero-delta.
+
+### Día 8.6 — XGBoost undercut modeling hardening
+- [x] **Stream A: runtime-first XGBoost improvement implemented.**
+  Expanded tuning to curated plus seeded structured random search. The selected
+  run is `candidate_18` with `reg:absoluteerror`, depth 5, eta
+  0.032881845587215686, 100 rounds, `hist`, and early stopping 20. Temporal CV
+  improved to MAE/RMSE/R2 = 1,379.7 ms / 4,585.0 ms / 0.020 vs zero-delta
+  1,762.7 ms and train-mean 1,612.9 ms.
+- [x] **Stream A+B: XGBoost confidence gate fixed.**
+  `XGBoostPredictor` now uses `confidence_calibration` from model metadata,
+  currently base confidence 0.755, plus runtime support penalties for unknown
+  categories and missing live features. Raw aggregate R2 is no longer the main
+  runtime confidence signal.
+- [x] **Stream A: offline decision challengers evaluated.**
+  Pair-level XGBoost remains offline only: proxy-label F1=0.400, but observed
+  success validation has only 27 rows. Random Forest proxy-label F1=0.0, so it
+  is not a better runtime direction. Full report:
+  `reports/ml/xgb_model_improvement_plan.md`.
 
 ### Día 9
 - [x] **Stream C: BacktestView frontend completado.**
@@ -474,9 +492,11 @@
   Added `backend/src/pitwall/engine/backtest.py`, real
   `GET /api/v1/backtest/{session_id}?predictor=scipy|xgboost`, and
   `make compare-predictors`. Current demo comparison over Bahrain, Monaco and
-  Hungary 2024: mean MAE@k3 scipy=1619 ms, XGBoost=1482 ms (~8.5% better),
-  but below ADR 0009's 10% threshold; both predictors had alert F1=0.0.
-  Recommended default remains `scipy`.
+	  Hungary 2024: mean MAE@k3 scipy=1619 ms, XGBoost=1424 ms (~12.0% better),
+	  clearing ADR 0009's pace threshold; both predictors still have alert F1=0.0.
+	  XGBoost is the recommended trained artifact for pace simulation, while
+	  `.env.example` remains `scipy` so clean demo bootstrap does not require a
+	  prebuilt model artifact.
 - [x] **Stream B**: confidence final, `data_quality_factor`, calibratable cold-tyre penalties,
   hypothesis property tests, and `/api/v1/backtest/{session_id}` endpoint.
   `_data_quality_factor(atk)` reduces confidence for short stints (< 8 laps → linear ramp)
@@ -588,8 +608,12 @@
 - [x] Blockers classified precisely:
       1. **Score = 0** (Monaco/Hungary): low degradation → `gap_recuperable ≤ 0` under green flag.
          Monaco is VSC-driven; green-flag undercuts are genuinely unviable (engine correct).
-      2. **Confidence < 0.5** (all sessions): max R²=0.362 (Monaco MEDIUM), threshold=0.5 unreachable.
-      3. **Bahrain INSUFFICIENT_DATA**: `_NEXT_COMPOUND` maps to MEDIUM, no Bahrain MEDIUM coefficient.
+	      2. **Confidence < 0.5** (all sessions): max R²=0.362 (Monaco MEDIUM), threshold=0.5 unreachable.
+	      3. **Bahrain INSUFFICIENT_DATA**: `_NEXT_COMPOUND` maps to MEDIUM, no Bahrain MEDIUM coefficient.
+- [x] Follow-up: the XGBoost-specific confidence blocker was fixed in Day 8.6.
+      The latest backtest threshold sweep reports zero confidence-suppressed
+      XGBoost alerts at the default 0.4/0.5 gate; remaining no-alert behavior is
+      score/decision-surface driven.
 - [x] Validation doc: `docs/stream-c-phase5c-live-alert-verification.md`.
 - [ ] Alerts do not yet fire — remaining fixes before panel-by-panel design:
       lower `CONFIDENCE_THRESHOLD` to 0.25–0.30, or use a session with real green-flag degradation.

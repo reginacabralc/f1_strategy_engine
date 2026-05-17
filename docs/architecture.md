@@ -102,7 +102,7 @@ UndercutEngine.consume()
             # 3. proyectar pace attacker k=1..5: predictor.predict(attacker, fresh_compound, k)
             # 4. gap_recuperable_acumulado(k)
             # 5. score = clamp((gain - pit_loss - gap) / pit_loss, 0, 1)
-            # 6. confidence = min(R²_defender, R²_attacker) * data_quality
+            # 6. confidence = min(predictor support) * data_quality
          if decision.should_alert:
             await alerts_topic.publish(decision)
             await db.persist(decision)

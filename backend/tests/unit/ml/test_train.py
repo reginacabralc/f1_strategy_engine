@@ -17,6 +17,16 @@ DIAGNOSIS = (
 )
 
 
+def _metadata_base() -> dict[str, Any]:
+    return {
+        "target_transform": {"strategy": "identity"},
+        "confidence_calibration": {
+            "method": "temporal_validation_support_v1",
+            "base_confidence": 0.5,
+        },
+    }
+
+
 def _frame() -> pl.DataFrame:
     return pl.DataFrame(
         [
@@ -119,7 +129,76 @@ def test_metrics_and_zero_delta_baseline_are_calculated() -> None:
     assert metrics.mae_ms == pytest.approx(13.3333333333)
     assert metrics.rmse_ms == pytest.approx(np.sqrt((10.0**2 + 30.0**2) / 3))
     assert metrics.r2 == pytest.approx(0.9538461538)
+    assert metrics.median_abs_error_ms == pytest.approx(10.0)
+    assert metrics.p75_abs_error_ms == pytest.approx(20.0)
+    assert metrics.p90_abs_error_ms == pytest.approx(26.0)
+    assert metrics.signed_bias_ms == pytest.approx(6.6666666667)
     assert zero_metrics.mae_ms == pytest.approx(83.3333333333)
+
+
+def test_target_clip_transform_winsorizes_training_labels_only() -> None:
+    target = np.array([-1000.0, 0.0, 100.0, 200.0, 20_000.0])
+
+    fitted = train.fit_target_transform(
+        target,
+        train.TargetClipConfig(lower_quantile=0.2, upper_quantile=0.8),
+    )
+    transformed = train.apply_target_transform(target, fitted)
+
+    assert fitted.strategy == "winsorize_quantile"
+    assert fitted.lower_bound_ms == pytest.approx(-200.0)
+    assert fitted.upper_bound_ms == pytest.approx(4160.0)
+    assert transformed.tolist() == pytest.approx([-200.0, 0.0, 100.0, 200.0, 4160.0])
+
+
+def test_training_metadata_records_confidence_calibration_and_target_transform() -> None:
+    fold_result = train.FoldEvaluationResult(
+        fold_metrics=[
+            {
+                "fold_id": "fold_001",
+                "holdout_session": "s2",
+                "holdout_mae_ms": 900.0,
+                "zero_holdout_mae_ms": 1100.0,
+                "train_mean_holdout_mae_ms": 950.0,
+                "improvement_vs_zero_mae_ms": 200.0,
+                "target_distribution": {"count": 2},
+            }
+        ],
+        aggregate_metrics={
+            "holdout_mae_ms": 900.0,
+            "zero_holdout_mae_ms": 1100.0,
+            "train_mean_holdout_mae_ms": 950.0,
+            "improvement_vs_zero_mae_ms": 200.0,
+            "train_validation_gap_mae_ms": 100.0,
+        },
+        baseline_metrics={"zero_holdout_mae_ms": 1100.0},
+    )
+
+    metadata = train.build_training_metadata(
+        dataset_metadata={"sessions_included": ["s1", "s2"], "folds": []},
+        dataset_path=Path("data/ml/xgb_pace_dataset.parquet"),
+        dataset_metadata_path=Path("data/ml/xgb_pace_dataset.meta.json"),
+        final_schema=train.fit_feature_schema(_frame()),
+        fold_result=fold_result,
+        row_count=4,
+        usable_row_count=4,
+        hyperparameters=train.default_hyperparameters(),
+        num_boost_round=10,
+        top_feature_importances=[],
+        target_transform=train.FittedTargetTransform(
+            strategy="winsorize_quantile",
+            lower_bound_ms=-200.0,
+            upper_bound_ms=4200.0,
+            lower_quantile=0.01,
+            upper_quantile=0.99,
+            train_rows=4,
+        ),
+    )
+
+    calibration = metadata["confidence_calibration"]
+    assert calibration["method"] == "temporal_validation_support_v1"
+    assert calibration["base_confidence"] > 0.5
+    assert metadata["target_transform"]["strategy"] == "winsorize_quantile"
 
 
 def test_train_mean_baseline_predicts_fold_training_mean() -> None:
@@ -144,6 +223,29 @@ def test_target_distribution_reports_percentiles() -> None:
     assert distribution["max_ms"] == pytest.approx(300.0)
     assert distribution["p10_ms"] == pytest.approx(-60.0)
     assert distribution["p90_ms"] == pytest.approx(260.0)
+
+
+def test_signed_bias_by_group_reports_runtime_cohorts() -> None:
+    rows = [
+        _row("fold_a", "s1", "bahrain", "VER", "red_bull_racing", "HARD", 100.0, "holdout"),
+        _row("fold_a", "s1", "bahrain", "LEC", "ferrari", "HARD", 200.0, "holdout"),
+        _row("fold_a", "s2", "monaco", "NOR", "mclaren", "SOFT", 300.0, "holdout"),
+    ]
+    rows[2]["tyre_age"] = 12
+    y_true = np.array([100.0, 200.0, 300.0])
+    y_pred = np.array([150.0, 100.0, 250.0])
+
+    bias = train.signed_bias_by_group(rows, y_true, y_pred)
+
+    assert bias["circuit_id"][0] == {
+        "value": "bahrain",
+        "count": 2,
+        "signed_bias_ms": pytest.approx(-25.0),
+        "mae_ms": pytest.approx(75.0),
+    }
+    assert bias["compound"][0]["value"] == "HARD"
+    assert {row["value"] for row in bias["tyre_age_bucket"]} == {"05-09", "10-14"}
+    assert bias["driver_code"][0]["count"] == 1
 
 
 def test_loro_evaluation_uses_only_fold_train_and_holdout_rows() -> None:
@@ -183,6 +285,8 @@ def test_loro_evaluation_uses_only_fold_train_and_holdout_rows() -> None:
     assert "zero_holdout_mae_ms" in result.fold_metrics[0]
     assert "train_mean_holdout_mae_ms" in result.fold_metrics[0]
     assert result.fold_metrics[0]["target_distribution"]["count"] == 1
+    assert "signed_bias_by_group" in result.fold_metrics[0]
+    assert "signed_bias_by_group" in result.aggregate_metrics
     assert result.aggregate_metrics["holdout_rows"] == 2
 
 
@@ -285,6 +389,7 @@ def test_training_metadata_contains_required_keys() -> None:
 
 def test_validation_rejects_pit_loss_feature_leakage() -> None:
     metadata = {
+        **_metadata_base(),
         "feature_list": ["tyre_age", "pit_loss_ms"],
         "target_column": TARGET_COLUMN,
         "fold_metrics": [{"holdout_session": "a", "xgb_mae_ms": 1.0}],
@@ -304,6 +409,7 @@ def test_validation_rejects_pit_loss_feature_leakage() -> None:
 
 def test_validation_rejects_missing_fold_metrics() -> None:
     metadata = {
+        **_metadata_base(),
         "feature_list": ["tyre_age"],
         "target_column": TARGET_COLUMN,
         "fold_metrics": [],
@@ -325,6 +431,7 @@ def test_save_training_outputs_writes_model_and_metadata(tmp_path: Path) -> None
     model_path = tmp_path / "models" / "xgb_pace_v1.json"
     metadata_path = tmp_path / "models" / "xgb_pace_v1.meta.json"
     metadata = {
+        **_metadata_base(),
         "feature_list": ["tyre_age"],
         "target_column": TARGET_COLUMN,
         "fold_metrics": [{"holdout_session": "a", "xgb_mae_ms": 1.0}],

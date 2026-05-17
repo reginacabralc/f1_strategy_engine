@@ -31,7 +31,7 @@ def main() -> int:
             "absolute_lap_time",
             "season_circuit_compound_delta",
         ),
-        default=os.environ.get("TARGET_STRATEGY", "lap_time_delta"),
+        default=os.environ.get("TARGET_STRATEGY", "session_normalized_delta"),
     )
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST_PATH)
     parser.add_argument("--dataset", type=Path, default=DATASET_PATH)

@@ -55,25 +55,29 @@ def test_set_predictor_scipy_response_shape() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_set_predictor_xgboost_409_when_model_missing() -> None:
+def test_set_predictor_xgboost_409_when_model_missing(tmp_path: Path) -> None:
     client = _make_client()
-    # models/xgb_pace_v1.json does not exist in the test environment
-    r = client.post("/api/v1/config/predictor", json={"predictor": "xgboost"})
+    missing_model = tmp_path / "missing_xgb_pace_v1.json"
+    with patch("pitwall.api.routes.config.get_settings") as mock_settings:
+        mock_settings.return_value.xgb_model_path = str(missing_model)
+        r = client.post("/api/v1/config/predictor", json={"predictor": "xgboost"})
     assert r.status_code == 409
-    assert "xgb_pace_v1.json" in r.json()["detail"] or "train-xgb" in r.json()["detail"]
+    assert "missing_xgb_pace_v1.json" in r.json()["detail"] or "train-xgb" in r.json()["detail"]
 
 
-def test_set_predictor_xgboost_409_detail_mentions_make_train_xgb() -> None:
+def test_set_predictor_xgboost_409_detail_mentions_make_train_xgb(tmp_path: Path) -> None:
     client = _make_client()
-    r = client.post("/api/v1/config/predictor", json={"predictor": "xgboost"})
+    missing_model = tmp_path / "missing_xgb_pace_v1.json"
+    with patch("pitwall.api.routes.config.get_settings") as mock_settings:
+        mock_settings.return_value.xgb_model_path = str(missing_model)
+        r = client.post("/api/v1/config/predictor", json={"predictor": "xgboost"})
     assert r.status_code == 409
     assert "train-xgb" in r.json()["detail"]
 
 
-def test_set_predictor_xgboost_200_when_model_exists_but_class_missing(
+def test_set_predictor_xgboost_200_when_model_exists(
     tmp_path: Path,
 ) -> None:
-    """When the model JSON exists but XGBoostPredictor isn't implemented yet → 409."""
     model_file = tmp_path / "xgb_pace_v1.json"
     model_file.write_text("{}")
 
@@ -81,14 +85,19 @@ def test_set_predictor_xgboost_200_when_model_exists_but_class_missing(
     mock_loop = MagicMock()
     app.dependency_overrides[get_engine_loop] = lambda: mock_loop
 
-    with patch("pitwall.core.config.get_settings") as mock_settings:
+    with (
+        patch("pitwall.api.routes.config.get_settings") as mock_settings,
+        patch("pitwall.ml.predictor.XGBoostPredictor.from_file") as mock_from_file,
+    ):
         mock_settings.return_value.xgb_model_path = str(model_file)
         mock_settings.return_value.pace_predictor = "scipy"
+        mock_from_file.return_value = object()
         with TestClient(app) as client:
             r = client.post("/api/v1/config/predictor", json={"predictor": "xgboost"})
 
-    # XGBoostPredictor doesn't exist yet → 409 from ImportError branch
-    assert r.status_code == 409
+    assert r.status_code == 200
+    assert r.json()["active_predictor"] == "xgboost"
+    mock_loop.set_predictor.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

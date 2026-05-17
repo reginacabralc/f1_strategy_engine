@@ -29,9 +29,9 @@ import logging
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
+import pitwall.engine.demo_mode as _demo_mode_mod
 from pitwall.causal.live_inference import evaluate_causal_live
 from pitwall.core.topics import Topics
-import pitwall.engine.demo_mode as _demo_mode_mod
 from pitwall.engine.demo_mode import (
     RELAXED_CONFIDENCE_THRESHOLD,
     RELAXED_SCORE_THRESHOLD,
@@ -89,7 +89,7 @@ class EngineLoop:
         self._last_snapshot_lap: int | None = None
         self._demo_mode: bool = False
         self._scripted_alerts: dict[str, list[ScriptedAlert]] = {}
-        self._emitted_scripted_keys: set[str] = set()  # prevents duplicate emissions per (session, lap, atk, def)
+        self._emitted_scripted_keys: set[str] = set()
 
     # ------------------------------------------------------------------
     # Public interface
@@ -118,7 +118,9 @@ class EngineLoop:
         """
         self._demo_mode = bool(active)
         if self._demo_mode and not self._scripted_alerts:
-            self._scripted_alerts = load_scripted_alerts(_demo_mode_mod.DEFAULT_SCRIPTED_ALERTS_PATH)
+            self._scripted_alerts = load_scripted_alerts(
+                _demo_mode_mod.DEFAULT_SCRIPTED_ALERTS_PATH
+            )
         if not self._demo_mode:
             self._emitted_scripted_keys.clear()
         logger.info(
@@ -215,9 +217,17 @@ class EngineLoop:
             if self._demo_mode:
                 for atk, def_ in compute_relevant_pairs(self._state):
                     try:
-                        pit_loss_for_causal = lookup_pit_loss(circuit_id, atk.team_code, self._pit_loss_table)
+                        pit_loss_for_causal = lookup_pit_loss(
+                            circuit_id,
+                            atk.team_code,
+                            self._pit_loss_table,
+                        )
                         causal_result = evaluate_causal_live(
-                            self._state, atk, def_, self._predictor, pit_loss_ms=pit_loss_for_causal
+                            self._state,
+                            atk,
+                            def_,
+                            self._predictor,
+                            pit_loss_ms=pit_loss_for_causal,
                         )
                     except Exception:
                         logger.exception(
@@ -226,7 +236,10 @@ class EngineLoop:
                             def_.driver_code,
                         )
                         continue
-                    if causal_result.undercut_viable and causal_result.support_level != "insufficient":
+                    if (
+                        causal_result.undercut_viable
+                        and causal_result.support_level != "insufficient"
+                    ):
                         await self._broadcaster.broadcast_json(
                             build_causal_alert_payload(causal_result)
                         )

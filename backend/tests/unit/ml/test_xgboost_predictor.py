@@ -187,6 +187,67 @@ def test_predict_encodes_schema_features_and_adds_live_reference() -> None:
     )
 
 
+def test_predict_uses_calibrated_confidence_instead_of_raw_low_r2() -> None:
+    metadata = _runtime_metadata()
+    metadata["aggregate_metrics"] = {"holdout_r2": 0.007, "holdout_mae_ms": 1561.9}
+    metadata["confidence_calibration"] = {
+        "method": "temporal_validation_support_v1",
+        "base_confidence": 0.68,
+    }
+    predictor = XGBoostPredictor(_CapturingBooster(prediction_delta_ms=250.0), metadata)
+
+    prediction = predictor.predict(
+        PaceContext(
+            driver_code="VER",
+            circuit_id="monaco",
+            compound="MEDIUM",
+            tyre_age=8,
+            lap_number=20,
+            total_laps=78,
+            gap_to_ahead_ms=1600,
+            team_code="red_bull_racing",
+            reference_lap_time_ms=80_000,
+            driver_pace_offset_ms=0.0,
+            driver_pace_offset_missing=False,
+        )
+    )
+
+    assert prediction.confidence == pytest.approx(0.68)
+
+
+def test_predict_penalizes_unknown_runtime_feature_support() -> None:
+    metadata = _runtime_metadata()
+    metadata["confidence_calibration"] = {
+        "method": "temporal_validation_support_v1",
+        "base_confidence": 0.72,
+    }
+    predictor = XGBoostPredictor(_CapturingBooster(prediction_delta_ms=250.0), metadata)
+
+    known = predictor.predict(
+        PaceContext(
+            driver_code="VER",
+            circuit_id="monaco",
+            compound="MEDIUM",
+            tyre_age=8,
+            team_code="red_bull_racing",
+            reference_lap_time_ms=80_000,
+        )
+    )
+    unknown = predictor.predict(
+        PaceContext(
+            driver_code="PIA",
+            circuit_id="silverstone",
+            compound="HARD",
+            tyre_age=8,
+            team_code="mclaren",
+            reference_lap_time_ms=80_000,
+        )
+    )
+
+    assert known.confidence > unknown.confidence
+    assert unknown.confidence < 0.5
+
+
 def test_predict_maps_unseen_categories_to_unknown_columns() -> None:
     booster = _CapturingBooster(prediction_delta_ms=500.0)
     predictor = XGBoostPredictor(booster, _runtime_metadata())
