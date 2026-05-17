@@ -1,14 +1,21 @@
 import { usePredictor } from "../hooks/usePredictor";
 import type { PredictorName } from "../api/types";
 
-const PREDICTORS: PredictorName[] = ["scipy", "xgboost"];
+// Three independent decision paths — all three are real options at runtime.
+// `causal` uses scipy for pace projection and runs the causal observer in
+// parallel (see docs/causal_model_performance.md).
+const PREDICTORS: PredictorName[] = ["scipy", "xgboost", "causal"];
 
 interface Props {
   activePredictor?: PredictorName;
 }
 
 export function PredictorToggle({ activePredictor }: Props) {
-  const { pendingTarget, error, switchPredictor } = usePredictor();
+  // Pass activePredictor into the hook so it can clear the optimistic
+  // pending state as soon as the next snapshot confirms the switch.
+  const { pendingTarget, error, switchPredictor } = usePredictor({
+    activePredictor,
+  });
   const pending = pendingTarget !== null;
   // While switching show target optimistically; fall back to prop then "scipy"
   const displayed: PredictorName = pendingTarget ?? activePredictor ?? "scipy";

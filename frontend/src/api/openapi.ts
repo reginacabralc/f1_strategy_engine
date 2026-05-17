@@ -95,7 +95,7 @@ export interface components {
      */
     Compound: "SOFT" | "MEDIUM" | "HARD" | "INTER" | "WET";
     /** @enum {string} */
-    PredictorName: "scipy" | "xgboost";
+    PredictorName: "scipy" | "xgboost" | "causal";
     /** @enum {string} */
     TrackStatus: "GREEN" | "SC" | "VSC" | "YELLOW" | "RED";
     /**

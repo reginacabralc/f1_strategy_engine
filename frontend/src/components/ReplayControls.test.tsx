@@ -3,10 +3,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../api/client");
 
-import { startReplay, stopReplay } from "../api/client";
+import { startReplayWithReset, stopReplay } from "../api/client";
 import { ReplayControls } from "./ReplayControls";
 
-const mockStartReplay = vi.mocked(startReplay);
+const mockStartReplay = vi.mocked(startReplayWithReset);
 const mockStopReplay = vi.mocked(stopReplay);
 
 describe("ReplayControls", () => {

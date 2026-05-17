@@ -13,7 +13,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-PredictorName = Literal["scipy", "xgboost"]
+PredictorName = Literal["scipy", "xgboost", "causal"]
 
 
 class Health(BaseModel):
@@ -60,7 +60,7 @@ class ReplayRun(BaseModel):
     session_id: str
     speed_factor: float
     started_at: datetime
-    pace_predictor: Literal["scipy", "xgboost"]
+    pace_predictor: Literal["scipy", "xgboost", "causal"]
 
 
 class ReplayStopResponse(BaseModel):

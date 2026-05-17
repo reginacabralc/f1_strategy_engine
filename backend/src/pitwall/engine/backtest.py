@@ -18,7 +18,7 @@ from pitwall.engine.state import RaceState, compute_relevant_pairs
 from pitwall.engine.undercut import K_MAX, evaluate_undercut
 from pitwall.feeds.base import Event
 
-PredictorName = Literal["scipy", "xgboost"]
+PredictorName = Literal["scipy", "xgboost", "causal"]
 _DRY_COMPOUNDS = {"SOFT", "MEDIUM", "HARD"}
 
 

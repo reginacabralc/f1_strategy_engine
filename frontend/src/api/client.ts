@@ -113,6 +113,40 @@ export function stopReplay(): Promise<ReplayStopResponse> {
   });
 }
 
+/** POST /api/v1/replay/start with automatic reset on 409 Conflict.
+ *
+ * If a replay is already running, the backend returns 409. This helper
+ * catches that case, issues a stop, waits briefly for the engine loop to
+ * settle, and retries the start once. Other errors (404, 400, etc.)
+ * propagate normally.
+ *
+ * Returns the ReplayRun for the eventually-started replay. If both the
+ * initial start AND the retry fail, the second error is thrown.
+ */
+export async function startReplayWithReset(
+  sessionId: string,
+  speedFactor?: number,
+  demoMode?: boolean,
+): Promise<ReplayRun> {
+  try {
+    return await startReplay(sessionId, speedFactor, demoMode);
+  } catch (err) {
+    if (!(err instanceof ApiError) || err.status !== 409) {
+      throw err;
+    }
+    // Conflict: a replay is already running. Stop it and retry.
+    try {
+      await stopReplay();
+    } catch {
+      // stop() is idempotent on the backend; ignore failures here so we
+      // still attempt the retry. If the retry start fails, that error wins.
+    }
+    // Brief settle so the ReplayManager's background task fully releases.
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    return startReplay(sessionId, speedFactor, demoMode);
+  }
+}
+
 /** POST /api/v1/config/predictor */
 export function setPredictor(
   predictor: PredictorName,

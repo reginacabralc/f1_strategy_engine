@@ -1,314 +1,277 @@
-export interface TrackMapDriver {
-  number: string;
-  code: string;
-  team?: string;
-  color?: string;
-  x: number;
-  y: number;
-  gap?: string;
-  labelOffset?: { dx: number; dy: number };
-}
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { DriverState } from "../api/types";
+import {
+  getTrackLayout,
+  type TrackLayout,
+} from "../data/trackLayouts";
 
-// Centerline path, 280×200 viewBox, clockwise from top of main straight.
-// Not topographically accurate — stylised approximation only.
-const CIRCUIT_PATH =
-  "M 220 52 " +
-  "C 232 46,244 54,252 68 " +
-  "C 258 80,255 96,246 107 " +
-  "L 232 115 " +
-  "C 222 119,212 117,204 111 " +
-  "L 178 109 " +
-  "C 166 107,158 99,158 87 " +
-  "L 158 67 " +
-  "C 158 53,149 45,137 45 " +
-  "C 124 45,116 55,116 68 " +
-  "L 116 84 " +
-  "C 116 98,106 107,93 108 " +
-  "C 79 109,70 121,70 135 " +
-  "C 70 149,81 158,95 157 " +
-  "L 112 154 " +
-  "C 122 153,128 162,126 174 " +
-  "C 124 185,113 190,100 189 " +
-  "L 66 188 " +
-  "C 47 188,36 173,36 155 " +
-  "C 36 137,50 128,66 129 " +
-  "L 192 129 " +
-  "C 207 129,216 141,214 157 " +
-  "L 215 170 " +
-  "C 217 178,219 168,220 155 " +
-  "L 220 52";
+// ────────────────────────────────────────────────────────────────────────────
+// Driver projection
+// ────────────────────────────────────────────────────────────────────────────
+//
+// Backend snapshots contain `position`, `gap_to_leader_ms`, `last_lap_ms` per
+// driver — but no telemetry coordinates. We approximate each driver's position
+// along the track centerline using:
+//
+//   fraction_behind_leader = (gap_to_leader_ms mod REFERENCE_LAP_MS) / REFERENCE_LAP_MS
+//   fraction_around_track  = (startFinishAt + (1 - fraction_behind_leader)) mod 1
+//
+// The leader sits at the start/finish line (parametric t = startFinishAt) and
+// everyone else trails clockwise around the path by their gap share. This is a
+// *spatial approximation* — useful for the demo, not real telemetry.
 
-const MOCK_DRIVERS: TrackMapDriver[] = [
-  {
-    number: "1",
-    code: "VER",
-    team: "Red Bull",
-    color: "#3671C6",
-    x: 220,
-    y: 98,
-    labelOffset: { dx: 8, dy: -3 },
-  },
-  {
-    number: "16",
-    code: "LEC",
-    team: "Ferrari",
-    color: "#E8002D",
-    x: 249,
-    y: 87,
-    labelOffset: { dx: -30, dy: -6 },
-  },
-  {
-    number: "4",
-    code: "NOR",
-    team: "McLaren",
-    color: "#FF8000",
-    x: 142,
-    y: 45,
-    labelOffset: { dx: -4, dy: -7 },
-  },
-  {
-    number: "81",
-    code: "PIA",
-    team: "McLaren",
-    color: "#FF8000",
-    x: 90,
-    y: 108,
-    labelOffset: { dx: -30, dy: -5 },
-  },
-  {
-    number: "44",
-    code: "HAM",
-    team: "Mercedes",
-    color: "#27F4D2",
-    x: 128,
-    y: 129,
-    labelOffset: { dx: -4, dy: 11 },
-  },
-  {
-    number: "55",
-    code: "SAI",
-    team: "Ferrari",
-    color: "#E8002D",
-    x: 50,
-    y: 162,
-    labelOffset: { dx: -30, dy: -5 },
-  },
-];
+const REFERENCE_LAP_MS = 90_000;
 
-function DriverMarker({ driver }: { driver: TrackMapDriver }) {
-  const color = driver.color ?? "#e2e8f0";
-  const { dx = 8, dy = -4 } = driver.labelOffset ?? {};
+// Approximate FIA team colours. Falls back to a hash-based hue.
+const TEAM_COLORS: Record<string, string> = {
+  red_bull: "#3671C6",
+  ferrari: "#E8002D",
+  mercedes: "#27F4D2",
+  mclaren: "#FF8000",
+  aston_martin: "#229971",
+  alpine: "#0093CC",
+  williams: "#37BEDD",
+  rb: "#6692FF",
+  alphatauri: "#5E8FAA",
+  sauber: "#52E252",
+  haas: "#B6BABD",
+  kick_sauber: "#52E252",
+};
 
-  return (
-    <g role="img" aria-label={`${driver.code} car ${driver.number}`}>
-      <circle cx={driver.x} cy={driver.y} r={7} fill={color} opacity={0.18} />
-      <circle
-        cx={driver.x}
-        cy={driver.y}
-        r={4}
-        fill={color}
-        stroke="#0a0c12"
-        strokeWidth={1.5}
-      />
-      <text
-        x={driver.x + dx}
-        y={driver.y + dy}
-        fontSize="6.5"
-        fontFamily="ui-monospace,monospace"
-        fontWeight="700"
-        fill={color}
-        opacity={0.92}
-      >
-        {driver.number} {driver.code}
-      </text>
-    </g>
-  );
+function colorForDriver(driver: DriverState): string {
+  const team = (driver.team_code ?? "").toLowerCase();
+  const hit = TEAM_COLORS[team];
+  if (hit) return hit;
+  let h = 0;
+  for (let i = 0; i < driver.driver_code.length; i++) {
+    h = (h * 31 + driver.driver_code.charCodeAt(i)) % 360;
+  }
+  return `hsl(${h}, 70%, 55%)`;
 }
 
 interface Props {
-  drivers?: TrackMapDriver[];
+  drivers?: DriverState[];
+  circuit?: string;
+  currentLap?: number;
+  totalLaps?: number;
+  isLive?: boolean;
 }
 
-// Backend snapshots contain no car telemetry coordinates in V1 — FastF1 historical
-// data does not provide real-time positional streams. MOCK_DRIVERS are always shown.
-export function TrackMapPanel({ drivers = MOCK_DRIVERS }: Props) {
+export function TrackMapPanel({
+  drivers = [],
+  circuit,
+  currentLap = 0,
+  totalLaps,
+  isLive = false,
+}: Props) {
+  const { layout, isFallback } = getTrackLayout(circuit);
+  const pathRef = useRef<SVGPathElement | null>(null);
+  const [pathLength, setPathLength] = useState<number>(0);
+
+  // Re-measure path length whenever the layout changes (selecting a new track
+  // swaps `layout.path` and triggers this effect). jsdom (the test runner)
+  // does not implement `getTotalLength`, so we guard for that and fall back
+  // to the empty state — production browsers always succeed.
+  useEffect(() => {
+    const node = pathRef.current;
+    if (node && typeof node.getTotalLength === "function") {
+      try {
+        setPathLength(node.getTotalLength());
+      } catch {
+        setPathLength(0);
+      }
+    } else {
+      setPathLength(0);
+    }
+  }, [layout.path]);
+
+  // Compute (x, y) for each driver along the path.
+  const positionedDrivers = useMemo(() => {
+    if (!pathRef.current || pathLength === 0) return [];
+    const sorted = [...drivers].sort(
+      (a, b) => (a.position ?? 99) - (b.position ?? 99),
+    );
+    const startFinish = layout.startFinishAt ?? 0;
+    return sorted.map((d, idx) => {
+      let fractionBehindLeader: number;
+      if (d.gap_to_leader_ms != null && d.gap_to_leader_ms > 0) {
+        fractionBehindLeader =
+          (d.gap_to_leader_ms % REFERENCE_LAP_MS) / REFERENCE_LAP_MS;
+      } else if ((d.position ?? 0) > 1) {
+        // Spread by grid order when gaps are unknown so dots never collapse.
+        fractionBehindLeader = (idx * 0.05) % 1;
+      } else {
+        fractionBehindLeader = 0;
+      }
+      const fractionAroundPath = (startFinish + (1.0 - fractionBehindLeader)) % 1;
+      const pt = pathRef.current!.getPointAtLength(
+        fractionAroundPath * pathLength,
+      );
+      return { driver: d, x: pt.x, y: pt.y, color: colorForDriver(d) };
+    });
+  }, [drivers, pathLength, layout.path, layout.startFinishAt]);
+
+  const startFinishPoint = useMemo(() => {
+    if (!pathRef.current || pathLength === 0) return null;
+    const t = layout.startFinishAt ?? 0;
+    try {
+      return pathRef.current.getPointAtLength(t * pathLength);
+    } catch {
+      return null;
+    }
+  }, [pathLength, layout.startFinishAt]);
+
   return (
     <section
       aria-label="Track map"
-      className="panel flex flex-col overflow-hidden"
+      data-testid={`track-map-${layout.id}`}
+      className="panel flex flex-col overflow-hidden h-full"
     >
-      {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-pitwall-border shrink-0">
         <div className="flex items-center gap-2">
           <span className="label-caps">Track Map</span>
-          <span className="text-[9px] text-pitwall-muted">
-            Circuit de Monaco
+          <span className="text-[10px] text-pitwall-muted font-mono">
+            {layout.displayName}
           </span>
         </div>
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-pitwall-accent/10 text-pitwall-accent border border-pitwall-accent/30 uppercase tracking-wide">
-          Static circuit preview
-        </span>
+        <div className="flex items-center gap-2">
+          {currentLap > 0 && (
+            <span className="text-[10px] font-mono text-pitwall-muted">
+              Lap {currentLap}
+              {totalLaps ? ` / ${totalLaps}` : ""}
+            </span>
+          )}
+          <span
+            className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border uppercase tracking-wide ${
+              isLive
+                ? "bg-pitwall-accent/10 text-pitwall-accent border-pitwall-accent/40 animate-pulse"
+                : "bg-pitwall-muted/10 text-pitwall-muted border-pitwall-muted/30"
+            }`}
+          >
+            {isLive ? "Live" : "Idle"}
+          </span>
+        </div>
       </div>
 
-      {/* Map */}
       <div className="flex-1 flex items-center justify-center p-2 min-h-0">
         <svg
-          viewBox="0 0 280 200"
-          className="w-full"
-          style={{ maxHeight: 172 }}
+          viewBox={layout.viewBox}
+          className="w-full h-full"
           preserveAspectRatio="xMidYMid meet"
-          aria-hidden="true"
         >
-          {/* DRS zone — main straight */}
-          <line
-            x1="220"
-            y1="60"
-            x2="220"
-            y2="132"
-            stroke="#22c55e"
-            strokeWidth="3.5"
-            strokeOpacity="0.22"
-            strokeLinecap="round"
-          />
-
-          {/* Track width (wide stroke = asphalt) */}
+          {/* Asphalt outline (wide stroke = track edge halo) */}
           <path
-            d={CIRCUIT_PATH}
+            d={layout.path}
             fill="none"
             stroke="#252836"
-            strokeWidth="9"
+            strokeWidth="11"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
-
-          {/* Track surface highlight */}
           <path
-            d={CIRCUIT_PATH}
+            d={layout.path}
             fill="none"
             stroke="#32374a"
-            strokeWidth="5"
+            strokeWidth="6"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
-
-          {/* Centreline */}
+          {/* Centreline + measurement reference */}
           <path
-            d={CIRCUIT_PATH}
+            ref={pathRef}
+            d={layout.path}
             fill="none"
             stroke="#3e4558"
             strokeWidth="1"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeDasharray="3 4"
+            strokeDasharray="2 3"
           />
 
-          {/* Start / finish line */}
-          <line
-            x1="215"
-            y1="52"
-            x2="225"
-            y2="52"
-            stroke="#ffffff"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-          />
+          {/* Start/finish marker (white tick perpendicular to centerline) */}
+          {startFinishPoint && (
+            <g>
+              <circle
+                cx={startFinishPoint.x}
+                cy={startFinishPoint.y}
+                r={3.2}
+                fill="#f3f4f6"
+                stroke="#0f1118"
+                strokeWidth={0.6}
+              />
+              <text
+                x={startFinishPoint.x + 5}
+                y={startFinishPoint.y - 4}
+                fontSize={5}
+                fontFamily="ui-monospace,monospace"
+                fill="#f3f4f6"
+                opacity={0.7}
+              >
+                S/F
+              </text>
+            </g>
+          )}
 
-          {/* Pit lane entry mark */}
-          <line
-            x1="215"
-            y1="148"
-            x2="225"
-            y2="148"
-            stroke="#eab308"
-            strokeWidth="1.5"
-            strokeOpacity="0.55"
-            strokeLinecap="round"
-          />
+          {/* Driver dots */}
+          {positionedDrivers.map(({ driver, x, y, color }) => {
+            const isInPit = driver.is_in_pit;
+            return (
+              <g key={driver.driver_code}>
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={5.5}
+                  fill={color}
+                  fillOpacity={isInPit ? 0.25 : 0.18}
+                />
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={3.4}
+                  fill={color}
+                  stroke="#0f1118"
+                  strokeWidth={0.8}
+                  fillOpacity={isInPit ? 0.5 : 1}
+                />
+                <text
+                  x={x}
+                  y={y - 7}
+                  fontSize={5.5}
+                  fontFamily="ui-monospace,monospace"
+                  fontWeight={700}
+                  textAnchor="middle"
+                  fill="#e5e7eb"
+                  opacity={0.95}
+                >
+                  {driver.driver_code}
+                </text>
+              </g>
+            );
+          })}
 
-          {/* Sector boundary S1→S2 (near top hairpin) */}
-          <line
-            x1="128"
-            y1="38"
-            x2="146"
-            y2="38"
-            stroke="#3b82f6"
-            strokeWidth="1.5"
-            strokeOpacity="0.5"
-          />
-
-          {/* Sector boundary S2→S3 (Rascasse) */}
-          <line
-            x1="28"
-            y1="148"
-            x2="28"
-            y2="163"
-            stroke="#8b5cf6"
-            strokeWidth="1.5"
-            strokeOpacity="0.5"
-          />
-
-          {/* Corner / zone labels */}
-          <text
-            x="227"
-            y="56"
-            fontSize="5.5"
-            fill="#9ca3af"
-            fontFamily="ui-monospace,monospace"
-          >
-            S/F
-          </text>
-          <text
-            x="227"
-            y="146"
-            fontSize="5.5"
-            fill="#eab308"
-            fontFamily="ui-monospace,monospace"
-            opacity="0.65"
-          >
-            PIT
-          </text>
-          <text
-            x="227"
-            y="74"
-            fontSize="5"
-            fill="#22c55e"
-            fontFamily="ui-monospace,monospace"
-            opacity="0.55"
-          >
-            DRS
-          </text>
-          <text
-            x="129"
-            y="35"
-            fontSize="5"
-            fill="#3b82f6"
-            fontFamily="ui-monospace,monospace"
-            opacity="0.6"
-          >
-            S2
-          </text>
-          <text
-            x="16"
-            y="158"
-            fontSize="5"
-            fill="#8b5cf6"
-            fontFamily="ui-monospace,monospace"
-            opacity="0.6"
-          >
-            S3
-          </text>
-
-          {/* Driver markers */}
-          {drivers.map((d) => (
-            <DriverMarker key={d.code} driver={d} />
-          ))}
+          {/* Empty-state message */}
+          {positionedDrivers.length === 0 && (
+            <text
+              x={140}
+              y={104}
+              textAnchor="middle"
+              fontSize={8}
+              fontFamily="ui-monospace,monospace"
+              fill="#6b7280"
+            >
+              Waiting for replay snapshot…
+            </text>
+          )}
         </svg>
       </div>
 
-      {/* Footer */}
-      <p className="px-3 py-1.5 text-[10px] text-pitwall-muted border-t border-pitwall-border text-center shrink-0">
-        Monaco 2024 · static preview — live car coordinates unavailable in V1
-      </p>
+      {/* Fallback footer when the selected circuit has no dedicated layout. */}
+      {isFallback && (
+        <div
+          data-testid="track-map-fallback-note"
+          className="px-3 py-1.5 border-t border-pitwall-border text-[10px] text-pitwall-muted font-mono"
+        >
+          Custom layout not available for this track — showing generic oval.
+        </div>
+      )}
     </section>
   );
 }

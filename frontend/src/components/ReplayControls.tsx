@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { startReplay, stopReplay } from "../api/client";
+import { startReplayWithReset, stopReplay } from "../api/client";
 
 // 6× plays a 90-minute race in ~15 minutes wall-clock — the class-demo default.
 // Other speeds remain available for quick tests / dev replays.
@@ -103,7 +103,9 @@ export function ReplayControls({
     setIsPending(true);
     setError(null);
     try {
-      await startReplay(selectedSession, speed, demoMode);
+      // startReplayWithReset auto-stops any in-flight replay before starting,
+      // turning the previously-fatal 409 Conflict into a clean restart.
+      await startReplayWithReset(selectedSession, speed, demoMode);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start replay");
     } finally {
